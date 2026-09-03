@@ -35,12 +35,29 @@ depois.
 | Comportamento | Contadores |
 |---|---|
 | **Somam todos os modos** | `total_kills`, `total_deaths`, `total_damage_done`, `total_rounds_played`, `total_matches_played`, `total_time_played`, `total_contribution_score`, e todos os por arma (`total_shots_*`, `total_hits_*`, `total_kills_*`) |
-| **Só competitivo/premier** | os 18 `last_match_*` — nenhum se moveu com a casual |
+| **Aparentemente mortos** | os 18 `last_match_*` — ver abaixo |
 | **Não se moveram** | os 30 por mapa (inconclusivo: pode ser escopo ou mapa não rastreado) |
 
 Consequência para o produto: um K/D por período que inclua dias de casual vem
-inflado, porque casual é mais solto. Os `last_match_*` são o sinal mais limpo
-por partida oficial que a Web API oferece.
+inflado, porque casual é mais solto.
+
+### `last_match_*` parece ser legado morto
+
+A primeira leitura foi que esses contadores refletiam só partidas oficiais,
+já que não se moveram com a casual. Medindo melhor, a explicação é outra:
+eles ficaram **congelados em `8 kills / 16 mortes / 1151 de dano` por dois
+dias e ao menos duas partidas**, enquanto `total_matches_played` subia.
+
+A hipótese mais provável é resquício do CS:GO que a Valve deixou de escrever
+na migração para o CS2 — coerente com o fato de todas as ferramentas de
+mercado usarem auth code e parsing de demo para dado por partida, em vez da
+Web API.
+
+Não há confirmação oficial, e o comportamento pode variar por modo, então o
+código **detecta por evidência** em vez de assumir: `gaugesLookStale()`
+compara a primeira e a última coleta e, se houve partida nova sem nenhum
+`last_match_*` mudar, avisa na tela. Confirmar em definitivo exige uma
+partida competitiva ou premier observada entre duas coletas.
 
 Corroborando: `total_time_played` marca 751h contra 1.987h de
 `playtime_forever`. 62% do tempo em jogo não entra em contador nenhum — menu,

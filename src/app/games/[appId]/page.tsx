@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { gameHeaderUrl } from "@/lib/steam/api";
 import { formatPlaytime, parseStatSchema } from "@/lib/stats";
-import { metricCatalog, type SnapshotRow } from "@/lib/series";
+import { gaugesLookStale, metricCatalog, type SnapshotRow } from "@/lib/series";
 import { SiteHeader } from "@/components/site-header";
 import { Explorer, type Preset } from "@/components/explorer";
 import { CollectionStatus } from "@/components/collection-status";
@@ -103,7 +103,7 @@ export default async function GamePage({
 
         <div className="mt-6 space-y-3">
           <CollectionStatus snapshotCount={rows.length} />
-          <CounterScope appId={appId} />
+          <CounterScope appId={appId} gaugesStale={gaugesLookStale(rows)} />
         </div>
 
         <section className="mt-8">
@@ -124,11 +124,7 @@ export default async function GamePage({
               metrics: r.metrics,
             }))}
             catalog={catalog}
-            presets={presetsFor(
-              appId,
-              catalog.map((c) => c.key),
-              rows.length,
-            )}
+            presets={presetsFor(appId, catalog.map((c) => c.key))}
           />
         </section>
       </main>
@@ -150,16 +146,14 @@ function coerce(value: unknown): Record<string, number> {
  * Atalhos para as combinações que valem a pena em CS2 — a mesma coisa que o
  * usuário montaria à mão no explorador, em um clique.
  *
- * O primeiro preset é o que o explorador abre. Com uma coleta só, um preset
- * de contador abriria um gráfico vazio: modos derivados precisam de dois
- * pontos. Os de última partida são gauges e já desenham com um — então
- * quando a série é curta, eles vêm primeiro.
+ * O primeiro preset é o que o explorador abre.
+ *
+ * Já priorizamos os de última partida quando havia uma coleta só, porque são
+ * os únicos que desenham com um ponto. Voltamos atrás: medimos e esses
+ * contadores estavam congelados enquanto partidas eram jogadas, então o
+ * padrão exibia dado velho como se fosse atual — pior do que não exibir nada.
  */
-function presetsFor(
-  appId: number,
-  available: string[],
-  snapshotCount: number,
-): Preset[] {
+function presetsFor(appId: number, available: string[]): Preset[] {
   if (appId !== 730) return [];
 
   const has = (...keys: string[]) => keys.every((k) => available.includes(k));
@@ -292,11 +286,6 @@ function presetsFor(
         { metric: "last_match_damage", denominator: "last_match_rounds", mode: "ratio" },
       ],
     });
-  }
-
-  if (snapshotCount < 2) {
-    const gauge = (p: Preset) => p.specs.every((s) => s.metric.startsWith("last_match_"));
-    return [...presets.filter(gauge), ...presets.filter((p) => !gauge(p))];
   }
 
   return presets;

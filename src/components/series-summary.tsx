@@ -54,15 +54,26 @@ function Card({ item }: { item: SummaryItem }) {
         <span className="text-xs leading-snug text-ink-muted">{item.label}</span>
       </div>
 
-      <p className="tnum mt-2 text-2xl font-semibold">
-        {value === null ? (
-          <span className="text-base font-normal text-ink-faint">sem dado</span>
-        ) : (
-          format(value)
-        )}
-      </p>
+      {/* Sem valor de período ainda, o vitalício vira o número principal: é
+          dado real, e mostrar "sem dado" quando existe algo a dizer é pior. */}
+      {value === null && lifetime !== null ? (
+        <>
+          <p className="tnum mt-2 text-2xl font-semibold">{format(lifetime)}</p>
+          <p className="mt-1 text-xs text-ink-faint">
+            vitalício — o valor do período aparece na próxima coleta
+          </p>
+        </>
+      ) : (
+        <p className="tnum mt-2 text-2xl font-semibold">
+          {value === null ? (
+            <span className="text-base font-normal text-ink-faint">sem dado</span>
+          ) : (
+            format(value)
+          )}
+        </p>
+      )}
 
-      {lifetime !== null && (
+      {value !== null && lifetime !== null && (
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className="text-xs text-ink-faint">
             vitalício <span className="tnum">{format(lifetime)}</span>

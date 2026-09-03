@@ -313,6 +313,33 @@ export const MODE_LABELS: Record<Mode, string> = {
  * Devolve null onde a comparação não faria sentido: a contagem crua de um
  * período não se compara com o total acumulado, e gauge não tem vitalício.
  */
+/**
+ * Detecta se os contadores de última partida estão congelados para este
+ * jogador.
+ *
+ * Observamos `last_match_*` parado enquanto `total_matches_played` subia —
+ * provável legado do CS:GO que a Valve deixou de escrever no CS2. Como não
+ * há confirmação oficial e o comportamento pode variar por modo, detectamos
+ * por evidência em vez de assumir.
+ *
+ * Só responde com duas ou mais coletas: com uma não há como saber.
+ */
+export function gaugesLookStale(snapshots: SnapshotRow[]): boolean {
+  if (snapshots.length < 2) return false;
+
+  const primeiro = snapshots[0].metrics;
+  const ultimo = snapshots[snapshots.length - 1].metrics;
+
+  // Sem partida nova no intervalo, parado é o esperado — não é sinal de nada.
+  const jogou = (ultimo.total_matches_played ?? 0) > (primeiro.total_matches_played ?? 0);
+  if (!jogou) return false;
+
+  const gauges = Object.keys(ultimo).filter((k) => classifyMetric(k) === "gauge");
+  if (gauges.length === 0) return false;
+
+  return gauges.every((k) => ultimo[k] === primeiro[k]);
+}
+
 export function lifetimeValue(
   spec: SeriesSpec,
   snapshots: SnapshotRow[],

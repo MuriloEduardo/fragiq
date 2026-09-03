@@ -1,4 +1,4 @@
-import { Info } from "lucide-react";
+import { Info, TriangleAlert } from "lucide-react";
 
 /**
  * A Valve não documenta o escopo dos contadores, e o escopo não é uniforme.
@@ -7,7 +7,13 @@ import { Info } from "lucide-react";
  * Sem este aviso o produto mente por omissão: alguém olha "K/D por período"
  * achando que é competitivo e está vendo casual misturado.
  */
-export function CounterScope({ appId }: { appId: number }) {
+export function CounterScope({
+  appId,
+  gaugesStale,
+}: {
+  appId: number;
+  gaugesStale: boolean;
+}) {
   if (appId !== 730) return null;
 
   return (
@@ -20,6 +26,16 @@ export function CounterScope({ appId }: { appId: number }) {
       </summary>
 
       <div className="space-y-3 border-t border-line px-4 py-3 text-sm leading-relaxed text-ink-muted">
+        {gaugesStale && (
+          <p className="flex items-start gap-2 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" />
+            <span>
+              Confirmado nos <strong className="font-medium text-ink">seus</strong>{" "}
+              dados: você jogou partidas entre coletas e nenhum contador de
+              última partida se moveu.
+            </span>
+          </p>
+        )}
         <p className="text-xs text-ink-faint">
           A Valve não documenta isto. Medimos jogando uma partida casual e
           comparando os 197 contadores antes e depois.
@@ -31,10 +47,11 @@ export function CounterScope({ appId }: { appId: number }) {
           dias de casual vem inflado — casual é mais solto.
         </Item>
 
-        <Item titulo="Só competitivo e premier">
+        <Item titulo="Provavelmente legado">
           Os contadores de <code className="font-mono text-xs">última partida</code>{" "}
-          não se moveram com a casual. São o sinal mais limpo que a Web API
-          oferece por partida oficial.
+          não se moveram — nem com a casual, nem com partidas anteriores. Tudo
+          indica que são resquício do CS:GO que a Valve deixou de escrever no
+          CS2. Não os use como se fossem a sua partida mais recente.
         </Item>
 
         <Item titulo="Mapas legados apenas">
