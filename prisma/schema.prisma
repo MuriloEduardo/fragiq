@@ -184,4 +184,6 @@ enum SyncTrigger {
   MANUAL
   LOGIN
   CRON
+  /// Disparado pelo bot de presença quando o jogador sai de uma partida.
+  EVENT
 }
