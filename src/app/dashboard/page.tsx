@@ -7,6 +7,7 @@ import { getSession } from "@/lib/session";
 import { gameIconUrl } from "@/lib/steam/api";
 import { formatPlaytime } from "@/lib/stats";
 import { SiteHeader } from "@/components/site-header";
+import { LibraryStatus } from "@/components/collection-status";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,8 @@ export default async function Dashboard() {
   });
 
   const tracked = games.filter((g) => g._count.snapshots > 0);
+  // Duas coletas é o mínimo para existir evolução; uma só ainda não desenha.
+  const withSeries = games.filter((g) => g._count.snapshots >= 2);
   const totalHours = games.reduce((sum, g) => sum + g.playtimeForeverMin, 0);
 
   return (
@@ -56,6 +59,8 @@ export default async function Dashboard() {
             )}
           />
         </dl>
+
+        {tracked.length > 0 && <LibraryStatus gamesWithSeries={withSeries.length} />}
 
         {games.length === 0 ? (
           <EmptyState />

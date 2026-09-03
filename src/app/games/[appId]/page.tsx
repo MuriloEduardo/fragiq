@@ -9,6 +9,7 @@ import { formatPlaytime, parseStatSchema } from "@/lib/stats";
 import { metricCatalog, type SnapshotRow } from "@/lib/series";
 import { SiteHeader } from "@/components/site-header";
 import { Explorer, type Preset } from "@/components/explorer";
+import { CollectionStatus } from "@/components/collection-status";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,10 @@ export default async function GamePage({
           </div>
         </header>
 
+        <div className="mt-6">
+          <CollectionStatus snapshotCount={rows.length} />
+        </div>
+
         <section className="mt-8">
           <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
             Explorador
@@ -117,7 +122,11 @@ export default async function GamePage({
               metrics: r.metrics,
             }))}
             catalog={catalog}
-            presets={presetsFor(appId, catalog.map((c) => c.key))}
+            presets={presetsFor(
+              appId,
+              catalog.map((c) => c.key),
+              rows.length,
+            )}
           />
         </section>
       </main>
@@ -138,8 +147,17 @@ function coerce(value: unknown): Record<string, number> {
 /**
  * Atalhos para as combinações que valem a pena em CS2 — a mesma coisa que o
  * usuário montaria à mão no explorador, em um clique.
+ *
+ * O primeiro preset é o que o explorador abre. Com uma coleta só, um preset
+ * de contador abriria um gráfico vazio: modos derivados precisam de dois
+ * pontos. Os de última partida são gauges e já desenham com um — então
+ * quando a série é curta, eles vêm primeiro.
  */
-function presetsFor(appId: number, available: string[]): Preset[] {
+function presetsFor(
+  appId: number,
+  available: string[],
+  snapshotCount: number,
+): Preset[] {
   if (appId !== 730) return [];
 
   const has = (...keys: string[]) => keys.every((k) => available.includes(k));
@@ -272,6 +290,11 @@ function presetsFor(appId: number, available: string[]): Preset[] {
         { metric: "last_match_damage", denominator: "last_match_rounds", mode: "ratio" },
       ],
     });
+  }
+
+  if (snapshotCount < 2) {
+    const gauge = (p: Preset) => p.specs.every((s) => s.metric.startsWith("last_match_"));
+    return [...presets.filter(gauge), ...presets.filter((p) => !gauge(p))];
   }
 
   return presets;

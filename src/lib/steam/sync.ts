@@ -27,9 +27,6 @@ import {
 const MAX_GAMES_WITH_STATS = 40;
 const SCHEMA_TTL_DAYS = 30;
 
-// Dois syncs na mesma janela não devem gerar dois pontos quase idênticos.
-const SNAPSHOT_WINDOW_MS = 1000 * 60 * 60 * 6;
-
 // Abaixo disso o jogo é ruído na biblioteca (demo, teste, jogo de bundle).
 const MIN_PLAYTIME_MIN = 30;
 
@@ -214,10 +211,19 @@ async function captureSnapshot(
     select: { capturedAt: true, metrics: true },
   });
 
-  if (latest) {
-    const fresh = Date.now() - latest.capturedAt.getTime() < SNAPSHOT_WINDOW_MS;
-    const unchanged = JSON.stringify(latest.metrics) === JSON.stringify(stats.metrics);
-    if (fresh || unchanged) return false;
+  // Único critério: os contadores mudaram? Se não mudaram, o ponto seria
+  // idêntico ao anterior e só engordaria a série.
+  //
+  // Não há janela mínima de tempo. Havia uma de 6 horas, e ela bloqueava
+  // dado legítimo: quem jogava e sincronizava logo depois não ganhava ponto
+  // nenhum. Como as stats do CS2 só são gravadas no fim da partida, sem a
+  // janela cada sync durante uma sessão rende aproximadamente um ponto por
+  // partida — a granularidade mais fina que a Web API permite.
+  //
+  // Isso não polui gráfico: o explorador agrega por dia, semana ou mês na
+  // hora da consulta. Guardar cru e agregar na leitura é o desenho.
+  if (latest && JSON.stringify(latest.metrics) === JSON.stringify(stats.metrics)) {
+    return false;
   }
 
   await prisma.statSnapshot.create({

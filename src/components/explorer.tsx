@@ -56,13 +56,15 @@ const makeId = () => `q${nextId++}`;
 export function Explorer({ snapshots, catalog, presets }: Props) {
   const [bucket, setBucket] = useState<Bucket>("day");
   const [rangeDays, setRangeDays] = useState<number | null>(90);
-  const [specs, setSpecs] = useState<SeriesSpec[]>(() =>
-    presets[0]
-      ? presets[0].specs.map((s) => ({ ...s, id: makeId() }))
-      : catalog[0]
-        ? [{ id: makeId(), metric: catalog[0].key, mode: "delta" as Mode }]
-        : [],
-  );
+  const [specs, setSpecs] = useState<SeriesSpec[]>(() => {
+    if (presets[0]) return presets[0].specs.map((s) => ({ ...s, id: makeId() }));
+    if (!catalog[0]) return [];
+
+    // Jogo sem preset conhecido: "por período" abriria vazio enquanto só
+    // houver uma coleta, porque modo derivado precisa de dois pontos.
+    const mode: Mode = snapshots.length < 2 ? "cumulative" : "delta";
+    return [{ id: makeId(), metric: catalog[0].key, mode }];
+  });
 
   const labels = useMemo(
     () => new Map(catalog.map((m) => [m.key, m.label])),

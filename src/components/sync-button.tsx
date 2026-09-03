@@ -26,10 +26,14 @@ export function SyncButton({ className }: { className?: string }) {
         return;
       }
 
+      // "Nada novo" sozinho parece falha. Como os contadores da Steam só são
+      // gravados no fim da partida, a ação certa é explícita.
       setMessage(
         data.snapshotsCreated > 0
-          ? `${data.snapshotsCreated} novo(s) registro(s).`
-          : "Tudo em dia — nada novo desde a última coleta.",
+          ? data.snapshotsCreated === 1
+            ? "1 novo ponto na série."
+            : `${data.snapshotsCreated} novos pontos na série.`
+          : "Nada mudou desde a última coleta — jogue uma partida e sincronize.",
       );
       // refresh() revalida os Server Components sem recarregar a página.
       startTransition(() => router.refresh());
