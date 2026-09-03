@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import {
   Area,
   AreaChart,
@@ -22,7 +24,11 @@ type Props = {
   formatValue: (v: number) => string;
 };
 
-export function MetricChart({ points, color = "#4ade80", formatValue }: Props) {
+export function MetricChart({ points, color = "var(--s1)", formatValue }: Props) {
+  // Antes do early return: hook chamado condicionalmente muda a ordem entre
+  // renders e quebra a reconciliação do React.
+  const id = useId();
+
   if (points.length < 2) {
     return (
       <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-line text-xs text-ink-faint">
@@ -30,8 +36,6 @@ export function MetricChart({ points, color = "#4ade80", formatValue }: Props) {
       </div>
     );
   }
-
-  const id = `grad-${color.replace("#", "")}`;
 
   return (
     <div className="h-40 w-full">
@@ -44,7 +48,7 @@ export function MetricChart({ points, color = "#4ade80", formatValue }: Props) {
             </linearGradient>
           </defs>
 
-          <CartesianGrid stroke="#1d212a" vertical={false} />
+          <CartesianGrid stroke="var(--line-soft)" vertical={false} />
 
           <XAxis
             dataKey="t"
@@ -54,7 +58,7 @@ export function MetricChart({ points, color = "#4ade80", formatValue }: Props) {
             tickFormatter={(v: number) =>
               new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
             }
-            stroke="#6b7280"
+            stroke="var(--ink-faint)"
             tick={{ fontSize: 11 }}
             tickLine={false}
             axisLine={false}
@@ -62,7 +66,7 @@ export function MetricChart({ points, color = "#4ade80", formatValue }: Props) {
           />
 
           <YAxis
-            stroke="#6b7280"
+            stroke="var(--ink-faint)"
             tick={{ fontSize: 11 }}
             tickLine={false}
             axisLine={false}
@@ -74,14 +78,14 @@ export function MetricChart({ points, color = "#4ade80", formatValue }: Props) {
           />
 
           <Tooltip
-            cursor={{ stroke: "#3a4050" }}
+            cursor={{ stroke: "var(--ink-faint)" }}
             contentStyle={{
-              background: "#12141a",
-              border: "1px solid #262a35",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
               borderRadius: 8,
               fontSize: 12,
             }}
-            labelStyle={{ color: "#949cab" }}
+            labelStyle={{ color: "var(--ink-muted)" }}
             labelFormatter={(v) => new Date(Number(v)).toLocaleString("pt-BR")}
             formatter={(v) => [formatValue(Number(v)), ""] as [string, string]}
           />

@@ -1,35 +1,101 @@
 @import "tailwindcss";
 
-/* Tema único e escuro: a app é um painel de dados de jogo, e a leitura de
-   gráficos densos é melhor sobre fundo escuro. */
-@theme {
-  --color-canvas: #0a0b0f;
-  --color-surface: #12141a;
-  --color-surface-2: #181b23;
-  --color-line: #262a35;
-  --color-line-soft: #1d212a;
+/* Os tokens apontam para variáveis CSS em vez de cores literais, então
+   trocar de esquema redefine só as variáveis — nenhum componente precisa
+   saber que existe modo claro. */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
 
-  --color-ink: #e9ecf1;
-  --color-ink-muted: #949cab;
-  --color-ink-faint: #6b7280;
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
 
-  --color-accent: #4ade80;
-  --color-accent-dim: #16351f;
-  --color-danger: #f87171;
-  --color-warn: #fbbf24;
-  --color-steam: #66c0f4;
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-steam: var(--steam);
+
+  --color-s1: var(--s1);
+  --color-s2: var(--s2);
+  --color-s3: var(--s3);
+  --color-s4: var(--s4);
+  --color-s5: var(--s5);
+  --color-s6: var(--s6);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
+/* Claro é o padrão para o HTML servido antes de qualquer JS: se a primeira
+   pintura for escura e o sistema pedir claro, o usuário vê um flash. */
+:root {
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --line: #dde1e8;
+  --line-soft: #e9ecf1;
+
+  --ink: #0e1117;
+  --ink-muted: #55606f;
+  --ink-faint: #7c8797;
+
+  /* Verde escurecido: o #4ade80 do modo escuro tem contraste insuficiente
+     sobre branco. */
+  --accent: #15803d;
+  --accent-soft: #dcfce7;
+  --danger: #c62828;
+  --warn: #a16207;
+  --steam: #0e6ba8;
+
+  --s1: #15803d;
+  --s2: #1d4ed8;
+  --s3: #be185d;
+  --s4: #b45309;
+  --s5: #6d28d9;
+  --s6: #0e7490;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0a0b0f;
+    --surface: #12141a;
+    --surface-2: #181b23;
+    --line: #262a35;
+    --line-soft: #1d212a;
+
+    --ink: #e9ecf1;
+    --ink-muted: #949cab;
+    --ink-faint: #6b7280;
+
+    --accent: #4ade80;
+    --accent-soft: #14321d;
+    --danger: #f87171;
+    --warn: #fbbf24;
+    --steam: #66c0f4;
+
+    --s1: #4ade80;
+    --s2: #60a5fa;
+    --s3: #f472b6;
+    --s4: #fbbf24;
+    --s5: #a78bfa;
+    --s6: #22d3ee;
+  }
+}
+
 html {
-  color-scheme: dark;
+  /* Faz o browser pintar scrollbars, seletores e inputs nativos no esquema
+     certo — sem isto, um <select> aparece branco no modo escuro. */
+  color-scheme: light dark;
 }
 
 body {
-  background-color: var(--color-canvas);
-  color: var(--color-ink);
+  background-color: var(--canvas);
+  color: var(--ink);
   font-family: var(--font-sans);
 }
 
@@ -37,4 +103,14 @@ body {
    colunas de estatística "tremem" a cada re-render. */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

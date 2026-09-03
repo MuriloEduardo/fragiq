@@ -14,13 +14,15 @@ import type { SeriesResult } from "@/lib/series";
 
 // Paleta categórica: matizes bem separados, todos legíveis sobre o fundo
 // escuro. A ordem é fixa para a cor de uma query não mudar ao adicionar outra.
+// Referenciam as variáveis do tema em vez de literais: a mesma série troca
+// de tom entre claro e escuro sem o componente saber qual está ativo.
 export const SERIES_COLORS = [
-  "#4ade80",
-  "#60a5fa",
-  "#f472b6",
-  "#fbbf24",
-  "#a78bfa",
-  "#22d3ee",
+  "var(--s1)",
+  "var(--s2)",
+  "var(--s3)",
+  "var(--s4)",
+  "var(--s5)",
+  "var(--s6)",
 ];
 
 type Props = {
@@ -61,7 +63,7 @@ export function TimeSeriesChart({ series, height = 340 }: Props) {
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -8 }}>
-          <CartesianGrid stroke="#1d212a" vertical={false} />
+          <CartesianGrid stroke="var(--line-soft)" vertical={false} />
 
           <XAxis
             dataKey="t"
@@ -71,7 +73,7 @@ export function TimeSeriesChart({ series, height = 340 }: Props) {
             tickFormatter={(v: number) =>
               new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
             }
-            stroke="#6b7280"
+            stroke="var(--ink-faint)"
             tick={{ fontSize: 11 }}
             tickLine={false}
             axisLine={false}
@@ -79,7 +81,7 @@ export function TimeSeriesChart({ series, height = 340 }: Props) {
           />
 
           <YAxis
-            stroke="#6b7280"
+            stroke="var(--ink-faint)"
             tick={{ fontSize: 11 }}
             tickLine={false}
             axisLine={false}
@@ -89,14 +91,14 @@ export function TimeSeriesChart({ series, height = 340 }: Props) {
           />
 
           <Tooltip
-            cursor={{ stroke: "#3a4050" }}
+            cursor={{ stroke: "var(--ink-faint)" }}
             contentStyle={{
-              background: "#12141a",
-              border: "1px solid #262a35",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
               borderRadius: 8,
               fontSize: 12,
             }}
-            labelStyle={{ color: "#949cab", marginBottom: 4 }}
+            labelStyle={{ color: "var(--ink-muted)", marginBottom: 4 }}
             labelFormatter={(v) => new Date(Number(v)).toLocaleString("pt-BR")}
             formatter={(value, id) => {
               const match = withData.find((s) => s.id === id);
@@ -108,7 +110,7 @@ export function TimeSeriesChart({ series, height = 340 }: Props) {
             verticalAlign="bottom"
             height={28}
             iconType="plainline"
-            wrapperStyle={{ fontSize: 12, color: "#949cab" }}
+            wrapperStyle={{ fontSize: 12, color: "var(--ink-muted)" }}
             formatter={(id) => withData.find((s) => s.id === id)?.label ?? String(id)}
           />
 

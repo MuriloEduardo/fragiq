@@ -104,7 +104,7 @@ function Trend({ metric }: { metric: MetricSeries }) {
       className={cn(
         "tnum inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium",
         flat && "bg-surface-2 text-ink-faint",
-        !flat && good && "bg-accent-dim text-accent",
+        !flat && good && "bg-accent-soft text-accent",
         !flat && !good && "bg-danger/10 text-danger",
       )}
       title="Variação em relação ao período anterior"
