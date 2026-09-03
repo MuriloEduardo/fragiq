@@ -63,6 +63,22 @@ Corroborando: `total_time_played` marca 751h contra 1.987h de
 `playtime_forever`. 62% do tempo em jogo não entra em contador nenhum — menu,
 workshop, servidores da comunidade.
 
+### Estes contadores não produzem ADR nem rating
+
+Tentador comparar com os números de mercado. Não funciona, e o teste é
+rápido: numa conta com K/D vitalício de 0,70, `total_damage_done /
+total_rounds_played` dá **94,4** — acima da mediana de ADR dos profissionais
+do top 100 (82,5, via `api.csapi.de`). As duas coisas não podem ser verdade.
+
+A causa é a mesma mistura de modos: o dano soma deathmatch e casual, onde se
+causa muito dano por round, enquanto os rounds não incrementam na mesma
+proporção. Sinal de apoio: os dados implicam 41,3 rounds por hora de jogo,
+contra ~30 esperados numa partida MR12.
+
+Conclusão para o produto: estes contadores servem para **comparar o jogador
+com ele mesmo ao longo do tempo**. Benchmark contra terceiros exige dado de
+demo, e cai no caminho 4.
+
 ### Contadores por mapa estão congelados
 
 A Valve parou de adicionar mapas. Existem:

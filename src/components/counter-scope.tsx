@@ -54,6 +54,15 @@ export function CounterScope({
           CS2. Não os use como se fossem a sua partida mais recente.
         </Item>
 
+        <Item titulo="Não são ADR nem rating">
+          Estes números não se comparam com os do csstats, do HLTV ou de
+          qualquer site que leia demos. O dano por round daqui inclui modos
+          onde se causa muito dano por round, então sai inflado — medimos:
+          o valor vitalício de uma conta com K/D 0,70 apareceria acima da
+          mediana de ADR dos profissionais. Use estes contadores para
+          comparar você com você mesmo ao longo do tempo, não com terceiros.
+        </Item>
+
         <Item titulo="Mapas legados apenas">
           A Valve parou de adicionar mapas a estes contadores. Dust2, Inferno,
           Nuke, Train e Vertigo existem;{" "}

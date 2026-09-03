@@ -20,6 +20,9 @@ export const CS2_PANEL: PanelStat[] = [
     spec: { metric: "total_kills", denominator: "total_deaths", mode: "ratio" },
   },
   {
+    // Deliberadamente NÃO chamado de ADR: o contador soma modos onde se
+    // causa muito dano por round, então o número sai inflado e não se
+    // compara com o ADR do HLTV ou do csstats.
     key: "adr",
     label: "Dano por round",
     decimals: 0,
