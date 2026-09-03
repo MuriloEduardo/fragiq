@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { env } from "../env";
+import { appUrl } from "../env";
 
 // Steam não fala OAuth2/OIDC para login de terceiros: fala OpenID 2.0.
 // São só dois passos — um redirect e uma verificação server-to-server —
@@ -15,7 +15,7 @@ const CLAIMED_ID_PATTERN =
 export const STATE_COOKIE = "fragiq_openid_state";
 
 function callbackUrl() {
-  return new URL("/api/auth/steam/callback", env().NEXT_PUBLIC_APP_URL).toString();
+  return new URL("/api/auth/steam/callback", appUrl()).toString();
 }
 
 /** Nonce anti-CSRF: viaja no return_to e é comparado com o cookie na volta. */
@@ -32,7 +32,7 @@ export function buildAuthorizeUrl(state: string) {
     "openid.ns": OPENID_NS,
     "openid.mode": "checkid_setup",
     "openid.return_to": returnTo.toString(),
-    "openid.realm": env().NEXT_PUBLIC_APP_URL,
+    "openid.realm": appUrl(),
     "openid.identity": IDENTIFIER_SELECT,
     "openid.claimed_id": IDENTIFIER_SELECT,
   });

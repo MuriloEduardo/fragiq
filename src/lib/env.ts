@@ -6,7 +6,6 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   STEAM_API_KEY: z.string().min(1, "Pegue a chave em https://steamcommunity.com/dev/apikey"),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET precisa ter ao menos 32 caracteres"),
-  NEXT_PUBLIC_APP_URL: z.url(),
 });
 
 let cached: z.infer<typeof schema> | null = null;
@@ -18,7 +17,6 @@ export function env() {
     DATABASE_URL: process.env.DATABASE_URL,
     STEAM_API_KEY: process.env.STEAM_API_KEY,
     AUTH_SECRET: process.env.AUTH_SECRET,
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   });
 
   if (!parsed.success) {
@@ -30,4 +28,27 @@ export function env() {
 
   cached = parsed.data;
   return cached;
+}
+
+/**
+ * URL pública da aplicação, usada para montar o `realm` e o `return_to` do
+ * OpenID da Steam e todos os redirects de autenticação.
+ *
+ * Deriva sozinha em vez de exigir configuração porque, num primeiro deploy,
+ * a URL só existe *depois* de subir — exigir a variável antes criaria um
+ * ovo-e-galinha (deploy quebrado, corrige a env, redeploy).
+ *
+ * `VERCEL_PROJECT_PRODUCTION_URL` é o domínio estável do projeto, igual em
+ * todos os deployments. Usamos ele mesmo em preview de propósito: cada
+ * preview tem URL própria e aleatória, e mandar o OpenID para uma delas só
+ * espalharia sessões por domínios efêmeros.
+ */
+export function appUrl(): string {
+  const explicit = process.env.APP_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercel) return `https://${vercel}`;
+
+  return "http://localhost:3000";
 }

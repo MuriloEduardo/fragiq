@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
-import { env } from "@/lib/env";
+import { appUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/session";
 import { STATE_COOKIE, statesMatch, verifyAssertion } from "@/lib/steam/openid";
@@ -10,7 +10,7 @@ import { syncUser } from "@/lib/steam/sync";
 export const dynamic = "force-dynamic";
 
 function failure(reason: string) {
-  const url = new URL("/", env().NEXT_PUBLIC_APP_URL);
+  const url = new URL("/", appUrl());
   url.searchParams.set("erro", reason);
   return NextResponse.redirect(url);
 }
@@ -65,5 +65,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL("/dashboard", env().NEXT_PUBLIC_APP_URL));
+  return NextResponse.redirect(new URL("/dashboard", appUrl()));
 }

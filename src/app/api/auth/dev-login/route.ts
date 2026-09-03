@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { env } from "@/lib/env";
+import { appUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/session";
 
@@ -26,5 +26,5 @@ export async function GET(request: NextRequest) {
   }
 
   await createSession({ userId: user.id, steamId: user.steamId });
-  return NextResponse.redirect(new URL("/dashboard", env().NEXT_PUBLIC_APP_URL));
+  return NextResponse.redirect(new URL("/dashboard", appUrl()));
 }

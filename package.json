@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "probe": "tsx scripts/probe-steam.ts"
+    "probe": "tsx scripts/probe-steam.ts",
+    "vercel-build": "prisma migrate deploy && next build"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
