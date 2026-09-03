@@ -302,6 +302,45 @@ export const MODE_LABELS: Record<Mode, string> = {
   ratio: "Razão entre duas métricas",
 };
 
+/**
+ * O mesmo cálculo da série, mas sobre os totais vitalícios do último
+ * snapshot — ou seja, o número que a Steam mostraria.
+ *
+ * É a comparação que dá sentido ao produto: "0,94 neste período contra 0,70
+ * na vida inteira" diz algo; "0,94" sozinho não diz nada. E funciona já na
+ * segunda coleta, quando o gráfico ainda é um ponto só.
+ *
+ * Devolve null onde a comparação não faria sentido: a contagem crua de um
+ * período não se compara com o total acumulado, e gauge não tem vitalício.
+ */
+export function lifetimeValue(
+  spec: SeriesSpec,
+  snapshots: SnapshotRow[],
+): number | null {
+  const last = snapshots[snapshots.length - 1];
+  if (!last) return null;
+  if ((spec.kind ?? classifyMetric(spec.metric)) === "gauge") return null;
+
+  const value = num(last, spec.metric);
+  if (value === null) return null;
+
+  const scale = spec.scale ?? 1;
+
+  if (spec.mode === "ratio") {
+    if (!spec.denominator) return null;
+    const den = num(last, spec.denominator);
+    if (den === null || den === 0) return null;
+    return (value / den) * scale;
+  }
+
+  if (spec.mode === "perHour") {
+    const hours = last.playtimeForeverMin / 60;
+    return hours > 0 ? value / hours : null;
+  }
+
+  return null;
+}
+
 export function seriesLabel(spec: SeriesSpec, catalog: Map<string, string>): string {
   const metric = catalog.get(spec.metric) ?? humanizeKey(spec.metric);
   const kind = spec.kind ?? classifyMetric(spec.metric);

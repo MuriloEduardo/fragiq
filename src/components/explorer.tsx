@@ -6,6 +6,7 @@ import {
   GROUP_ORDER,
   MODE_LABELS,
   buildSeries,
+  lifetimeValue,
   modesFor,
   seriesLabel,
   type Bucket,
@@ -16,6 +17,8 @@ import {
   type SnapshotRow,
 } from "@/lib/series";
 import { SERIES_COLORS, TimeSeriesChart } from "./time-series-chart";
+import { SeriesSummary, type SummaryItem } from "./series-summary";
+import { formatCount } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 
 type RawSnapshot = {
@@ -115,9 +118,12 @@ export function Explorer({ snapshots, catalog, presets }: Props) {
           id: spec.id,
           label: seriesLabel(resolved, labels),
           points: buildSeries(inRange, resolved, bucket),
+          // Vitalício vem de todos os snapshots, não da janela: o total
+          // acumulado não muda por causa do filtro de período.
+          lifetime: lifetimeValue(resolved, parsed),
         };
       }),
-    [specs, inRange, bucket, labels, kinds],
+    [specs, inRange, bucket, labels, kinds, parsed],
   );
 
   function update(id: string, patch: Partial<SeriesSpec>) {
@@ -148,6 +154,23 @@ export function Explorer({ snapshots, catalog, presets }: Props) {
     setSpecs(preset.specs.map((s) => ({ ...s, id: makeId() })));
   }
 
+  const summary: SummaryItem[] = results.map((r, i) => {
+    const ultimo = r.points[r.points.length - 1];
+    return {
+      id: r.id,
+      label: r.label,
+      color: SERIES_COLORS[i % SERIES_COLORS.length],
+      value: ultimo?.value ?? null,
+      lifetime: r.lifetime,
+      points: r.points.length,
+      format: formatCount,
+    };
+  });
+
+  // Com um ponto por série o gráfico não comunica nada: o eixo auto-escala
+  // em torno do valor único e todo gráfico sai igual.
+  const maxPontos = Math.max(0, ...results.map((r) => r.points.length));
+
   if (catalog.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-line px-6 py-10 text-center text-sm text-ink-faint">
@@ -177,9 +200,20 @@ export function Explorer({ snapshots, catalog, presets }: Props) {
         </span>
       </div>
 
+      {/* --------------------------------- números -------------------------------- */}
+      <SeriesSummary items={summary} />
+
       {/* --------------------------------- gráfico -------------------------------- */}
       <div className="rounded-xl border border-line bg-surface p-4">
         <TimeSeriesChart series={results} />
+
+        {maxPontos === 1 && (
+          <p className="mt-3 border-t border-line pt-3 text-xs leading-relaxed text-ink-faint">
+            Um ponto por série ainda não desenha tendência — o gráfico ganha
+            forma a partir da terceira coleta. Por enquanto, os números acima
+            dizem mais.
+          </p>
+        )}
       </div>
 
       {/* -------------------------------- queries --------------------------------- */}
