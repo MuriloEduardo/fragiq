@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { LogOut } from "lucide-react";
 import { SyncButton } from "./sync-button";
+import { FeedbackButton } from "./feedback-button";
 
 type Props = {
   personaName: string;
@@ -40,6 +41,8 @@ export function SiteHeader({ personaName, avatarUrl, lastSyncedAt }: Props) {
               </p>
             </div>
           </div>
+
+          <FeedbackButton />
 
           <form action="/api/auth/logout" method="post">
             <button

@@ -29,6 +29,7 @@ model User {
 
   games    UserGame[]
   syncRuns SyncRun[]
+  feedback Feedback[]
 
   @@map("users")
 }
@@ -101,6 +102,27 @@ model StatSnapshot {
   @@unique([userGameId, capturedAt])
   @@index([userGameId, capturedAt])
   @@map("stat_snapshots")
+}
+
+/// Feedback do beta. Só de usuário autenticado, então cada mensagem já vem
+/// amarrada ao SteamID — dá para ler o relato e olhar a série da pessoa lado
+/// a lado, que é o que torna o feedback acionável.
+model Feedback {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  message String
+
+  /// De onde a pessoa enviou. "Está confuso" significa coisas diferentes no
+  /// dashboard e no explorador.
+  path String?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("feedback")
 }
 
 model SyncRun {

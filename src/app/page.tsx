@@ -5,7 +5,6 @@ import {
   GitCompareArrows,
   Layers,
   Lock,
-  MessageSquare,
   ShieldCheck,
   SlidersHorizontal,
   TriangleAlert,
@@ -16,9 +15,6 @@ import { ThesisChart } from "@/components/thesis-chart";
 import { Comparison } from "@/components/landing/comparison";
 
 export const dynamic = "force-dynamic";
-
-// TODO: trocar pelo canal real de feedback do beta (Discord, e-mail, form).
-const FEEDBACK_URL = "https://steamcommunity.com/id/merudox";
 
 export default async function Home({
   searchParams,
@@ -327,7 +323,7 @@ function Beta() {
           </div>
         </div>
 
-        <div className="mt-9 flex flex-wrap items-center gap-3">
+        <div className="mt-9">
           <a
             href="/api/auth/steam"
             className="group inline-flex items-center gap-3 rounded-xl bg-steam px-5 py-3 font-medium text-white transition hover:brightness-110"
@@ -337,15 +333,10 @@ function Beta() {
             <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
           </a>
 
-          <a
-            href={FEEDBACK_URL}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="inline-flex items-center gap-2 rounded-xl border border-line px-5 py-3 text-sm font-medium text-ink-muted transition hover:border-ink-faint hover:text-ink"
-          >
-            <MessageSquare className="size-4" />
-            Enviar feedback
-          </a>
+          <p className="mt-3 text-sm text-ink-faint">
+            O canal de feedback fica dentro do app, no topo da página — assim
+            cada relato já chega junto com a sua série.
+          </p>
         </div>
 
         <p className="mt-6 flex max-w-2xl items-start gap-2 rounded-lg border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-ink-muted">
