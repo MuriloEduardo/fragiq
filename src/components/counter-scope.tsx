@@ -41,13 +41,19 @@ export function CounterScope({
           comparando os 197 contadores antes e depois.
         </p>
 
-        <Item titulo="Não dá para separar por modo">
+        <Item titulo="Os contadores não separam modo">
           Competitivo, premier, casual e deathmatch caem todos nos mesmos
           contadores — inclusive os por arma e os por mapa. O schema do jogo
           declara 286 estatísticas e{" "}
           <strong className="font-medium text-ink">nenhuma</strong> distingue
-          esses modos; só arms race tem contadores próprios. Um K/D por período
-          que inclua dias de casual vem inflado, e não há como filtrar.
+          esses modos; só arms race tem contadores próprios.
+        </Item>
+
+        <Item titulo="Mas o bot resolve">
+          Adicionando o bot do FragIQ como amigo na Steam, lemos mapa e modo
+          direto do jogo enquanto você joga — inclusive nos mapas que os
+          contadores não conhecem. Cada coleta feita com o bot ativo fica
+          marcada com o mapa e o modo daquela partida.
         </Item>
 
         <Item titulo="Provavelmente legado">

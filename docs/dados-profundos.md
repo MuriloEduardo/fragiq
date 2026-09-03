@@ -65,8 +65,43 @@ os conjuntos é só *qual arma e qual mapa foram usados*
 (`total_kills_tec9` num, `total_kills_ssg08` no outro; `de_dust2` num,
 `de_inferno` no outro). Nenhum contador é exclusivo de um modo.
 
-Conclusão: **arms race é o único modo separável**. Para isolar competitivo ou
-premier é preciso dado de partida — caminho 4.
+Conclusão para a API de estatísticas: **arms race é o único modo separável**.
+
+**Mas o rich presence resolve isso** — ver abaixo.
+
+### O rich presence entrega mapa e modo
+
+Achado que muda o teto do projeto. Consultando o estado de persona de um
+amigo com `node-steam-user`, o CS2 publica:
+
+```
+game:map    = de_anubis
+game:mode   = retakes
+game:score  = [ 7 : 3 ]
+game:state  = game
+game:server = offline
+status      = Offline Retakes Anubis [ 7 : 3 ]
+```
+
+Duas coisas que a API de estatísticas não dá, de graça:
+
+1. **O mapa** — inclusive `de_anubis`, que não existe no schema de stats.
+   Mirage, Ancient e Overpass caem no mesmo caso.
+2. **O modo** — o que torna possível separar competitivo de casual, algo que
+   nenhum contador permite.
+
+Combinando com a coleta reativa do bot: sincronizando ao fim de cada partida
+e guardando o contexto observado, **o delta entre dois snapshots passa a ser
+atribuível a um mapa e a um modo**. É o que `StatSnapshot.matchMap` e
+`matchMode` guardam.
+
+Detalhe de implementação que custou tempo: veio do **estado de persona**
+(`getPersonas`), não de `requestRichPresence` — este último devolveu vazio
+nos testes. Quem for reimplementar deve olhar a persona.
+
+Limites conhecidos: exige amizade com o bot, exige o bot online no momento
+da partida, e o valor observado é o do último estado antes de sair. Partida
+em servidor local (treino com bots) publica `game:server = offline`.
 
 ### `last_match_*` parece ser legado morto
 

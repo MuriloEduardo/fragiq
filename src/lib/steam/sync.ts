@@ -37,17 +37,29 @@ export type SyncResult = {
   statCallsSpent: number;
 };
 
+/**
+ * Contexto observado pelo bot de presença no momento em que a partida
+ * terminou. A Web API não sabe em que mapa nem em que modo você jogou; o
+ * rich presence sabe, e é a única forma de atribuir o delta.
+ */
+export type MatchContext = {
+  map?: string | null;
+  mode?: string | null;
+  score?: string | null;
+};
+
 export async function syncUser(
   userId: string,
   steamId: string,
   trigger: SyncTrigger = "MANUAL",
+  context?: MatchContext,
 ): Promise<SyncResult> {
   const run = await prisma.syncRun.create({
     data: { userId, trigger, status: "RUNNING" },
   });
 
   try {
-    const result = await runSync(userId, steamId);
+    const result = await runSync(userId, steamId, context);
 
     await prisma.$transaction([
       prisma.syncRun.update({
@@ -76,7 +88,11 @@ export async function syncUser(
   }
 }
 
-async function runSync(userId: string, steamId: string): Promise<SyncResult> {
+async function runSync(
+  userId: string,
+  steamId: string,
+  context?: MatchContext,
+): Promise<SyncResult> {
   const summary = await getPlayerSummary(steamId);
   if (summary) {
     await prisma.user.update({
@@ -89,9 +105,6 @@ async function runSync(userId: string, steamId: string): Promise<SyncResult> {
       },
     });
   }
-
-  const owned = await getOwnedGames(steamId);
-  const played = owned.filter((g) => g.playtime_forever > 0);
 
   // Estado anterior lido ANTES do upsert — é a base da comparação de playtime.
   const previous = new Map(
@@ -109,6 +122,8 @@ async function runSync(userId: string, steamId: string): Promise<SyncResult> {
       { playtime: ug.playtimeForeverMin, snapshots: ug._count.snapshots },
     ]),
   );
+
+  const played = await listarJogados(steamId, previous.size > 0);
 
   for (const game of played) await upsertGameAndOwnership(userId, game);
 
@@ -140,7 +155,7 @@ async function runSync(userId: string, steamId: string): Promise<SyncResult> {
     if (record && !record.supportsStats) continue; // já sabemos que não expõe stats.
 
     statCallsSpent++;
-    if (await captureSnapshot(userId, steamId, game)) snapshotsCreated++;
+    if (await captureSnapshot(userId, steamId, game, context)) snapshotsCreated++;
   }
 
   return {
@@ -149,6 +164,40 @@ async function runSync(userId: string, steamId: string): Promise<SyncResult> {
     snapshotsCreated,
     statCallsSpent,
   };
+}
+
+/**
+ * A Steam devolve lista vazia de forma intermitente, e vazio é
+ * indistinguível de "perfil privado" na resposta. Tratar os dois igual custa
+ * caro: numa coleta disparada por fim de partida, pular significa perder
+ * aquele ponto para sempre — a API só sabe o total de hoje.
+ *
+ * Quando já conhecemos jogos deste usuário, uma lista vazia é quase
+ * certamente falha transitória, então tentamos de novo antes de desistir.
+ */
+async function listarJogados(steamId: string, jaConhecido: boolean): Promise<OwnedGame[]> {
+  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    const owned = await getOwnedGames(steamId);
+    const played = owned.filter((g) => g.playtime_forever > 0);
+
+    if (played.length > 0 || !jaConhecido) return played;
+
+    if (tentativa < 3) {
+      console.warn(
+        `[sync] biblioteca vazia para ${steamId} (tentativa ${tentativa}) — ` +
+          "provável falha transitória da Steam, tentando de novo",
+      );
+      await new Promise((r) => setTimeout(r, tentativa * 1000));
+    }
+  }
+
+  // Persistiu vazio: pode ser perfil que virou privado. Não é erro fatal,
+  // mas precisa aparecer no log em vez de sumir como coleta silenciosa.
+  console.error(
+    `[sync] biblioteca de ${steamId} veio vazia em 3 tentativas — ` +
+      "perfil restrito ou indisponibilidade da Steam",
+  );
+  return [];
 }
 
 async function upsertGameAndOwnership(userId: string, game: OwnedGame) {
@@ -185,6 +234,7 @@ async function captureSnapshot(
   userId: string,
   steamId: string,
   game: OwnedGame,
+  context?: MatchContext,
 ): Promise<boolean> {
   const stats = await getUserStatsForGame(steamId, game.appid);
 
@@ -233,6 +283,11 @@ async function captureSnapshot(
       metrics: stats.metrics,
       achievementsUnlocked: stats.achievementsUnlocked,
       achievementsTotal: stats.achievementsTotal,
+      // Só faz sentido no jogo que o bot observou; os demais jogos do mesmo
+      // sync não têm nada a ver com aquela partida.
+      matchMap: game.appid === 730 ? (context?.map ?? null) : null,
+      matchMode: game.appid === 730 ? (context?.mode ?? null) : null,
+      matchScore: game.appid === 730 ? (context?.score ?? null) : null,
     },
   });
 

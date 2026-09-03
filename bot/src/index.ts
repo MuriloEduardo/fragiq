@@ -22,6 +22,17 @@ const jogando = new Map<string, boolean>();
 /** steamId -> timer de espera antes de avisar. */
 const pendentes = new Map<string, NodeJS.Timeout>();
 
+/**
+ * steamId -> última partida observada.
+ *
+ * A API de estatísticas da Steam não diz em que mapa nem em que modo você
+ * jogou, e nem sequer conhece Mirage, Ancient, Anubis ou Overpass. O rich
+ * presence do CS2 publica os dois para amigos — então guardamos aqui
+ * enquanto a partida acontece e enviamos junto quando ela termina.
+ */
+type Contexto = { map?: string; mode?: string; score?: string };
+const contexto = new Map<string, Contexto>();
+
 /* ---------------------------------- login --------------------------------- */
 
 if (config.refreshToken) {
@@ -102,6 +113,7 @@ client.on("friendRelationship", (steamID, relationship) => {
 
   if (relationship === SteamUser.EFriendRelationship.None) {
     jogando.delete(id);
+    contexto.delete(id);
     limparPendente(id);
     console.log(`Removido da lista: ${id}`);
   }
@@ -115,6 +127,21 @@ client.on("user", (steamID, user) => {
   const agora = String(user.gameid ?? "0") === String(CS2_APPID);
   const antes = jogando.get(id) ?? false;
 
+  // Guardamos o contexto a cada atualização, não só na transição: o rich
+  // presence muda durante a partida (o placar sobe), e quando a pessoa sai
+  // ele já veio a zero. O último estado útil é o que vale.
+  if (agora) {
+    const rp = new Map((user.rich_presence ?? []).map((kv) => [kv.key, kv.value]));
+    const mapa = rp.get("game:map");
+    if (mapa) {
+      contexto.set(id, {
+        map: mapa,
+        mode: rp.get("game:mode"),
+        score: rp.get("game:score"),
+      });
+    }
+  }
+
   if (agora === antes) return;
   jogando.set(id, agora);
 
@@ -126,7 +153,11 @@ client.on("user", (steamID, user) => {
     return;
   }
 
-  console.log(`${id} saiu do CS2 — sincronizando em ${config.graceMs / 1000}s`);
+  const ctx = contexto.get(id);
+  console.log(
+    `${id} saiu do CS2 — sincronizando em ${config.graceMs / 1000}s` +
+      (ctx?.map ? ` (${ctx.mode ?? "?"} em ${ctx.map}${ctx.score ? ` ${ctx.score}` : ""})` : ""),
+  );
   limparPendente(id);
   pendentes.set(
     id,
@@ -148,6 +179,9 @@ function limparPendente(id: string) {
 /* --------------------------------- webhook -------------------------------- */
 
 async function avisar(steamId: string) {
+  const ctx = contexto.get(steamId);
+  contexto.delete(steamId);
+
   try {
     const res = await fetch(config.webhookUrl, {
       method: "POST",
@@ -155,7 +189,13 @@ async function avisar(steamId: string) {
         "Content-Type": "application/json",
         authorization: `Bearer ${config.webhookSecret}`,
       },
-      body: JSON.stringify({ steamId, event: "match_ended" }),
+      body: JSON.stringify({
+        steamId,
+        event: "match_ended",
+        map: ctx?.map,
+        mode: ctx?.mode,
+        score: ctx?.score,
+      }),
     });
 
     const corpo = await res.text();

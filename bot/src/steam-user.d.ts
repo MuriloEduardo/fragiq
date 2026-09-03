@@ -11,8 +11,12 @@ declare module "steam-user" {
   export interface PersonaUser {
     gameid?: string | number;
     game_name?: string;
+    game_extra_info?: string;
     persona_state?: number;
     player_name?: string;
+    /** Chave/valor publicado pelo jogo, quando ele publica. */
+    rich_presence?: { key: string; value: string }[];
+    rich_presence_string?: string;
   }
 
   export interface LogOnDetails {
@@ -47,6 +51,10 @@ declare module "steam-user" {
     logOff(): void;
     setPersona(state: number): void;
     addFriend(steamID: SteamID | string): void;
+    getPersonas(
+      steamIDs: (SteamID | string)[],
+      callback: (err: Error | null, personas: Record<string, PersonaUser>) => void,
+    ): void;
     requestRichPresence(
       appid: number,
       steamIDs: (SteamID | string)[],

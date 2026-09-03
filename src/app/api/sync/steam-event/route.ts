@@ -17,6 +17,10 @@ export const maxDuration = 60;
 const schema = z.object({
   steamId: z.string().regex(/^7656119\d{10}$/),
   event: z.enum(["match_ended"]),
+  /** Observado pelo bot no rich presence, quando disponível. */
+  map: z.string().max(64).optional(),
+  mode: z.string().max(64).optional(),
+  score: z.string().max(32).optional(),
 });
 
 // Um bot com defeito reconectando em loop não pode virar rajada contra a
@@ -55,7 +59,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await syncUser(user.id, user.steamId, "EVENT");
+    const result = await syncUser(user.id, user.steamId, "EVENT", {
+      map: parsed.data.map,
+      mode: parsed.data.mode,
+      score: parsed.data.score,
+    });
     return NextResponse.json(result);
   } catch (err) {
     console.error("[steam-event] sync falhou", err);

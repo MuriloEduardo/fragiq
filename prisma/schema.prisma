@@ -99,8 +99,20 @@ model StatSnapshot {
   achievementsUnlocked Int?
   achievementsTotal    Int?
 
+  /// Contexto da partida que produziu o delta até este snapshot, quando o bot
+  /// de presença conseguiu observá-la.
+  ///
+  /// A API de estatísticas não distingue modo nem cobre os mapas modernos,
+  /// mas o rich presence do CS2 publica os dois para amigos. Guardando aqui,
+  /// o delta entre o snapshot anterior e este passa a ser atribuível a um
+  /// mapa e a um modo — o que a Web API sozinha não permite.
+  matchMap   String?
+  matchMode  String?
+  matchScore String?
+
   @@unique([userGameId, capturedAt])
   @@index([userGameId, capturedAt])
+  @@index([userGameId, matchMode])
   @@map("stat_snapshots")
 }
 

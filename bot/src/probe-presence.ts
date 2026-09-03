@@ -2,15 +2,19 @@ import SteamUser from "steam-user";
 import { CS2_APPID, config } from "./config.js";
 
 /**
- * Experimento: o rich presence do CS2 entrega o mapa?
+ * Experimento: o CS2 publica o mapa em algum canal que o bot consiga ler?
  *
- * Se entregar, dá para saber em que mapa a pessoa está jogando sem parsear
- * demo — o que contornaria o fato de a API de estatísticas não ter Mirage,
- * Ancient, Anubis nem Overpass.
+ * Se publicar, dá para rastrear mapa sem parsear demo — o que contornaria a
+ * ausência de Mirage, Ancient, Anubis e Overpass nos contadores da Steam.
+ *
+ * Consulta as duas fontes possíveis, porque elas são alimentadas de formas
+ * diferentes: o estado de persona chega de graça para amigos, e o rich
+ * presence é um pedido explícito ao servidor.
  *
  *   npm run probe -- <SteamID64>
  *
- * Rode com o alvo DENTRO de uma partida; fora dela não há o que reportar.
+ * Rode com o alvo dentro de uma partida de matchmaking. Treino com bots roda
+ * em servidor local e pode não publicar nada.
  */
 
 const alvo = process.argv[2];
@@ -30,7 +34,7 @@ else {
 }
 
 client.on("steamGuard", () => {
-  console.error("Steam Guard exigido — gere o refresh token primeiro.");
+  console.error("Steam Guard exigido — rode o bot uma vez para gerar o token.");
   process.exit(1);
 });
 
@@ -39,40 +43,94 @@ client.on("error", (err) => {
   process.exit(1);
 });
 
+const achados: string[] = [];
+
 client.on("loggedOn", () => {
   client.setPersona(SteamUser.EPersonaState.Online);
-  console.log("Conectado. Consultando rich presence de", alvo, "\n");
+  console.log("Conectado. Consultando", alvo, "\n");
+  setTimeout(consultarPersona, 1500);
+});
+
+/** Fonte 1: estado de persona, entregue automaticamente para amigos. */
+function consultarPersona() {
+  client.getPersonas([alvo], (err, personas) => {
+    console.log("=== estado de persona ===");
+
+    if (err) console.log("  erro:", err.message);
+    const p = personas?.[alvo];
+
+    if (!p) {
+      console.log("  (nada — confirme que o bot é amigo do alvo)");
+    } else {
+      const emCs2 = String(p.gameid ?? "0") === String(CS2_APPID);
+      console.log("  nome            :", p.player_name ?? "—");
+      console.log("  gameid          :", p.gameid ?? "—", emCs2 ? "(CS2 ✓)" : "");
+      console.log("  game_name       :", p.game_name ?? "—");
+      console.log("  game_extra_info :", p.game_extra_info ?? "—");
+
+      const rp = p.rich_presence ?? [];
+      console.log("  rich_presence   :", rp.length ? `${rp.length} campo(s)` : "(vazio)");
+      for (const kv of rp) {
+        console.log(`      ${kv.key} = ${kv.value}`);
+        achados.push(`${kv.key}=${kv.value}`);
+      }
+
+      console.log("  texto exibido   :", p.rich_presence_string ?? "—");
+      if (p.rich_presence_string) achados.push(p.rich_presence_string);
+      if (p.game_extra_info) achados.push(p.game_extra_info);
+    }
+
+    console.log();
+    consultarRichPresence();
+  });
+}
+
+/** Fonte 2: pedido explícito de rich presence ao servidor. */
+function consultarRichPresence() {
+  console.log("=== requestRichPresence ===");
 
   client.requestRichPresence(CS2_APPID, [alvo], "portuguese", (err, res) => {
     if (err) {
-      console.error("requestRichPresence falhou:", err.message);
-      process.exit(1);
+      console.log("  falhou:", err.message);
+      return concluir();
     }
 
     const dados = res.users?.[alvo];
-    if (!dados?.richPresence || Object.keys(dados.richPresence).length === 0) {
-      console.log("Sem rich presence.");
-      console.log("Causas possíveis: fora de partida, perfil restrito, ou");
-      console.log("o bot não é amigo do alvo.");
-      client.logOff();
-      process.exit(0);
+    const campos = dados?.richPresence ? Object.entries(dados.richPresence) : [];
+
+    if (campos.length === 0) {
+      console.log("  (vazio)");
+    } else {
+      for (const [k, v] of campos) {
+        console.log(`  ${k.padEnd(22)} ${v}`);
+        achados.push(`${k}=${v}`);
+      }
+      if (dados?.localizedString) {
+        console.log("  texto exibido:", dados.localizedString);
+        achados.push(dados.localizedString);
+      }
     }
 
-    console.log("=== campos publicados ===");
-    for (const [k, v] of Object.entries(dados.richPresence)) {
-      console.log(`  ${k.padEnd(24)} ${v}`);
-    }
-    if (dados.localizedString) console.log("\n  texto exibido:", dados.localizedString);
-
-    // A pergunta que o experimento existe para responder.
-    const chaves = Object.keys(dados.richPresence).join(" ").toLowerCase();
-    const valores = Object.values(dados.richPresence).join(" ").toLowerCase();
-    const temMapa = /map|de_|cs_|ar_/.test(chaves + " " + valores);
-    console.log(
-      `\n  >> mapa presente? ${temMapa ? "SIM — dá para rastrear mapa sem demo" : "NAO"}`,
-    );
-
-    client.logOff();
-    process.exit(0);
+    concluir();
   });
-});
+}
+
+function concluir() {
+  const texto = achados.join(" ").toLowerCase();
+  const temMapa = /\b(de|cs|ar)_[a-z0-9]+/.test(texto) || /\bmap\b/.test(texto);
+
+  console.log("\n=== veredito ===");
+  if (achados.length === 0) {
+    console.log("  Nada publicado neste estado.");
+    console.log("  Repita dentro de uma partida de matchmaking — treino com");
+    console.log("  bots roda em servidor local e tende a não publicar nada.");
+  } else if (temMapa) {
+    console.log("  MAPA PRESENTE — dá para rastrear mapa sem parsear demo.");
+  } else {
+    console.log("  Há presença publicada, mas sem o mapa.");
+    console.log("  Campos vistos:", achados.join(" | ").slice(0, 300));
+  }
+
+  client.logOff();
+  process.exit(0);
+}
