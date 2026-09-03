@@ -100,18 +100,18 @@ function Hero({ erro }: { erro?: string }) {
 
       <div className="relative mx-auto max-w-5xl px-6 pt-16 pb-14 sm:pt-24">
         <p className="font-mono text-[11px] tracking-[0.2em] text-ink-faint uppercase">
-          Análise temporal de desempenho · Steam
+          Counter-Strike 2 · Análise temporal de desempenho
         </p>
 
         <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
-          Todo número do seu jogo,{" "}
+          Suas estatísticas de CS2,{" "}
           <span className="text-accent">ao longo do tempo</span>.
         </h1>
 
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-muted">
-          A Steam guarda só o total de hoje, acumulado desde sempre. Depois de mil
-          horas, esse número não se move mais — um mês excelente e um mês péssimo
-          produzem a mesma média. O FragIQ coleta periodicamente e mostra a{" "}
+          A Steam guarda só o total de hoje, acumulado desde sempre. Depois de
+          duas mil horas, esse número não se move mais — um mês excelente e um mês
+          péssimo produzem o mesmo K/D. O FragIQ coleta periodicamente e mostra a{" "}
           <strong className="font-medium text-ink">diferença entre as coletas</strong>:
           como você está jogando agora, não como jogou na vida inteira.
         </p>
@@ -167,8 +167,8 @@ function MetricBuckets() {
   return (
     <Section
       eyebrow="O balde"
-      title="178 métricas do CS2, não seis"
-      lead="O CS2 expõe muito mais do que os painéis mostram. Medimos: são 197 contadores, dos quais 178 viram série temporal. Qualquer um deles pode virar gráfico."
+      title="178 estatísticas, não seis"
+      lead="O CS2 expõe muito mais do que os painéis mostram. Medimos: são 197 contadores, dos quais 178 viram série temporal. O painel traz as principais prontas; o explorador abre qualquer uma das outras."
     >
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {BUCKETS.map((b) => (
@@ -190,9 +190,10 @@ function MetricBuckets() {
       </dl>
 
       <p className="mt-5 text-sm leading-relaxed text-ink-muted">
-        E como o catálogo é montado a partir dos próprios dados, não de uma lista
-        escrita no código, qualquer jogo da Steam que exponha estatísticas entra no
-        acompanhamento sem alteração nenhuma.
+        Nem todo contador se comporta igual, e a Valve não documenta isso.
+        Medimos jogando: os contadores globais e por arma somam casual junto com
+        competitivo, e os por mapa estão congelados em mapas legados. O FragIQ
+        diz isso na tela em vez de deixar você concluir errado.
       </p>
     </Section>
   );
@@ -265,8 +266,8 @@ function Differentiators() {
         />
         <Callout
           icon={<Layers className="size-4" />}
-          title="Não é só CS2"
-          body="O motor não sabe o que é Counter-Strike. Ele lê contadores e deriva séries, então qualquer jogo da sua biblioteca que exponha estatísticas aparece junto."
+          title="Painel fixo, e o resto sob demanda"
+          body="As principais estatísticas ficam sempre à vista, cada uma com o valor do período e o vitalício ao lado. Quando quiser ir fundo, o explorador abre qualquer um dos 178 contadores."
         />
       </div>
     </Section>

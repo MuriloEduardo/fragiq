@@ -28,10 +28,13 @@ type RawSnapshot = {
 };
 
 type Props = {
-  appId: number;
   snapshots: RawSnapshot[];
   catalog: MetricInfo[];
   presets: Preset[];
+  /** Controlado pelo pai: um clique no painel carrega a métrica aqui. */
+  specs: SeriesSpec[];
+  onSpecsChange: (specs: SeriesSpec[]) => void;
+  onPresetApplied?: () => void;
 };
 
 export type Preset = {
@@ -56,18 +59,23 @@ const BUCKETS: { value: Bucket; label: string }[] = [
 let nextId = 0;
 const makeId = () => `q${nextId++}`;
 
-export function Explorer({ snapshots, catalog, presets }: Props) {
+export function Explorer({
+  snapshots,
+  catalog,
+  presets,
+  specs,
+  onSpecsChange,
+  onPresetApplied,
+}: Props) {
   const [bucket, setBucket] = useState<Bucket>("day");
   const [rangeDays, setRangeDays] = useState<number | null>(90);
-  const [specs, setSpecs] = useState<SeriesSpec[]>(() => {
-    if (presets[0]) return presets[0].specs.map((s) => ({ ...s, id: makeId() }));
-    if (!catalog[0]) return [];
 
-    // Jogo sem preset conhecido: "por período" abriria vazio enquanto só
-    // houver uma coleta, porque modo derivado precisa de dois pontos.
-    const mode: Mode = snapshots.length < 2 ? "cumulative" : "delta";
-    return [{ id: makeId(), metric: catalog[0].key, mode }];
-  });
+  // As séries vivem no pai para que um clique no painel possa carregá-las
+  // aqui. Bucket e período continuam locais: são preferências de leitura,
+  // não conteúdo.
+  const setSpecs = (
+    next: SeriesSpec[] | ((current: SeriesSpec[]) => SeriesSpec[]),
+  ) => onSpecsChange(typeof next === "function" ? next(specs) : next);
 
   const labels = useMemo(
     () => new Map(catalog.map((m) => [m.key, m.label])),
@@ -152,6 +160,7 @@ export function Explorer({ snapshots, catalog, presets }: Props) {
 
   function applyPreset(preset: Preset) {
     setSpecs(preset.specs.map((s) => ({ ...s, id: makeId() })));
+    onPresetApplied?.();
   }
 
   const summary: SummaryItem[] = results.map((r, i) => {

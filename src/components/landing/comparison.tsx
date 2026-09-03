@@ -33,9 +33,9 @@ const ROWS: { label: string; note?: string; cells: [Cell, Cell, Cell, Cell] }[] 
     cells: ["partial", "no", "no", "no"],
   },
   {
-    label: "Funciona em qualquer jogo da Steam",
-    note: "o motor é agnóstico de jogo",
-    cells: ["yes", "no", "no", "no"],
+    label: "Painel com todas as estatísticas de uma vez",
+    note: "sem escolher uma métrica por vez",
+    cells: ["yes", "partial", "partial", "partial"],
   },
   {
     label: "Começa só com o login",

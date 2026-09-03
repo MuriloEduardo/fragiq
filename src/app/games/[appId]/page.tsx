@@ -8,7 +8,8 @@ import { gameHeaderUrl } from "@/lib/steam/api";
 import { formatPlaytime, parseStatSchema } from "@/lib/stats";
 import { gaugesLookStale, metricCatalog, type SnapshotRow } from "@/lib/series";
 import { SiteHeader } from "@/components/site-header";
-import { Explorer, type Preset } from "@/components/explorer";
+import { type Preset } from "@/components/explorer";
+import { GameAnalysis } from "@/components/game-analysis";
 import { CollectionStatus } from "@/components/collection-status";
 import { CounterScope } from "@/components/counter-scope";
 
@@ -61,6 +62,13 @@ export default async function GamePage({
 
   const catalog = metricCatalog(rows, schema);
 
+  // Datas viram string na fronteira Server -> Client Component.
+  const serialized = rows.map((r) => ({
+    capturedAt: r.capturedAt.toISOString(),
+    playtimeForeverMin: r.playtimeForeverMin,
+    metrics: r.metrics,
+  }));
+
   return (
     <>
       <SiteHeader {...user} />
@@ -106,27 +114,15 @@ export default async function GamePage({
           <CounterScope appId={appId} gaugesStale={gaugesLookStale(rows)} />
         </div>
 
-        <section className="mt-8">
-          <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
-            Explorador
-          </h2>
-          <p className="mt-1 mb-5 max-w-2xl text-sm text-ink-muted">
-            Monte suas próprias séries. Qualquer contador que o jogo exponha pode virar
-            gráfico — como total acumulado, por período, normalizado por hora jogada, ou
-            como razão entre duas métricas.
-          </p>
-
-          <Explorer
+        <div className="mt-10">
+          <GameAnalysis
             appId={appId}
-            snapshots={rows.map((r) => ({
-              capturedAt: r.capturedAt.toISOString(),
-              playtimeForeverMin: r.playtimeForeverMin,
-              metrics: r.metrics,
-            }))}
+            snapshots={serialized}
+            parsed={rows}
             catalog={catalog}
             presets={presetsFor(appId, catalog.map((c) => c.key))}
           />
-        </section>
+        </div>
       </main>
     </>
   );

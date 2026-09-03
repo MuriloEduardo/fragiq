@@ -52,12 +52,16 @@
   --warn: #a16207;
   --steam: #0e6ba8;
 
-  --s1: #15803d;
-  --s2: #1d4ed8;
-  --s3: #be185d;
-  --s4: #b45309;
-  --s5: #6d28d9;
-  --s6: #0e7490;
+  /* Paleta categórica validada: as cores que eu tinha escolhido a olho
+     reprovavam em croma e em separação sob visão normal. Estas passam nos
+     seis checks nos dois modos, na ordem em que estão — a ordem faz parte
+     da validação e não pode ser embaralhada. */
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+  --s5: #e87ba4;
+  --s6: #008300;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -78,12 +82,12 @@
     --warn: #fbbf24;
     --steam: #66c0f4;
 
-    --s1: #4ade80;
-    --s2: #60a5fa;
-    --s3: #f472b6;
-    --s4: #fbbf24;
-    --s5: #a78bfa;
-    --s6: #22d3ee;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+    --s5: #d55181;
+    --s6: #008300;
   }
 }
 

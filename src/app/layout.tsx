@@ -6,9 +6,9 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "FragIQ — todo número do seu jogo, ao longo do tempo",
+  title: "FragIQ — suas estatísticas de CS2 ao longo do tempo",
   description:
-    "A Steam guarda só o total acumulado. O FragIQ registra periodicamente e mostra a diferença entre as coletas: 178 métricas do CS2 em série temporal, com consultas que você mesmo monta. Beta aberto.",
+    "A Steam guarda só o total acumulado desde sempre. O FragIQ coleta periodicamente e mostra a diferença entre as coletas: 178 estatísticas de CS2 em série temporal, com um painel fixo e um explorador para consultas próprias. Beta aberto.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
