@@ -14,7 +14,7 @@ export function SiteHeader({ personaName, avatarUrl, lastSyncedAt }: Props) {
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
-        <Link href="/dashboard" className="font-mono text-sm font-bold tracking-tight">
+        <Link href="/cs2" className="font-mono text-sm font-bold tracking-tight">
           Frag<span className="text-accent">IQ</span>
         </Link>
 

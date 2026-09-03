@@ -21,7 +21,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ erro?: string }>;
 }) {
-  if (await getSession()) redirect("/dashboard");
+  if (await getSession()) redirect("/cs2");
 
   const { erro } = await searchParams;
 

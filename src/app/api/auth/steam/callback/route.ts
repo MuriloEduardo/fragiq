@@ -65,5 +65,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL("/dashboard", appUrl()));
+  return NextResponse.redirect(new URL("/cs2", appUrl()));
 }
