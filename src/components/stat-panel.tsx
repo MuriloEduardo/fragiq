@@ -1,6 +1,12 @@
 "use client";
 
-import { buildSeries, lifetimeValue, type SeriesSpec, type SnapshotRow } from "@/lib/series";
+import {
+  buildSeries,
+  lifetimeValue,
+  type ContextFilter,
+  type SeriesSpec,
+  type SnapshotRow,
+} from "@/lib/series";
 import { Sparkline } from "./sparkline";
 import { cn } from "@/lib/utils";
 
@@ -26,12 +32,13 @@ type Props = {
   stats: PanelStat[];
   snapshots: SnapshotRow[];
   activeKey?: string;
+  filter?: ContextFilter;
   onSelect?: (stat: PanelStat) => void;
 };
 
-export function StatPanel({ stats, snapshots, activeKey, onSelect }: Props) {
+export function StatPanel({ stats, snapshots, activeKey, filter, onSelect }: Props) {
   const tiles = stats.map((stat) => {
-    const spec: SeriesSpec = { ...stat.spec, id: stat.key };
+    const spec: SeriesSpec = { ...stat.spec, id: stat.key, filter };
     // "raw": cada coleta é um ponto. Agrupar por dia colapsaria justamente a
     // granularidade por partida que a coleta frequente produz — e um tile
     // quer mostrar movimento, não uma média diária.

@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CS2_PANEL } from "@/lib/cs2-panel";
 import { StatPanel, type PanelStat } from "./stat-panel";
 import { Explorer, type Preset } from "./explorer";
-import type { MetricInfo, SeriesSpec, SnapshotRow } from "@/lib/series";
+import { contextOptions, type ContextFilter, type MetricInfo, type SeriesSpec, type SnapshotRow } from "@/lib/series";
+import { ContextFilterBar } from "./context-filter";
 
 type RawSnapshot = {
   capturedAt: string;
   playtimeForeverMin: number;
   metrics: Record<string, number>;
+  matchMap?: string | null;
+  matchMode?: string | null;
 };
 
 /**
@@ -38,6 +41,10 @@ export function GameAnalysis({
         : [],
   );
   const [ativo, setAtivo] = useState<string | undefined>();
+  const [filtro, setFiltro] = useState<ContextFilter>({});
+
+  const opcoes = useMemo(() => contextOptions(parsed), [parsed]);
+  const semContexto = parsed.filter((s) => !s.matchMode && !s.matchMap).length;
 
   function selecionar(stat: PanelStat) {
     setSpecs([{ ...stat.spec, id: `tile-${stat.key}` }]);
@@ -47,6 +54,16 @@ export function GameAnalysis({
 
   return (
     <div className="space-y-10">
+      {appId === 730 && (
+        <ContextFilterBar
+          modes={opcoes.modes}
+          maps={opcoes.maps}
+          value={filtro}
+          onChange={setFiltro}
+          semContexto={semContexto}
+        />
+      )}
+
       {appId === 730 && (
         <section>
           <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
@@ -61,6 +78,7 @@ export function GameAnalysis({
               stats={CS2_PANEL}
               snapshots={parsed}
               activeKey={ativo}
+              filter={filtro}
               onSelect={selecionar}
             />
           </div>
@@ -83,6 +101,7 @@ export function GameAnalysis({
             specs={specs}
             onSpecsChange={setSpecs}
             onPresetApplied={() => setAtivo(undefined)}
+            filter={filtro}
           />
         </div>
       </section>

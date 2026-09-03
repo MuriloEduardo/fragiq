@@ -48,6 +48,8 @@ export type SeriesSpec = {
   metric: string;
   /** Resolvido a partir do catálogo; decide como a série é calculada. */
   kind?: MetricKind;
+  /** Recorte por mapa/modo, quando o bot registrou o contexto. */
+  filter?: ContextFilter;
   /** Só usado quando mode === "ratio". */
   denominator?: string;
   mode: Mode;
@@ -55,10 +57,26 @@ export type SeriesSpec = {
   scale?: number;
 };
 
+/**
+ * Recorte por contexto de partida.
+ *
+ * Aplicado sobre os DELTAS, não sobre os snapshots. O `matchMode` descreve a
+ * partida que produziu o delta *até* aquele snapshot, então filtrar os
+ * snapshots e depois derivar somaria as partidas descartadas no meio: um
+ * delta entre dois competitivos separados por um casual incluiria o casual.
+ */
+export type ContextFilter = {
+  mode?: string | null;
+  map?: string | null;
+};
+
 export type SnapshotRow = {
   capturedAt: Date;
   playtimeForeverMin: number;
   metrics: Record<string, number>;
+  /** Observado pelo bot de presença; ausente nas coletas sem bot. */
+  matchMap?: string | null;
+  matchMode?: string | null;
 };
 
 export type SeriesPoint = { t: number; value: number };
@@ -116,6 +134,29 @@ function collapse(snapshots: SnapshotRow[], bucket: Bucket): SnapshotRow[] {
 
 /* --------------------------------- cálculo -------------------------------- */
 
+function matchesFilter(row: SnapshotRow, filter?: ContextFilter): boolean {
+  if (!filter) return true;
+  if (filter.mode && row.matchMode !== filter.mode) return false;
+  if (filter.map && row.matchMap !== filter.map) return false;
+  return true;
+}
+
+/** Modo e mapa que aparecem nas coletas — para montar o seletor. */
+export function contextOptions(snapshots: SnapshotRow[]) {
+  const modes = new Map<string, number>();
+  const maps = new Map<string, number>();
+
+  for (const s of snapshots) {
+    if (s.matchMode) modes.set(s.matchMode, (modes.get(s.matchMode) ?? 0) + 1);
+    if (s.matchMap) maps.set(s.matchMap, (maps.get(s.matchMap) ?? 0) + 1);
+  }
+
+  const ordenar = (m: Map<string, number>) =>
+    [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  return { modes: ordenar(modes), maps: ordenar(maps) };
+}
+
 function num(snap: SnapshotRow, key: string): number | null {
   const value = snap.metrics[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -163,6 +204,9 @@ export function buildSeries(
   for (let i = 1; i < rows.length; i++) {
     const prev = rows[i - 1];
     const curr = rows[i];
+
+    // O delta pertence à partida descrita pelo snapshot final do par.
+    if (!matchesFilter(curr, spec.filter)) continue;
 
     const before = num(prev, spec.metric);
     const after = num(curr, spec.metric);

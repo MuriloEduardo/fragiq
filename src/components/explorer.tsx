@@ -10,6 +10,7 @@ import {
   modesFor,
   seriesLabel,
   type Bucket,
+  type ContextFilter,
   type MetricInfo,
   type MetricKind,
   type Mode,
@@ -25,6 +26,8 @@ type RawSnapshot = {
   capturedAt: string;
   playtimeForeverMin: number;
   metrics: Record<string, number>;
+  matchMap?: string | null;
+  matchMode?: string | null;
 };
 
 type Props = {
@@ -35,6 +38,8 @@ type Props = {
   specs: SeriesSpec[];
   onSpecsChange: (specs: SeriesSpec[]) => void;
   onPresetApplied?: () => void;
+  /** Recorte por mapa/modo, controlado pelo pai. */
+  filter?: ContextFilter;
 };
 
 export type Preset = {
@@ -66,6 +71,7 @@ export function Explorer({
   specs,
   onSpecsChange,
   onPresetApplied,
+  filter,
 }: Props) {
   // Agrupar por dia com poucos dias de histórico esconde tudo: três coletas
   // do mesmo dia viram um ponto só. Começamos na granularidade mais fina e
@@ -118,6 +124,8 @@ export function Explorer({
         capturedAt: new Date(s.capturedAt),
         playtimeForeverMin: s.playtimeForeverMin,
         metrics: s.metrics,
+        matchMap: s.matchMap,
+        matchMode: s.matchMode,
       })),
     [snapshots],
   );
@@ -131,7 +139,7 @@ export function Explorer({
   const results = useMemo(
     () =>
       specs.map((spec) => {
-        const resolved = { ...spec, kind: kinds.get(spec.metric) };
+        const resolved = { ...spec, kind: kinds.get(spec.metric), filter };
         return {
           id: spec.id,
           label: seriesLabel(resolved, labels),
@@ -141,7 +149,7 @@ export function Explorer({
           lifetime: lifetimeValue(resolved, parsed),
         };
       }),
-    [specs, inRange, bucket, labels, kinds, parsed],
+    [specs, inRange, bucket, labels, kinds, parsed, filter],
   );
 
   function update(id: string, patch: Partial<SeriesSpec>) {

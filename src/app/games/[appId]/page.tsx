@@ -44,7 +44,13 @@ export default async function GamePage({
       snapshots: {
         orderBy: { capturedAt: "asc" },
         take: MAX_SNAPSHOTS,
-        select: { capturedAt: true, playtimeForeverMin: true, metrics: true },
+        select: {
+          capturedAt: true,
+          playtimeForeverMin: true,
+          metrics: true,
+          matchMap: true,
+          matchMode: true,
+        },
       },
     },
   });
@@ -67,6 +73,8 @@ export default async function GamePage({
     capturedAt: s.capturedAt,
     playtimeForeverMin: s.playtimeForeverMin,
     metrics: coerce(s.metrics),
+    matchMap: s.matchMap,
+    matchMode: s.matchMode,
   }));
 
   const catalog = metricCatalog(rows, schema);
@@ -76,6 +84,8 @@ export default async function GamePage({
     capturedAt: r.capturedAt.toISOString(),
     playtimeForeverMin: r.playtimeForeverMin,
     metrics: r.metrics,
+    matchMap: r.matchMap,
+    matchMode: r.matchMode,
   }));
 
   return (
