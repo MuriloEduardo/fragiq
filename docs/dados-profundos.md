@@ -1,32 +1,102 @@
-# Dados profundos de CS2
+# Fontes de dados de CS2
 
-Como obter ADR, KAST, rating, clutches e dados por round — que **não existem**
-na Steam Web API.
+Referência do que é possível obter, por qual mecanismo, e a que custo.
+Para a decisão de sequência, veja [roadmap-dados.md](./roadmap-dados.md).
 
-## Duas camadas, dois custos
+## O mapa
 
-| | Camada 1 — Web API | Camada 2 — demos |
-|---|---|---|
-| **Já implementado** | sim | não |
-| **Atrito para o usuário** | zero (só login) | precisa colar 2 códigos |
-| **Granularidade** | diária, agregada | por round e por evento |
-| **Métricas** | kills, mortes, HS%, precisão, dano, rounds, vitórias | tudo acima + ADR, KAST, rating, clutch, entry, utility, posições |
-| **Custo de infra** | uma chamada HTTP | download + parsing de ~100 MB por partida |
-| **Escopo** | qualquer jogo Steam | só CS2, e só partidas de matchmaking Valve |
+A Valve não expõe uma API de estatísticas de partida. O que existe são cinco
+caminhos distintos, com credenciais e limites diferentes.
 
-## Como a camada 2 funciona
+| # | Caminho | Credencial | Dá acesso a |
+|---|---|---|---|
+| 1 | **Web API pública** | chave da API | contadores vitalícios, biblioteca, perfil |
+| 2 | **Web API + bot amigo** | chave + amizade | o mesmo, em perfis "somente amigos" |
+| 3 | **Game Coordinator** | bot com CS2 + amizade | rank, medalhas, comendações |
+| 4 | **Share codes + demos** | auth code do usuário | tudo que existe numa partida |
+| 5 | **GCPD** | sessão do browser do usuário | 20 abas de dados pessoais |
 
-A Valve não expõe estatísticas de partida. Ela expõe uma trilha de **share
-codes**, e cada share code aponta para um arquivo de demo. Toda estatística
-profunda que csstats/csrep/Leetify mostram é calculada por eles a partir
-desses arquivos.
+O FragIQ hoje usa só o caminho 1.
+
+---
+
+## 1. Web API pública — o que já usamos
+
+`api.steampowered.com`, autenticado por `STEAM_API_KEY`. Entrega contadores
+**vitalícios e cumulativos**: no CS2 são 197, dos quais 178 viram série
+temporal (ver [README](../README.md)).
+
+### Limites reais
+
+O número documentado é 100.000 chamadas/dia por chave. O que os fóruns
+relatam, e que a documentação não diz:
+
+- Existem **limites por IP não documentados**. Há relato de `429` a cada
+  10–20 minutos com apenas uma requisição a cada 120 segundos.
+- A Valve aplica **shadow ban** quando o padrão de uso parece scraping. O
+  canal para contestar é `webapi@valvesoftware.com`.
+- O endpoint de inventário (`steamcommunity.com/inventory/...`) **não** entra
+  na cota de 100k: tem limite próprio, mais agressivo, e não é documentado.
+- `GetPlayerSummaries` aceita **até 100 SteamIDs por chamada**. Nosso cron
+  hoje faz uma chamada por usuário; ao escalar, agrupar é ganho imediato.
+
+### Privacidade
+
+Perfis privados devolvem biblioteca e stats vazias. Esta é a maior causa de
+dashboard vazio, e o caminho 2 existe para resolvê-la.
+
+---
+
+## 2. Bot amigo — o mecanismo menos conhecido
+
+A Web API respeita a privacidade **em relação ao dono da chave**, não em
+relação ao mundo. Se a conta que gerou a `STEAM_API_KEY` for amiga do
+jogador, perfis marcados como "Somente amigos" passam a responder
+normalmente. Desfeita a amizade, a API volta a devolver vazio.
+
+Ou seja: uma conta bot que o usuário adiciona converte perfil restrito em
+perfil legível, **sem nenhuma mudança de código na coleta**.
+
+É o que o Leetify faz — ao vincular a conta, o usuário recebe pedido de
+amizade do bot deles.
+
+Custo: uma conta Steam dedicada, um processo que envie e aceite pedidos
+(`node-steam-user`), um passo de onboarding pedindo o aceite, e o teto de
+1.000 amigos por conta — acima disso, sharding de bots.
+
+---
+
+## 3. Game Coordinator — rank e Premier
+
+Com um bot conectado ao GC do CS2 (`node-steam-user` + `globaloffensive`),
+`requestPlayersProfile()` devolve rank (0–18 com contagem de vitórias),
+comendações, medalhas, nível e XP privado, status de VAC e partida em
+andamento.
+
+**Não verificado.** A documentação do módulo diz que o alvo precisa estar na
+lista de amigos do bot **e** jogando CS no momento — o que faria disso uma
+coleta oportunista, não sob demanda. A doc é da era CS:GO. Antes de desenhar
+qualquer coisa em cima, precisa de um experimento com bot real para
+descobrir se o CS Rating do Premier realmente vem e sob quais condições.
+
+Exige processo persistente: não roda em serverless.
+
+---
+
+## 4. Share codes e parsing de demos — a camada profunda
+
+Toda estatística que csstats, csrep e Leetify mostram e que não existe na Web
+API — ADR, KAST, rating, clutches, entry duels, utility, posições — é
+calculada por eles **a partir dos arquivos de demo**.
+
+### Como a trilha funciona
 
 O usuário fornece duas coisas, uma vez:
 
-1. **Authentication Code** (`steamidkey`) — gerado em
-   `https://steamcommunity.com/my/gcpd/730` (Game State / histórico de
-   partidas). É a autorização explícita para terceiros pedirem as demos dele.
-2. **Um share code recente** (`knowncode`) — o ponto de partida da trilha.
+1. **Authentication Code** (`steamidkey`), gerado em
+   `steamcommunity.com/my/gcpd/730`. É a autorização explícita para
+   terceiros pedirem as demos dele.
+2. **Um share code recente** (`knowncode`), o ponto de partida.
 
 Com isso o backend caminha a cadeia:
 
@@ -35,97 +105,101 @@ GET https://api.steampowered.com/ICSGOPlayers_730/GetNextMatchSharingCode/v1
       ?key=<STEAM_API_KEY>
       &steamid=<SteamID64>
       &steamidkey=<Authentication Code>
-      &knowncode=<último share code conhecido>
-   → próximo share code  →  vira o knowncode da chamada seguinte
+      &knowncode=<ultimo share code conhecido>
+   -> proximo share code  ->  vira o knowncode da chamada seguinte
 ```
 
-Repete até esgotar. Cada share code decodifica para `matchId / outcomeId /
-tokenId`, que dão a URL do demo no CDN da Valve.
+Cada share code (`CSGO-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX`) decodifica para
+`matchId`, `reservationId` e `tvPort`, que dão a URL do demo no CDN da Valve.
+A biblioteca `csgo-sharecode` (npm, de akiver) faz essa decodificação.
 
-**Restrição operacional importante:** o `knowncode` precisa ter no máximo ~30
-dias. Se o usuário some por mais de um mês, a trilha se rompe e ele tem que
-colar um share code novo. Isso torna a coleta da camada 2 **obrigatoriamente
-agendada** — diferente da camada 1, aqui não dá para depender de um botão.
+### Restrições que moldam a arquitetura
 
-## Parsing
+- O `knowncode` precisa ter **no máximo ~30 dias**. Se o usuário some por
+  mais de um mês, a trilha se rompe e ele tem que colar um código novo.
+  Isso torna a coleta **obrigatoriamente agendada** — botão não resolve.
+- Um demo tem ~100 MB e leva dezenas de segundos para parsear. **Não roda em
+  serverless.** O desenho é fila de share codes pendentes + workers.
+- Só cobre **matchmaking oficial da Valve**. Unranked, Wingman e scrimmage
+  ficam de fora (ver caminho 5).
 
-Demos de CS2 são protobuf. Bibliotecas maduras:
+### Parsers
 
-- **demoinfocs-golang** — Go, a mais completa e rápida; boa para um worker
-- **demoparser2** — Rust com bindings Python/JS
+- **demoinfocs-golang** — Go, o mais completo e rápido
+- **demoparser2** — Rust, com bindings Python e JS
 - **awpy** — Python sobre demoparser2; já calcula ADR e KAST prontos
 
-Isso não roda numa serverless function: um demo tem ~100 MB e leva dezenas de
-segundos. O desenho seria uma fila (share codes pendentes) e workers separados
-gravando o resultado no mesmo banco.
+### Alternativa: comprar em vez de construir
 
-## Encaixe no modelo atual
+O **csrep.gg tem API pública v2** (`https://csrep.gg/api`, auth por header
+`X-API-Key`), com `POST /matches/import`, `POST /matches/import/faceit`,
+`GET /matches/{id}`, `GET /matches/faceit/{id}`,
+`GET /matches/gamersclub/{id}` e endpoints de Players. Spec OpenAPI 3.0
+disponível na documentação deles.
 
-O `StatSnapshot.metrics` já é um balde JSONB genérico — as métricas de demo
-entram nele sem migração. O que falta modelar é a granularidade por partida:
-uma tabela `Match` (share code, mapa, placar, data) com métricas por partida,
-já que o snapshot atual é por instante de coleta, não por partida.
+Isso permitiria ter as métricas profundas sem construir fila nem parsing.
+O custo é uma dependência de terceiro que também é concorrente direto.
 
-Feito isso, o explorador ganha as métricas novas automaticamente: o catálogo
-é montado a partir dos dados, não de uma lista fixa.
+---
 
-## Amizade na Steam: sim, desbloqueia dados
+## 5. GCPD — o caminho da extensão
 
-Este é o mecanismo menos conhecido e o mais barato de implementar.
+`steamcommunity.com/my/gcpd/730/?tab=<aba>` é a página de dados pessoais do
+jogo. São **20 abas**:
 
-A Web API respeita a privacidade **em relação ao dono da chave**, não em
-relação ao mundo. Se a conta que gerou a `STEAM_API_KEY` for amiga do
-jogador, perfis marcados como "Somente amigos" passam a responder — a
-biblioteca e as stats vêm normalmente. Desfeita a amizade, a API volta a
-devolver vazio.
+| Aba | Conteúdo |
+|---|---|
+| Account Information | tempo de atividade, privacidade, Prime, carteira |
+| Authentication Codes | registros de credenciais |
+| Matchmaking | rank competitivo, vitórias/derrotas, partidas jogadas |
+| Competitive / Casual / Wingman / Scrimmage Matches | mapa, resultado, data |
+| Match Stats | métricas de desempenho da partida |
+| Match Events | log detalhado de eventos |
+| Latency | região, ping, coordenadas e **IP** |
+| Loadout | skins equipadas, IDs de item, time |
+| Commendations | quem elogiou, tipo, quando |
+| Reports | denúncias de conduta |
+| Leaderboards, Prime, Major Pick'Em, Operations, Favorite Events | diversos |
 
-Consequência prática: um **bot amigo** converte a maior causa de dashboard
-vazio (perfil não-público) em algo resolvível. O Leetify faz exatamente isso —
-ao vincular a conta, o usuário recebe um pedido de amizade do bot deles.
+As abas de partida listam jogos **com link de download do demo**, incluindo
+os tipos que share code não cobre.
 
-Custo: uma conta Steam dedicada, um fluxo que peça ao usuário para aceitar, e
-o limite de 1.000 amigos por conta (ou seja, sharding de bots ao crescer).
+**A restrição decisiva:** isso exige o cookie de sessão da Steam do próprio
+usuário. Um servidor não tem como acessar. Por isso o Leetify distribui uma
+**extensão de Chrome** (`leetify/leetify-gcpd-upload`) que, rodando como o
+usuário, requisita as páginas de GCPD, extrai as partidas com demo
+disponível e envia os links para o backend deles. Sincroniza a cada 15
+minutos, ao visitar o Leetify, ao visitar o GCPD, ou por botão.
 
-### O que a amizade abre além disso
+---
 
-Com um bot **conectado ao Game Coordinator** do CS2 (via `node-steam-user` +
-`globaloffensive`), `requestPlayersProfile()` devolve rank, comendações,
-medalhas, nível e XP. A documentação do módulo diz que o alvo precisa estar
-na lista de amigos do bot **e** jogando CS — ou seja, é uma coleta
-oportunista, não sob demanda. **Não testamos isso**; antes de desenhar
-qualquer coisa em cima, vale um experimento com uma conta bot real para
-descobrir se o CS Rating do Premier realmente vem e sob quais condições.
+## O que fica de fora, e por quê
 
-## Outros caminhos, e o que eles custam
+Existem bibliotecas (`steam-session`) que obtêm refresh tokens via QR do
+app móvel, dando acesso completo à conta.
 
-| Caminho | O que dá | Custo / risco |
-|---|---|---|
-| **Bot amigo (Web API)** | perfis "somente amigos" | conta bot, aceite do usuário, 1.000 amigos/conta |
-| **Bot no Game Coordinator** | rank, medalhas, comendações | bot com CS2, alvo online, não verificado |
-| **Auth code + share code** | demos → ADR, KAST, rating, clutch | 2 códigos colados, fila + workers, `knowncode` expira em 30 dias |
-| **Inventário** | skins, valor de inventário | endpoint público não documentado, rate limit agressivo por IP |
-| **Login com credencial / QR** | tudo | **não fazer** — ver abaixo |
+A documentação da Web API da Valve é explícita: autenticar pedindo usuário e
+senha no seu site **viola os Termos de Uso da API** — é a razão de o OpenID
+existir. O fluxo por QR contorna a senha mas mantém o problema de fundo:
+você passa a segurar uma credencial que move skins, e é o vetor exato dos
+golpes de "verificação de trade" em CS2. Para uma plataforma de
+estatísticas, o passivo não paga.
 
-### Por que não pedir credencial
-
-Existem bibliotecas (`steam-session`) que obtêm refresh tokens via QR do app
-móvel, e isso daria acesso completo à conta — inclusive inventário e trades.
-
-A documentação da Web API da Valve é explícita: autenticar sem OpenID, pedindo
-usuário e senha no seu site, **viola os Termos de Uso da API**. O fluxo por QR
-contorna a senha mas mantém o problema de fundo: você passa a segurar uma
-credencial que move skins. É também o vetor exato dos golpes de "verificação
-de trade" em CS2. Para uma plataforma de estatísticas, o retorno não paga o
-passivo.
+---
 
 ## Fontes
 
+- https://steamcommunity.com/dev — Termos de Uso e OpenID
 - https://github.com/SteamTracking/SteamTracking/blob/master/API/ICSGOPlayers_730.json
-- https://leetify.com/blog/share-codes/
-- https://csstats.gg/getting-the-sharecode
+- https://github.com/SteamTracking/SteamTracking-GDPR/blob/master/csgo_730_gcpd.md
+- https://github.com/leetify/leetify-gcpd-upload
+- https://github.com/akiver/csgo-sharecode
+- https://github.com/DoctorMcKay/node-globaloffensive
 - https://github.com/markus-wa/demoinfocs-golang
 - https://github.com/LaihoE/demoparser
 - https://github.com/pnxenopoulos/awpy
-- https://github.com/DoctorMcKay/node-globaloffensive
-- https://steamcommunity.com/dev (Termos de Uso e OpenID)
-- https://steamcommunity.com/discussions/forum/7/1729827777339922602/ (amizade e privacidade na Web API)
+- https://leetify.com/blog/share-codes/
+- https://csstats.gg/getting-the-sharecode
+- https://csrep.gg/docs/api-reference
+- https://steamcommunity.com/discussions/forum/7/1729827777339922602/ — amizade e privacidade
+- https://dev.doctormckay.com/topic/4390-how-am-i-exceeding-steam-apis-rate-limit/ — limites por IP

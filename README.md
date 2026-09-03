@@ -172,9 +172,15 @@ kills, mortes, headshots, precisão, dano, rounds, vitórias — tudo ao longo d
 tempo, com granularidade diária.
 
 O que ela **não** entrega, e que csstats.gg / csrep.gg / Leetify mostram:
-ADR, KAST, HLTV rating, clutches, entry duels, dados por round, por arma e por
-posição. Nada disso existe na Web API — vem de **parsing de demos**. Veja
-`docs/dados-profundos.md`.
+ADR, KAST, HLTV rating, clutches, entry duels e dados por round. Nada disso
+existe na Web API.
+
+Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:
+
+- [docs/dados-profundos.md](docs/dados-profundos.md) — o que cada caminho
+  entrega, como funciona e quais limites ele impõe
+- [docs/roadmap-dados.md](docs/roadmap-dados.md) — qual atacar primeiro, e
+  qual medição decide isso
 
 ## Estrutura
 
