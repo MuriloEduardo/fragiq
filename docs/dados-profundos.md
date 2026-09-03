@@ -26,6 +26,39 @@ O FragIQ hoje usa só o caminho 1.
 **vitalícios e cumulativos**: no CS2 são 197, dos quais 178 viram série
 temporal (ver [README](../README.md)).
 
+### Escopo dos contadores — medido, não documentado
+
+A Valve não documenta o que cada contador conta, e o escopo **não é uniforme**.
+Medimos jogando uma partida casual e comparando os 197 contadores antes e
+depois.
+
+| Comportamento | Contadores |
+|---|---|
+| **Somam todos os modos** | `total_kills`, `total_deaths`, `total_damage_done`, `total_rounds_played`, `total_matches_played`, `total_time_played`, `total_contribution_score`, e todos os por arma (`total_shots_*`, `total_hits_*`, `total_kills_*`) |
+| **Só competitivo/premier** | os 18 `last_match_*` — nenhum se moveu com a casual |
+| **Não se moveram** | os 30 por mapa (inconclusivo: pode ser escopo ou mapa não rastreado) |
+
+Consequência para o produto: um K/D por período que inclua dias de casual vem
+inflado, porque casual é mais solto. Os `last_match_*` são o sinal mais limpo
+por partida oficial que a Web API oferece.
+
+Corroborando: `total_time_played` marca 751h contra 1.987h de
+`playtime_forever`. 62% do tempo em jogo não entra em contador nenhum — menu,
+workshop, servidores da comunidade.
+
+### Contadores por mapa estão congelados
+
+A Valve parou de adicionar mapas. Existem:
+
+```
+ar_baggage  ar_monastery  ar_shoots  cs_assault  cs_office  de_bank
+de_cbble    de_dust2      de_house   de_inferno  de_lake    de_nuke
+de_safehouse de_stmarc    de_train   de_vertigo
+```
+
+Do pool ativo, **Mirage, Ancient, Anubis e Overpass não são rastreados**.
+Qualquer análise por mapa cobre no máximo metade do que se joga hoje.
+
 ### Limites reais
 
 O número documentado é 100.000 chamadas/dia por chave. O que os fóruns

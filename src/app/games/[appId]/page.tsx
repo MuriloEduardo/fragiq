@@ -10,6 +10,7 @@ import { metricCatalog, type SnapshotRow } from "@/lib/series";
 import { SiteHeader } from "@/components/site-header";
 import { Explorer, type Preset } from "@/components/explorer";
 import { CollectionStatus } from "@/components/collection-status";
+import { CounterScope } from "@/components/counter-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -100,8 +101,9 @@ export default async function GamePage({
           </div>
         </header>
 
-        <div className="mt-6">
+        <div className="mt-6 space-y-3">
           <CollectionStatus snapshotCount={rows.length} />
+          <CounterScope appId={appId} />
         </div>
 
         <section className="mt-8">

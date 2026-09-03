@@ -106,6 +106,12 @@ Isso é bem mais do que "K/D ao longo do tempo": dá precisão **por arma** e
 taxa de vitória **por mapa** em série temporal, que nem csstats nem csrep
 grafica hoje.
 
+Duas ressalvas medidas experimentalmente, não documentadas pela Valve: os
+contadores globais e por arma **somam todos os modos** (casual entra junto com
+competitivo), e os contadores por mapa estão **congelados em mapas legados** —
+Mirage, Ancient, Anubis e Overpass não são rastreados. Detalhes em
+[docs/dados-profundos.md](docs/dados-profundos.md).
+
 ### Nem todo contador é cumulativo
 
 Tratar todos como cumulativos gera gráficos silenciosamente errados, então

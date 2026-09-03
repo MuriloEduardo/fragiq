@@ -24,12 +24,13 @@ const ROWS: { label: string; note?: string; cells: [Cell, Cell, Cell, Cell] }[] 
   },
   {
     label: "Precisão por arma ao longo do tempo",
-    note: "as outras mostram só o número vitalício",
+    note: "as outras mostram só o número vitalício; soma todos os modos",
     cells: ["yes", "no", "no", "no"],
   },
   {
     label: "Taxa de vitória por mapa ao longo do tempo",
-    cells: ["yes", "no", "no", "no"],
+    note: "só nos mapas que a Valve ainda rastreia — Mirage e Ancient ficam de fora",
+    cells: ["partial", "no", "no", "no"],
   },
   {
     label: "Funciona em qualquer jogo da Steam",
