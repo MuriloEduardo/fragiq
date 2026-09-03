@@ -19,9 +19,35 @@ export type Mode =
   /** Razão entre dois contadores no período: K/D, HS%, precisão. */
   | "ratio";
 
+/**
+ * Nem todo contador do jogo se comporta igual, e tratar todos como
+ * cumulativos produz gráficos silenciosamente errados.
+ *
+ * - `counter`: só sobe (total_kills). Delta entre coletas = o período.
+ * - `gauge`: reseta a cada partida (last_match_kills). O valor JÁ é o do
+ *   período — tirar delta dele não significa nada.
+ * - `hidden`: ruído (GI.lesson.* são flags de tutorial concluído).
+ */
+export type MetricKind = "counter" | "gauge" | "hidden";
+
+export function classifyMetric(key: string): MetricKind {
+  if (key.startsWith("GI.lesson.")) return "hidden";
+  if (key.startsWith("last_match_")) return "gauge";
+  return "counter";
+}
+
+/** Modos que fazem sentido para cada natureza de contador. */
+export function modesFor(kind: MetricKind): Mode[] {
+  return kind === "gauge"
+    ? ["cumulative", "ratio"]
+    : ["delta", "cumulative", "perHour", "ratio"];
+}
+
 export type SeriesSpec = {
   id: string;
   metric: string;
+  /** Resolvido a partir do catálogo; decide como a série é calculada. */
+  kind?: MetricKind;
   /** Só usado quando mode === "ratio". */
   denominator?: string;
   mode: Mode;
@@ -103,6 +129,27 @@ export function buildSeries(
   const rows = collapse(snapshots, bucket);
   const scale = spec.scale ?? 1;
   const points: SeriesPoint[] = [];
+  const kind = spec.kind ?? classifyMetric(spec.metric);
+
+  // Gauge já é o valor do período: plotamos direto, e a razão é ponto a
+  // ponto. Aplicar delta aqui compararia duas partidas diferentes.
+  if (kind === "gauge") {
+    for (const row of rows) {
+      const value = num(row, spec.metric);
+      if (value === null) continue;
+
+      if (spec.mode === "ratio") {
+        if (!spec.denominator) continue;
+        const den = num(row, spec.denominator);
+        if (den === null || den === 0) continue;
+        points.push({ t: row.capturedAt.getTime(), value: (value / den) * scale });
+        continue;
+      }
+
+      points.push({ t: row.capturedAt.getTime(), value: value * scale });
+    }
+    return points;
+  }
 
   if (spec.mode === "cumulative") {
     for (const row of rows) {
@@ -160,6 +207,9 @@ export function buildSeries(
 export type MetricInfo = {
   key: string;
   label: string;
+  kind: MetricKind;
+  /** Agrupamento para o seletor — com ~200 métricas, uma lista plana é inútil. */
+  group: string;
   /** Quanto o contador cresceu no histórico — proxy de "esta métrica é útil". */
   growth: number;
 };
@@ -183,13 +233,62 @@ export function metricCatalog(
   return [...keys]
     .map((key) => ({
       key,
+      kind: classifyMetric(key),
       label: schema?.[key] ?? humanizeKey(key),
+      group: groupOf(key),
       growth: (last[key] ?? 0) - (first[key] ?? 0),
     }))
-    .sort((a, b) => b.growth - a.growth || a.label.localeCompare(b.label));
+    .filter((m) => m.kind !== "hidden")
+    .sort(
+      (a, b) =>
+        GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) ||
+        b.growth - a.growth ||
+        a.label.localeCompare(b.label),
+    );
 }
 
+/**
+ * CS2 devolve ~200 contadores com nomes crus. Sem agrupar e sem rotular, o
+ * seletor do explorador é inutilizável.
+ */
+export const GROUP_ORDER: string[] = [
+  "Geral",
+  "Por arma",
+  "Por mapa",
+  "Última partida",
+  "Outros",
+];
+
+export function groupOf(key: string): string {
+  if (key.startsWith("last_match_")) return "Última partida";
+  if (/_map_/.test(key)) return "Por mapa";
+  if (/^total_(kills|shots|hits)_[a-z0-9]+$/.test(key) && key !== "total_kills_headshot")
+    return "Por arma";
+  if (key.startsWith("total_")) return "Geral";
+  return "Outros";
+}
+
+const PREFIX_LABELS: [RegExp, string][] = [
+  [/^total_kills_(?!headshot)/, "Kills"],
+  [/^total_hits_/, "Acertos"],
+  [/^total_shots_/, "Tiros"],
+  [/^total_wins_map_/, "Vitórias"],
+  [/^total_rounds_map_/, "Rounds"],
+  [/^last_match_/, "Última partida"],
+];
+
 export function humanizeKey(key: string) {
+  for (const [pattern, prefix] of PREFIX_LABELS) {
+    if (pattern.test(key)) {
+      const rest = key.replace(pattern, "");
+      // Nome de mapa (de_dust2) fica melhor cru do que "humanizado".
+      const suffix = /_map_/.test(key) || /^[a-z]{2}_/.test(rest)
+        ? rest
+        : rest.replace(/_/g, " ");
+      return `${prefix} · ${suffix}`;
+    }
+  }
+
   return key
     .replace(/^total_/, "")
     .replace(/_/g, " ")
@@ -197,7 +296,7 @@ export function humanizeKey(key: string) {
 }
 
 export const MODE_LABELS: Record<Mode, string> = {
-  cumulative: "Total acumulado",
+  cumulative: "Valor da coleta",
   delta: "Por período",
   perHour: "Por hora jogada",
   ratio: "Razão entre duas métricas",
@@ -205,10 +304,12 @@ export const MODE_LABELS: Record<Mode, string> = {
 
 export function seriesLabel(spec: SeriesSpec, catalog: Map<string, string>): string {
   const metric = catalog.get(spec.metric) ?? humanizeKey(spec.metric);
+  const kind = spec.kind ?? classifyMetric(spec.metric);
 
   switch (spec.mode) {
     case "cumulative":
-      return `${metric} (total)`;
+      // Para um gauge o valor não é um acumulado; chamá-lo de "total" mentiria.
+      return kind === "gauge" ? metric : `${metric} (total)`;
     case "delta":
       return metric;
     case "perHour":

@@ -220,5 +220,59 @@ function presetsFor(appId: number, available: string[]): Preset[] {
     });
   }
 
+  // Precisão por arma: o contador global total_shots_hit da Valve está
+  // quebrado há anos (devolve uma fração do real), mas os pares por arma
+  // total_hits_X / total_shots_X são confiáveis.
+  const armas = ["ak47", "m4a1", "awp", "deagle"].filter((a) =>
+    has(`total_hits_${a}`, `total_shots_${a}`),
+  );
+  if (armas.length) {
+    presets.push({
+      label: "Precisão por arma",
+      specs: armas.map((a) => ({
+        metric: `total_hits_${a}`,
+        denominator: `total_shots_${a}`,
+        mode: "ratio" as const,
+        scale: 100,
+      })),
+    });
+  }
+
+  const mapas = ["de_mirage", "de_dust2", "de_inferno", "de_nuke"].filter((m) =>
+    has(`total_wins_map_${m}`, `total_rounds_map_${m}`),
+  );
+  if (mapas.length) {
+    presets.push({
+      label: "Vitória por mapa",
+      specs: mapas.map((m) => ({
+        metric: `total_wins_map_${m}`,
+        denominator: `total_rounds_map_${m}`,
+        mode: "ratio" as const,
+        scale: 100,
+      })),
+    });
+  }
+
+  // last_match_* não é cumulativo: cada coleta traz o resultado da partida
+  // mais recente, o que dá a granularidade mais próxima de "por partida"
+  // sem parsing de demo.
+  if (has("last_match_kills", "last_match_deaths")) {
+    presets.push({
+      label: "Última partida: K/D",
+      specs: [
+        { metric: "last_match_kills", denominator: "last_match_deaths", mode: "ratio" },
+      ],
+    });
+  }
+
+  if (has("last_match_damage", "last_match_rounds")) {
+    presets.push({
+      label: "Última partida: dano/round",
+      specs: [
+        { metric: "last_match_damage", denominator: "last_match_rounds", mode: "ratio" },
+      ],
+    });
+  }
+
   return presets;
 }

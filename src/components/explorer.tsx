@@ -3,11 +3,14 @@
 import { useMemo, useState } from "react";
 import { Plus, Sparkles, X } from "lucide-react";
 import {
+  GROUP_ORDER,
   MODE_LABELS,
   buildSeries,
+  modesFor,
   seriesLabel,
   type Bucket,
   type MetricInfo,
+  type MetricKind,
   type Mode,
   type SeriesSpec,
   type SnapshotRow,
@@ -66,6 +69,25 @@ export function Explorer({ snapshots, catalog, presets }: Props) {
     [catalog],
   );
 
+  const kinds = useMemo(
+    () => new Map(catalog.map((m) => [m.key, m.kind])),
+    [catalog],
+  );
+
+  // Opções do seletor agrupadas — com ~200 contadores uma lista plana não
+  // é navegável.
+  const grouped = useMemo(() => {
+    const map = new Map<string, { value: string; label: string }[]>();
+    for (const m of catalog) {
+      const bucketList = map.get(m.group) ?? [];
+      bucketList.push({ value: m.key, label: m.label });
+      map.set(m.group, bucketList);
+    }
+    return [...map.entries()].sort(
+      (a, b) => GROUP_ORDER.indexOf(a[0]) - GROUP_ORDER.indexOf(b[0]),
+    );
+  }, [catalog]);
+
   // Datas chegam serializadas do Server Component; reidratamos uma vez só.
   const parsed = useMemo<SnapshotRow[]>(
     () =>
@@ -85,17 +107,29 @@ export function Explorer({ snapshots, catalog, presets }: Props) {
 
   const results = useMemo(
     () =>
-      specs.map((spec) => ({
-        id: spec.id,
-        label: seriesLabel(spec, labels),
-        points: buildSeries(inRange, spec, bucket),
-      })),
-    [specs, inRange, bucket, labels],
+      specs.map((spec) => {
+        const resolved = { ...spec, kind: kinds.get(spec.metric) };
+        return {
+          id: spec.id,
+          label: seriesLabel(resolved, labels),
+          points: buildSeries(inRange, resolved, bucket),
+        };
+      }),
+    [specs, inRange, bucket, labels, kinds],
   );
 
   function update(id: string, patch: Partial<SeriesSpec>) {
     setSpecs((current) =>
-      current.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+      current.map((s) => {
+        if (s.id !== id) return s;
+
+        const next = { ...s, ...patch };
+        // Trocar para um gauge com o modo em "por período" deixaria a série
+        // vazia sem explicação — reconciliamos para um modo válido.
+        const allowed = modesFor(kinds.get(next.metric) ?? "counter");
+        if (!allowed.includes(next.mode)) next.mode = allowed[0];
+        return next;
+      }),
     );
   }
 
@@ -153,7 +187,8 @@ export function Explorer({ snapshots, catalog, presets }: Props) {
             key={spec.id}
             spec={spec}
             color={SERIES_COLORS[index % SERIES_COLORS.length]}
-            catalog={catalog}
+            grouped={grouped}
+            kind={kinds.get(spec.metric) ?? "counter"}
             pointCount={results[index]?.points.length ?? 0}
             onChange={(patch) => update(spec.id, patch)}
             onRemove={
@@ -197,21 +232,26 @@ export function Explorer({ snapshots, catalog, presets }: Props) {
 
 /* ---------------------------------- linha ---------------------------------- */
 
+type GroupedOptions = [string, { value: string; label: string }[]][];
+
 function QueryRow({
   spec,
   color,
-  catalog,
+  grouped,
+  kind,
   pointCount,
   onChange,
   onRemove,
 }: {
   spec: SeriesSpec;
   color: string;
-  catalog: MetricInfo[];
+  grouped: GroupedOptions;
+  kind: MetricKind;
   pointCount: number;
   onChange: (patch: Partial<SeriesSpec>) => void;
   onRemove?: () => void;
 }) {
+  const firstKey = grouped[0]?.[1][0]?.value;
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2">
       <span
@@ -223,7 +263,7 @@ function QueryRow({
       <Select
         value={spec.metric}
         onChange={(v) => onChange({ metric: v })}
-        options={catalog.map((m) => ({ value: m.key, label: m.label }))}
+        grouped={grouped}
         className="min-w-44 flex-1"
       />
 
@@ -234,15 +274,12 @@ function QueryRow({
           onChange({
             mode,
             // Razão precisa de denominador e costuma ser exibida em %.
-            denominator:
-              mode === "ratio" ? (spec.denominator ?? catalog[0]?.key) : undefined,
+            denominator: mode === "ratio" ? (spec.denominator ?? firstKey) : undefined,
             scale: mode === "ratio" ? spec.scale : undefined,
           });
         }}
-        options={(Object.keys(MODE_LABELS) as Mode[]).map((m) => ({
-          value: m,
-          label: MODE_LABELS[m],
-        }))}
+        // Um gauge não aceita delta nem "por hora": o valor já é do período.
+        options={modesFor(kind).map((m) => ({ value: m, label: MODE_LABELS[m] }))}
         className="min-w-40"
       />
 
@@ -252,7 +289,7 @@ function QueryRow({
           <Select
             value={spec.denominator ?? ""}
             onChange={(v) => onChange({ denominator: v })}
-            options={catalog.map((m) => ({ value: m.key, label: m.label }))}
+            grouped={grouped}
             className="min-w-40 flex-1"
           />
           <label className="flex items-center gap-1.5 text-xs text-ink-faint">
@@ -288,11 +325,13 @@ function Select({
   value,
   onChange,
   options,
+  grouped,
   className,
 }: {
   value: string;
   onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  options?: { value: string; label: string }[];
+  grouped?: GroupedOptions;
   className?: string;
 }) {
   return (
@@ -304,7 +343,16 @@ function Select({
         className,
       )}
     >
-      {options.map((o) => (
+      {grouped?.map(([group, items]) => (
+        <optgroup key={group} label={group}>
+          {items.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+      {options?.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
         </option>

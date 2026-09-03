@@ -19,7 +19,19 @@ Para avaliar a interface sem chave da Steam:
 npm run seed                  # 90 dias de histórico fictício de CS2
 ```
 
-e acesse `/api/auth/dev-login` (só existe fora de produção).
+e acesse `/api/auth/dev-login` (só existe fora de produção; aceita
+`?steamId=` para escolher a conta).
+
+Para diagnosticar uma conta real sem gravar nada:
+
+```bash
+npm run probe -- 76561198000000000
+```
+
+No VS Code, `.vscode/launch.json` traz o compound **FragIQ: full stack**, que
+sobe o servidor e o Chrome juntos — no App Router os dois lados são o mesmo
+processo Next, então breakpoints em Server Components e no explorador
+funcionam na mesma sessão.
 
 ## Como os dados entram
 
@@ -63,6 +75,45 @@ Nada é pré-agregado. Métricas novas não exigem migração nem recoleta — o
 passa a expor um contador e ele aparece sozinho no explorador. É também o que
 torna o sistema agnóstico de jogo: qualquer appid da Steam que exponha stats
 funciona sem uma linha de código nova.
+
+### O que o CS2 realmente expõe
+
+Medido com `npm run probe`: **197 contadores**, dos quais 178 vão para o
+explorador.
+
+| Grupo | Qtd | Exemplos |
+|---|---|---|
+| Geral | 36 | `total_kills`, `total_damage_done`, `total_mvps` |
+| Por arma | 94 | `total_kills_ak47`, `total_hits_awp`, `total_shots_deagle` |
+| Por mapa | 30 | `total_wins_map_de_mirage`, `total_rounds_map_de_nuke` |
+| Última partida | 18 | `last_match_kills`, `last_match_damage` |
+| Ocultos | 19 | `GI.lesson.*` — flags de tutorial, ruído |
+
+Isso é bem mais do que "K/D ao longo do tempo": dá precisão **por arma** e
+taxa de vitória **por mapa** em série temporal, que nem csstats nem csrep
+grafica hoje.
+
+### Nem todo contador é cumulativo
+
+Tratar todos como cumulativos gera gráficos silenciosamente errados, então
+`classifyMetric()` separa três naturezas:
+
+- **`counter`** — só sobe (`total_kills`). O delta entre coletas é o período.
+- **`gauge`** — reseta a cada partida (`last_match_*`). O valor **já é** do
+  período; tirar delta dele compararia duas partidas diferentes. Estes só
+  aceitam os modos "valor da coleta" e "razão", e a UI reconcilia o modo
+  sozinha quando você troca a métrica.
+- **`hidden`** — `GI.lesson.*`, fora do catálogo.
+
+Os `last_match_*` são valiosos: dão a granularidade mais próxima de "por
+partida" sem precisar parsear demo.
+
+### Uma armadilha da Valve
+
+`total_shots_hit` está quebrado há anos — no perfil de teste devolve 8.635
+contra 940.530 de `total_shots_fired`, uma precisão impossível de 0,9%. Os
+pares por arma (`total_hits_ak47` / `total_shots_ak47`) são confiáveis, e é
+por isso que o preset "Precisão por arma" existe.
 
 ## O explorador
 
