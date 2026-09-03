@@ -64,6 +64,13 @@ export async function GET(request: NextRequest) {
     select: { id: true, steamId: true },
   });
 
+  // Registra a invocação antes de qualquer trabalho: uma execução sem
+  // candidatos precisa deixar rastro, senão não há como distinguir
+  // "agendador parado" de "nada a coletar".
+  const run = await prisma.cronRun.create({
+    data: { status: "RUNNING", candidates: users.length },
+  });
+
   const deadline = Date.now() + TIME_BUDGET_MS;
 
   let synced = 0;
@@ -89,7 +96,20 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  await prisma.cronRun.update({
+    where: { id: run.id },
+    data: {
+      status: failed > 0 && synced === 0 ? "FAILED" : "SUCCESS",
+      finishedAt: new Date(),
+      synced,
+      failed,
+      skipped,
+      snapshots,
+    },
+  });
+
   return NextResponse.json({
+    runId: run.id,
     candidates: users.length,
     synced,
     failed,
