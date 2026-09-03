@@ -41,10 +41,13 @@ export function CounterScope({
           comparando os 197 contadores antes e depois.
         </p>
 
-        <Item titulo="Somam todos os modos">
-          Kills, mortes, dano, rounds, partidas e os contadores por arma contam
-          casual junto com competitivo e premier. Um K/D por período que inclua
-          dias de casual vem inflado — casual é mais solto.
+        <Item titulo="Não dá para separar por modo">
+          Competitivo, premier, casual e deathmatch caem todos nos mesmos
+          contadores — inclusive os por arma e os por mapa. O schema do jogo
+          declara 286 estatísticas e{" "}
+          <strong className="font-medium text-ink">nenhuma</strong> distingue
+          esses modos; só arms race tem contadores próprios. Um K/D por período
+          que inclua dias de casual vem inflado, e não há como filtrar.
         </Item>
 
         <Item titulo="Provavelmente legado">
@@ -64,12 +67,13 @@ export function CounterScope({
         </Item>
 
         <Item titulo="Mapas legados apenas">
-          A Valve parou de adicionar mapas a estes contadores. Dust2, Inferno,
-          Nuke, Train e Vertigo existem;{" "}
+          A Valve parou de adicionar mapas a estes contadores por volta de 2013.
+          Dust2, Inferno, Nuke, Train e Vertigo existem;{" "}
           <strong className="font-medium text-ink">
             Mirage, Ancient, Anubis e Overpass não são rastreados
-          </strong>
-          .
+          </strong>{" "}
+          — partidas nesses mapas somam nos totais gerais, mas somem da análise
+          por mapa.
         </Item>
       </div>
     </details>

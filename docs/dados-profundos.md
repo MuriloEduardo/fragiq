@@ -36,10 +36,37 @@ depois.
 |---|---|
 | **Somam todos os modos** | `total_kills`, `total_deaths`, `total_damage_done`, `total_rounds_played`, `total_matches_played`, `total_time_played`, `total_contribution_score`, e todos os por arma (`total_shots_*`, `total_hits_*`, `total_kills_*`) |
 | **Aparentemente mortos** | os 18 `last_match_*` — ver abaixo |
-| **Não se moveram** | os 30 por mapa (inconclusivo: pode ser escopo ou mapa não rastreado) |
+| **Somam todos os modos** | também os 30 por mapa — confirmado: uma casual em Inferno moveu `total_rounds_map_de_inferno` |
 
 Consequência para o produto: um K/D por período que inclua dias de casual vem
 inflado, porque casual é mais solto.
+
+### Separar competitivo de casual é impossível por aqui
+
+Testado por dois caminhos independentes.
+
+**Pelo schema.** `GetSchemaForGame` declara 286 estatísticas. Procurando
+marcadores de modo no nome:
+
+| Modo | Contadores próprios |
+|---|---|
+| Arms race / gun game | **9** |
+| Tutorial (`GI.lesson.*`) | 34 (flags, não desempenho) |
+| Wingman | 0 |
+| Competitivo | 0 |
+| Casual | 0 |
+| Deathmatch | 0 |
+| Premier | 0 |
+| Sem marcador (globais) | 243 |
+
+**Pela observação.** Comparando quais contadores se moveram em dois
+intervalos — um com uma partida, outro com duas casuais — a diferença entre
+os conjuntos é só *qual arma e qual mapa foram usados*
+(`total_kills_tec9` num, `total_kills_ssg08` no outro; `de_dust2` num,
+`de_inferno` no outro). Nenhum contador é exclusivo de um modo.
+
+Conclusão: **arms race é o único modo separável**. Para isolar competitivo ou
+premier é preciso dado de partida — caminho 4.
 
 ### `last_match_*` parece ser legado morto
 
