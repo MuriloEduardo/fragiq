@@ -39,8 +39,13 @@ diante ele reconecta sozinho.
 
 ## Limite de amigos
 
-Uma conta Steam comporta 1.000 amigos. Passando disso, é preciso uma segunda
-conta e um roteamento por faixa de SteamID.
+O teto é 250 mais 5 por nível da conta — uma conta nova para em torno de 300,
+não em 1.000 como se costuma dizer. Medido: a conta recém-criada mostrava
+"1 / 300".
+
+Isso antecipa o momento de precisar de um segundo bot. Subir o nível custa
+dinheiro (é preciso comprar itens ou jogos), então na prática o caminho é
+sharding: várias contas, cada uma responsável por uma faixa de SteamID.
 
 ## Experimento pendente
 

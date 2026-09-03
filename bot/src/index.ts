@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { createInterface } from "node:readline/promises";
 import SteamUser from "steam-user";
 import { CS2_APPID, config } from "./config.js";
 
@@ -36,22 +38,42 @@ if (config.refreshToken) {
 }
 
 client.on("refreshToken", (token: string) => {
-  console.log(
-    `\n=== GUARDE ISTO ===\nSTEAM_BOT_REFRESH_TOKEN=${token}\n` +
-      "Com ele o bot reconecta sem senha e sem Steam Guard.\n",
-  );
+  // Grava sozinho e apaga a senha: pedir para copiar à mão é onde se erra,
+  // e senha esquecida no arquivo é senha vazada mais cedo ou mais tarde.
+  try {
+    const caminho = new URL("../.env", import.meta.url).pathname;
+    const atual = readFileSync(caminho, "utf8");
+    const novo = atual
+      .replace(/^STEAM_BOT_REFRESH_TOKEN=.*$/m, `STEAM_BOT_REFRESH_TOKEN="${token}"`)
+      .replace(/^STEAM_BOT_PASSWORD=.*$/m, 'STEAM_BOT_PASSWORD=""');
+    writeFileSync(caminho, novo);
+    console.log("\nRefresh token gravado em bot/.env e a senha foi apagada de lá.");
+    console.log("Guarde a senha no seu gerenciador — daqui em diante o bot não precisa dela.\n");
+  } catch {
+    console.log(`\n=== GUARDE ISTO ===\nSTEAM_BOT_REFRESH_TOKEN=${token}\n`);
+  }
 });
 
-client.on("steamGuard", (domain, callback, lastCodeWrong) => {
-  console.error(
-    `Steam Guard exigido${domain ? ` (e-mail ${domain})` : " (app móvel)"}` +
-      `${lastCodeWrong ? " — o código anterior estava errado" : ""}.`,
-  );
-  console.error(
-    "Rode uma vez em terminal interativo com STEAM_BOT_PASSWORD para gerar o " +
-      "refresh token, e depois use só o token.",
-  );
-  process.exit(1);
+client.on("steamGuard", async (domain, callback, lastCodeWrong) => {
+  const origem = domain ? `e-mail ${domain}` : "app móvel";
+
+  // Sem TTY não há como pedir o código: em produção o bot roda com refresh
+  // token justamente para nunca chegar aqui.
+  if (!process.stdin.isTTY) {
+    console.error(
+      `Steam Guard exigido (${origem}) mas o terminal não é interativo.\n` +
+        "Rode uma vez localmente com STEAM_BOT_PASSWORD para gerar o refresh " +
+        "token, e em produção use só STEAM_BOT_REFRESH_TOKEN.",
+    );
+    process.exit(1);
+  }
+
+  if (lastCodeWrong) console.error("O código anterior estava errado.");
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const codigo = await rl.question(`Código do Steam Guard (${origem}): `);
+  rl.close();
+  callback(codigo.trim());
 });
 
 client.on("loggedOn", () => {

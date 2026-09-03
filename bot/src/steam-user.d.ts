@@ -60,7 +60,11 @@ declare module "steam-user" {
     on(event: "disconnected", cb: (eresult: number, msg: string) => void): this;
     on(
       event: "steamGuard",
-      cb: (domain: string | null, callback: (code: string) => void, lastCodeWrong: boolean) => void,
+      cb: (
+        domain: string | null,
+        callback: (code: string) => void,
+        lastCodeWrong: boolean,
+      ) => void | Promise<void>,
     ): this;
     on(event: "friendRelationship", cb: (steamID: SteamID, relationship: number) => void): this;
     on(event: "user", cb: (steamID: SteamID, user: PersonaUser) => void): this;
