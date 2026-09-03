@@ -32,7 +32,10 @@ type Props = {
 export function StatPanel({ stats, snapshots, activeKey, onSelect }: Props) {
   const tiles = stats.map((stat) => {
     const spec: SeriesSpec = { ...stat.spec, id: stat.key };
-    const points = buildSeries(snapshots, spec, "day");
+    // "raw": cada coleta é um ponto. Agrupar por dia colapsaria justamente a
+    // granularidade por partida que a coleta frequente produz — e um tile
+    // quer mostrar movimento, não uma média diária.
+    const points = buildSeries(snapshots, spec, "raw");
     return {
       stat,
       values: points.map((p) => p.value),

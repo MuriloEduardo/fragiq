@@ -50,10 +50,10 @@ const RANGES = [
 ] as const;
 
 const BUCKETS: { value: Bucket; label: string }[] = [
+  { value: "raw", label: "Cada coleta" },
   { value: "day", label: "Dia" },
   { value: "week", label: "Semana" },
   { value: "month", label: "Mês" },
-  { value: "raw", label: "Cada coleta" },
 ];
 
 let nextId = 0;
@@ -67,7 +67,17 @@ export function Explorer({
   onSpecsChange,
   onPresetApplied,
 }: Props) {
-  const [bucket, setBucket] = useState<Bucket>("day");
+  // Agrupar por dia com poucos dias de histórico esconde tudo: três coletas
+  // do mesmo dia viram um ponto só. Começamos na granularidade mais fina e
+  // deixamos o agrupamento para quando houver dias suficientes.
+  const [bucket, setBucket] = useState<Bucket>(() => {
+    if (snapshots.length < 2) return "raw";
+    const dias =
+      (new Date(snapshots[snapshots.length - 1].capturedAt).getTime() -
+        new Date(snapshots[0].capturedAt).getTime()) /
+      86_400_000;
+    return dias >= 3 ? "day" : "raw";
+  });
   const [rangeDays, setRangeDays] = useState<number | null>(90);
 
   // As séries vivem no pai para que um clique no painel possa carregá-las
