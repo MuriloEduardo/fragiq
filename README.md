@@ -46,7 +46,20 @@ Steamworks são de comércio, para publishers. A Web API é 100% *pull*, então 
 | `CRON` | `GET /api/cron/sync` | diário às 05:00 UTC (`vercel.json`) |
 
 O cron é o que importa: sem ele a série só tem pontos nos dias em que a pessoa
-abriu o site, e uma plataforma de evolução com buracos não serve.
+abriu o site, e uma plataforma de evolução com buracos não serve. Em produção
+a coleta é automática — o botão é conveniência, não requisito.
+
+O cron para por **orçamento de tempo**, não por contagem de usuários: um sync
+varia de 1s a 40s conforme a biblioteca, então 50 usuários podem estourar o
+limite da função e perder o lote inteiro. Quem não coube volta primeiro na
+execução seguinte (a ordenação é por `lastSyncedAt` ascendente), então a fila
+gira sem estado extra. O campo `skipped` na resposta é o sinal de que a fila
+não está sendo vazada no ritmo do agendamento.
+
+Limites da Vercel a considerar: no **Hobby** o cron roda no máximo 1×/dia e a
+função morre em 60s (daí o `CRON_TIME_BUDGET_MS` padrão de 45s, que dá ~25
+usuários por dia — suficiente para validar, não para escalar). No **Pro** a
+cadência é por minuto e a função vai a 300s.
 
 ### O gate que torna o polling barato
 

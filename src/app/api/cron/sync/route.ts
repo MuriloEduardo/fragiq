@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { syncUser } from "@/lib/steam/sync";
 
 export const dynamic = "force-dynamic";
+
+// Teto da Vercel: 60s no Hobby, até 300s no Pro. Declaramos 300 porque no
+// Hobby o valor é simplesmente reduzido ao máximo do plano.
 export const maxDuration = 300;
 
 /**
@@ -14,9 +17,24 @@ export const maxDuration = 300;
  * linha reta.
  */
 
-// Quantos usuários por execução. Mantém o job dentro do limite de tempo da
-// serverless function; o restante entra na execução seguinte.
+// Teto de usuários que buscamos por execução.
 const BATCH_SIZE = 50;
+
+/**
+ * Orçamento de tempo, não de quantidade.
+ *
+ * Contar usuários não protege de estouro: um sync leva de 1s (ninguém jogou)
+ * a 40s (biblioteca grande com muitos jogos tocados). 50 usuários podem levar
+ * 90s e a função é morta no meio, perdendo o lote inteiro.
+ *
+ * Paramos por relógio e deixamos o resto para a próxima execução. Como a
+ * ordenação é por lastSyncedAt ascendente, quem sobrou vem primeiro na
+ * próxima — a fila gira sozinha, sem estado extra.
+ *
+ * O padrão de 45s cabe no limite de 60s do plano Hobby. Com maxDuration
+ * maior, suba via CRON_TIME_BUDGET_MS.
+ */
+const TIME_BUDGET_MS = Number(process.env.CRON_TIME_BUDGET_MS ?? 45_000);
 
 // Não recoleta quem já foi sincronizado há pouco (ex.: acabou de logar).
 const MIN_AGE_HOURS = 20;
@@ -46,13 +64,21 @@ export async function GET(request: NextRequest) {
     select: { id: true, steamId: true },
   });
 
+  const deadline = Date.now() + TIME_BUDGET_MS;
+
   let synced = 0;
   let failed = 0;
   let snapshots = 0;
+  let skipped = 0;
 
   // Sequencial de propósito: rajadas paralelas contra a Steam Web API são o
   // caminho mais curto para a chave ser limitada.
   for (const user of users) {
+    if (Date.now() >= deadline) {
+      skipped = users.length - synced - failed;
+      break;
+    }
+
     try {
       const result = await syncUser(user.id, user.steamId, "CRON");
       snapshots += result.snapshotsCreated;
@@ -63,5 +89,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ candidates: users.length, synced, failed, snapshots });
+  return NextResponse.json({
+    candidates: users.length,
+    synced,
+    failed,
+    // > 0 significa que a fila não está sendo vazada no ritmo do agendamento:
+    // ou aumente a frequência do cron, ou mova para um worker dedicado.
+    skipped,
+    snapshots,
+  });
 }

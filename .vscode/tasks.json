@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // O app não sobe sem Postgres. --wait segura até o healthcheck do
+      // container passar, senão o Next inicia e quebra na primeira query.
+      "label": "db",
+      "type": "shell",
+      "command": "docker compose up -d --wait",
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "shared" }
+    }
+  ]
+}

@@ -2,75 +2,23 @@
   "version": "0.2.0",
   "configurations": [
     {
-      // O Next.js é um processo só: as rotas de API, os Server Components e
-      // o sync da Steam rodam todos aqui. É o alvo para breakpoints em
-      // src/lib/steam/*, src/app/api/* e nas páginas server-side.
-      "name": "Next.js: servidor",
-      "type": "node",
+      // Único launcher: sobe o Postgres, roda o Next e abre o Chrome já
+      // anexado. No App Router não existem processos separados de front e
+      // back — as rotas de API, os Server Components e o sync da Steam são
+      // o mesmo processo — então "full stack" aqui é um alvo só, e os
+      // breakpoints valem dos dois lados.
+      "name": "FragIQ",
+      "type": "node-terminal",
       "request": "launch",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "command": "npm run dev",
       "cwd": "${workspaceFolder}",
-      "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal",
+      "preLaunchTask": "db",
       "serverReadyAction": {
-        "pattern": "- Local:\\s+(https?://\\S+)",
+        "pattern": "Local:\\s+(https?://\\S+)",
         "uriFormat": "%s",
-        "action": "debugWithChrome"
+        "action": "debugWithChrome",
+        "webRoot": "${workspaceFolder}"
       }
-    },
-    {
-      // Anexa ao Chrome para depurar o que roda no browser: o explorador,
-      // os gráficos do Recharts e o botão de sync. Exige o servidor já no ar.
-      "name": "Next.js: cliente (Chrome)",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}",
-      "sourceMapPathOverrides": {
-        "webpack://_N_E/*": "${webRoot}/*"
-      }
-    },
-    {
-      // Depuração do coletor fora do ciclo de request, com o SteamID como
-      // argumento. Útil para investigar por que a biblioteca de alguém
-      // volta vazia.
-      "name": "Script: probe da Steam",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx", "scripts/probe-steam.ts", "${input:steamId}"],
-      "cwd": "${workspaceFolder}",
-      "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Script: seed",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx", "scripts/seed.ts"],
-      "cwd": "${workspaceFolder}",
-      "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal"
-    }
-  ],
-  "compounds": [
-    {
-      // Sobe o servidor e o Chrome juntos — breakpoints funcionam nos dois
-      // lados na mesma sessão, que é o que "rodar front e back" significa
-      // num app App Router.
-      "name": "FragIQ: full stack",
-      "configurations": ["Next.js: servidor", "Next.js: cliente (Chrome)"],
-      "stopAll": true
-    }
-  ],
-  "inputs": [
-    {
-      "id": "steamId",
-      "type": "promptString",
-      "description": "SteamID64 para diagnosticar",
-      "default": "76561199045067879"
     }
   ]
 }
