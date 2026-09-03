@@ -1,0 +1,21 @@
+# Quando este arquivo existe, ele substitui o .gitignore como regra de upload
+# — então precisa listar tudo, não só os segredos.
+
+# Segredos. Um .env enviado junto vira arquivo dentro do deployment, e o
+# Next carrega .env em produção também: valores locais passariam a competir
+# com as env vars da plataforma.
+.env
+.env.*
+
+# Artefatos e dependências (a Vercel reinstala e recompila)
+node_modules
+.next
+*.tsbuildinfo
+
+# Só fazem sentido na máquina de desenvolvimento
+docker-compose.yml
+.vscode
+.vercel
+
+# Cliente do Prisma é gerado no build pelo postinstall
+src/generated
