@@ -1,0 +1,137 @@
+// FragIQ — schema.
+// Modelo central: séries temporais de estatísticas por (usuário, jogo).
+// Os contadores da Steam Web API são cumulativos e vitalícios; guardamos
+// snapshots periódicos e derivamos a performance de um período pelo delta
+// entre dois snapshots. Isso é o que permite "acompanhar ao longo do tempo".
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id String @id @default(cuid())
+
+  // SteamID64 — identificador externo estável. O personaName muda, este não.
+  steamId     String  @unique
+  personaName String
+  avatarUrl   String?
+  profileUrl  String?
+  countryCode String?
+
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  games    UserGame[]
+  syncRuns SyncRun[]
+
+  @@map("users")
+}
+
+model Game {
+  // appId da Steam (730 = CS2). Chave natural, usada nas URLs.
+  appId Int    @id
+  name  String
+
+  iconHash String?
+
+  // Schema de stats vindo de ISteamUserStats/GetSchemaForGame: mapeia
+  // nomes crus ("total_kills") para rótulos legíveis. Cacheado por jogo,
+  // não por usuário.
+  statSchema      Json?
+  schemaFetchedAt DateTime?
+
+  // false quando o jogo não expõe stats públicas — evita refetch a cada sync.
+  supportsStats Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  players UserGame[]
+
+  @@map("games")
+}
+
+model UserGame {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  gameAppId Int
+  game      Game @relation(fields: [gameAppId], references: [appId], onDelete: Cascade)
+
+  playtimeForeverMin  Int       @default(0)
+  playtimeTwoWeeksMin Int       @default(0)
+  lastPlayedAt        DateTime?
+
+  firstSeenAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  snapshots StatSnapshot[]
+
+  @@unique([userId, gameAppId])
+  @@index([userId, playtimeForeverMin])
+  @@map("user_games")
+}
+
+model StatSnapshot {
+  id String @id @default(cuid())
+
+  userGameId String
+  userGame   UserGame @relation(fields: [userGameId], references: [id], onDelete: Cascade)
+
+  capturedAt DateTime @default(now())
+
+  // Tempo de jogo no instante do snapshot — permite normalizar deltas por hora.
+  playtimeForeverMin Int @default(0)
+
+  // Stats cruas do jogo: { "total_kills": 41234, "total_deaths": 39001, ... }
+  // Json porque cada appId tem um conjunto de stats totalmente diferente.
+  metrics Json
+
+  achievementsUnlocked Int?
+  achievementsTotal    Int?
+
+  @@unique([userGameId, capturedAt])
+  @@index([userGameId, capturedAt])
+  @@map("stat_snapshots")
+}
+
+model SyncRun {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  trigger     SyncTrigger @default(MANUAL)
+  status      SyncStatus  @default(RUNNING)
+  gamesSeen   Int         @default(0)
+  gamesStored Int         @default(0)
+  error       String?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([userId, startedAt])
+  @@map("sync_runs")
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+/// De onde partiu a coleta. Útil para saber se a série de um usuário vem do
+/// cron (contínua) ou só de cliques manuais (esburacada).
+enum SyncTrigger {
+  MANUAL
+  LOGIN
+  CRON
+}
