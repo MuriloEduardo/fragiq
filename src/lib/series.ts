@@ -162,6 +162,97 @@ function num(snap: SnapshotRow, key: string): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Pares (base, leitura) de onde sai todo modo derivado.
+ *
+ * Vive separado porque o cabeçalho do período e os gráficos precisam
+ * concordar: se cada um caminhasse pela série à sua maneira, a tela diria
+ * "5 partidas" enquanto a linha ao lado plotaria outra coisa, e nenhum dos
+ * dois estaria obviamente errado.
+ *
+ * Base é a última leitura confiável, não a anterior. A Web API da Steam às
+ * vezes responde de um nó atrasado e devolve um contador vitalício MENOR que
+ * o da coleta passada. Descartar só o delta negativo não basta: a leitura
+ * baixa viraria base do par seguinte, e esse delta mediria a recuperação do
+ * atraso em vez da partida. Medido na conta real: 20159 → 20153 → 20165 vira
+ * uma "partida" de 12 abates em 2 minutos, quando de fato foram 6 desde o
+ * pico anterior.
+ */
+function* paresDerivados(
+  rows: SnapshotRow[],
+  metric: string,
+  filter?: ContextFilter,
+): Generator<{ prev: SnapshotRow; curr: SnapshotRow; before: number; after: number }> {
+  if (rows.length === 0) return;
+
+  let base = rows[0];
+  let abaixoDaBase = 0;
+
+  for (let i = 1; i < rows.length; i++) {
+    const curr = rows[i];
+
+    const before = num(base, metric);
+    const after = num(curr, metric);
+
+    if (before !== null && after !== null && after < before) {
+      // Uma leitura sozinha abaixo da base é atraso da Steam. Duas seguidas
+      // não: aí o jogo zerou os contadores de verdade e o novo chão é este.
+      //
+      // Custo assumido: a base vira a SEGUNDA leitura baixa, então o que foi
+      // jogado entre a primeira e a segunda não vira ponto. Perde-se um
+      // intervalo por reset — e reset de stats do CS2 é ação deliberada do
+      // jogador, não rotina. Rastrear a leitura candidata para recuperar esse
+      // intervalo custa mais complexidade do que o caso raro paga.
+      if (++abaixoDaBase >= 2) {
+        base = curr;
+        abaixoDaBase = 0;
+      }
+      continue;
+    }
+    abaixoDaBase = 0;
+
+    // A base avança mesmo quando o ponto é descartado pelo filtro, senão um
+    // delta passaria por cima da partida excluída e somaria o que ela rendeu.
+    const prev = base;
+    base = curr;
+
+    // O delta pertence à partida descrita pelo snapshot final do par.
+    if (!matchesFilter(curr, filter)) continue;
+    if (before === null || after === null) continue;
+
+    yield { prev, curr, before, after };
+  }
+}
+
+/**
+ * O par mais recente de uma métrica, para descrever o período que o painel
+ * está mostrando: de quando até quando, e o que aconteceu no meio.
+ */
+export function ultimoPar(
+  snapshots: SnapshotRow[],
+  metric: string,
+  filter?: ContextFilter,
+  bucket: Bucket = "raw",
+): { prev: SnapshotRow; curr: SnapshotRow } | null {
+  let ultimo: { prev: SnapshotRow; curr: SnapshotRow } | null = null;
+  for (const { prev, curr } of paresDerivados(collapse(snapshots, bucket), metric, filter)) {
+    ultimo = { prev, curr };
+  }
+  return ultimo;
+}
+
+/** Delta de uma métrica dentro de um par já escolhido. */
+export function deltaEntre(
+  par: { prev: SnapshotRow; curr: SnapshotRow },
+  metric: string,
+): number | null {
+  const before = num(par.prev, metric);
+  const after = num(par.curr, metric);
+  if (before === null || after === null) return null;
+  const d = after - before;
+  return d < 0 ? null : d;
+}
+
 export function buildSeries(
   snapshots: SnapshotRow[],
   spec: SeriesSpec,
@@ -201,46 +292,7 @@ export function buildSeries(
   }
 
   // Os demais modos são derivados: precisam de um par de pontos.
-  if (rows.length === 0) return points;
-
-  /**
-   * Base do par: a última leitura que podemos acreditar, não simplesmente a
-   * anterior. A Web API da Steam às vezes responde de um nó atrasado e devolve
-   * um contador vitalício MENOR que o da coleta passada. Descartar só o delta
-   * negativo não basta: a leitura baixa viraria base do par seguinte, e esse
-   * delta mediria a recuperação do atraso em vez da partida. Medido na conta
-   * real: 20159 → 20153 → 20165 vira uma "partida" de 12 abates em 2 minutos,
-   * quando de fato foram 6 desde o pico anterior.
-   */
-  let base = rows[0];
-  let abaixoDaBase = 0;
-
-  for (let i = 1; i < rows.length; i++) {
-    const curr = rows[i];
-
-    const before = num(base, spec.metric);
-    const after = num(curr, spec.metric);
-
-    if (before !== null && after !== null && after < before) {
-      // Uma leitura sozinha abaixo da base é atraso da Steam. Duas seguidas
-      // não: aí o jogo zerou os contadores de verdade e o novo chão é este.
-      if (++abaixoDaBase >= 2) {
-        base = curr;
-        abaixoDaBase = 0;
-      }
-      continue;
-    }
-    abaixoDaBase = 0;
-
-    // A base avança mesmo quando o ponto é descartado pelo filtro, senão um
-    // delta passaria por cima da partida excluída e somaria o que ela rendeu.
-    const prev = base;
-    base = curr;
-
-    // O delta pertence à partida descrita pelo snapshot final do par.
-    if (!matchesFilter(curr, spec.filter)) continue;
-    if (before === null || after === null) continue;
-
+  for (const { prev, curr, before, after } of paresDerivados(rows, spec.metric, spec.filter)) {
     const delta = after - before;
     const t = curr.capturedAt.getTime();
 

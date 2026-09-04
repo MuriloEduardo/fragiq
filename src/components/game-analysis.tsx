@@ -6,6 +6,7 @@ import { StatPanel, type PanelStat } from "./stat-panel";
 import { Explorer, type Preset } from "./explorer";
 import { contextOptions, type ContextFilter, type MetricInfo, type SeriesSpec, type SnapshotRow } from "@/lib/series";
 import { ContextFilterBar } from "./context-filter";
+import { PeriodSummary } from "./period-summary";
 
 type RawSnapshot = {
   capturedAt: string;
@@ -69,9 +70,10 @@ export function GameAnalysis({
           <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
             Painel
           </h2>
+          <PeriodSummary rows={parsed} filter={filtro} />
           <p className="mt-1 text-sm text-ink-faint">
-            Cada número é do período mais recente, comparado ao seu vitalício.
-            Clique para abrir no explorador.
+            Cada número é desse período, comparado ao seu vitalício. Clique
+            para abrir no explorador.
           </p>
           <div className="mt-4">
             <StatPanel
