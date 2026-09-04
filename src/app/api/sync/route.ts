@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { syncUser } from "@/lib/steam/sync";
@@ -10,7 +11,24 @@ export const maxDuration = 60;
 // um usuário clicando no botão repetidamente.
 const COOLDOWN_MS = 1000 * 60 * 2;
 
-export async function POST() {
+/**
+ * Contexto informado à mão.
+ *
+ * O bot lia modo e mapa do rich presence; sem ele, quem sabe o que foi jogado
+ * é a pessoa. O valor gravado é a mesma string que o rich presence do CS2
+ * publica ("competitive", "casual"…), e não um rótulo nosso — assim as duas
+ * origens caem no mesmo campo e o filtro não precisa saber quem preencheu.
+ *
+ * Vale para tudo que aconteceu desde a última coleta, não para uma partida:
+ * quem joga uma casual e uma competitiva antes de sincronizar marca as duas
+ * como uma coisa só. O bot não tinha esse problema porque coletava ao fim de
+ * cada partida.
+ */
+const schema = z.object({
+  mode: z.string().max(64).optional(),
+});
+
+export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
@@ -41,8 +59,16 @@ export async function POST() {
     );
   }
 
+  // Corpo é opcional: sincronizar sem marcar modo continua valendo.
+  const parsed = schema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
+  }
+
   try {
-    const result = await syncUser(session.userId, session.steamId, "MANUAL");
+    const result = await syncUser(session.userId, session.steamId, "MANUAL", {
+      mode: parsed.data.mode || null,
+    });
     return NextResponse.json(result);
   } catch (err) {
     console.error("[sync] falhou", err);
