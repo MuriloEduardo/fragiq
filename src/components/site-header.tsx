@@ -10,25 +10,39 @@ type Props = {
   lastSyncedAt: Date | null;
 };
 
+/**
+ * Cabeçalho.
+ *
+ * Mobile primeiro, e por um defeito medido: numa viewport de 390px o layout
+ * anterior produzia 471px de conteúdo — o botão de feedback e o de sair
+ * ficavam inteiramente fora da tela, e a página inteira deslizava para o
+ * lado. Agora o grupo de sincronização quebra para uma linha própria abaixo
+ * de `sm` (`order-last w-full`) e volta para a mesma linha a partir dali, sem
+ * duplicar o componente — duas instâncias de SyncButton seriam dois estados
+ * de seleção de modo divergindo em silêncio.
+ */
 export function SiteHeader({ personaName, avatarUrl, lastSyncedAt }: Props) {
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
-        <Link href="/cs2" className="font-mono text-sm font-bold tracking-tight">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 sm:flex-nowrap sm:gap-x-4 sm:px-6 sm:py-3">
+        <Link
+          href="/cs2"
+          className="font-mono text-sm font-bold tracking-tight"
+        >
           Frag<span className="text-accent">IQ</span>
         </Link>
 
-        <div className="ml-auto flex items-center gap-4">
-          <SyncButton />
-
-          <div className="flex items-center gap-2 border-l border-line pl-4">
+        {/* Identidade e ações ficam sempre na primeira linha: são o que
+            precisa estar alcançável mesmo com o teclado aberto. */}
+        <div className="ml-auto flex items-center gap-1 sm:order-last sm:gap-2">
+          <div className="flex items-center gap-2 sm:border-l sm:border-line sm:pl-4">
             {avatarUrl && (
               <Image
                 src={avatarUrl}
                 alt=""
                 width={28}
                 height={28}
-                className="rounded-full ring-1 ring-line"
+                className="size-7 rounded-full ring-1 ring-line"
                 unoptimized
               />
             )}
@@ -44,15 +58,20 @@ export function SiteHeader({ personaName, avatarUrl, lastSyncedAt }: Props) {
 
           <FeedbackButton />
 
-          <form action="/api/auth/logout" method="post">
+          <form action="/api/auth/logout" method="post" className="flex">
             <button
               type="submit"
               aria-label="Sair"
-              className="rounded-lg p-2 text-ink-faint transition hover:bg-surface-2 hover:text-danger"
+              className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-danger sm:size-9"
             >
               <LogOut className="size-4" />
             </button>
           </form>
+        </div>
+
+        {/* No celular vira a segunda linha, ocupando a largura toda. */}
+        <div className="order-last w-full sm:order-none sm:ml-auto sm:w-auto">
+          <SyncButton className="w-full sm:w-auto" />
         </div>
       </div>
     </header>

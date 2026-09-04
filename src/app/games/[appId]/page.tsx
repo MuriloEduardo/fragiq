@@ -92,9 +92,9 @@ export default async function GamePage({
     <>
       <SiteHeader {...user} />
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
 
-        <header className="mt-4 flex flex-wrap items-end gap-5 border-b border-line pb-6">
+        <header className="mt-4 flex flex-wrap items-end gap-4 border-b border-line pb-6 sm:gap-5">
           <Image
             src={gameHeaderUrl(appId)}
             alt=""
@@ -104,8 +104,10 @@ export default async function GamePage({
             unoptimized
           />
 
-          <div className="flex-1">
-            <h1 className="text-2xl font-semibold tracking-tight">
+          {/* w-full no celular força a imagem para a linha de cima, em vez de
+              espremer o título numa coluna de ~150px ao lado dela. */}
+          <div className="w-full min-w-0 sm:w-auto sm:flex-1">
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
               {userGame.game.name}
             </h1>
             <p className="tnum mt-1 text-sm text-ink-muted">

@@ -55,7 +55,7 @@ export function FeedbackButton() {
         onClick={abrir}
         aria-label="Enviar feedback"
         title="Enviar feedback"
-        className="rounded-lg p-2 text-ink-faint transition hover:bg-surface-2 hover:text-accent"
+        className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
       >
         <MessageSquare className="size-4" />
       </button>
