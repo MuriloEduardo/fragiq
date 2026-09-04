@@ -16,8 +16,6 @@
 
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
-  --color-good: var(--good);
-  --color-good-soft: var(--good-soft);
   --color-danger: var(--danger);
   --color-warn: var(--warn);
   --color-steam: var(--steam);
@@ -54,12 +52,6 @@
      que é o par usado nos selos (`bg-accent-soft text-accent`). */
   --accent: #a15c00;
   --accent-soft: #fdf3e0;
-
-  /* Verde de status, separado da cor de marca. Antes o --accent acumulava as
-     duas funções; com a marca em âmbar, "bom" em âmbar ficaria a um passo do
-     --warn e perderia o par verde/vermelho que o olho lê sem legenda. */
-  --good: #15803d;
-  --good-soft: #dcfce7;
   --danger: #c62828;
   --warn: #a16207;
   --steam: #0e6ba8;
@@ -92,9 +84,6 @@
        accent-soft. */
     --accent: #dea835;
     --accent-soft: #33260d;
-
-    --good: #4ade80;
-    --good-soft: #14321d;
     --danger: #f87171;
     --warn: #fbbf24;
     --steam: #66c0f4;
