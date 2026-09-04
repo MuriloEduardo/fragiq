@@ -27,11 +27,60 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  /// Segredo do Game State Integration. O CS2 manda este valor dentro do
+  /// corpo do POST (bloco "auth"), não em cabeçalho, então ele é a única
+  /// coisa que identifica de quem é a partida que chegou.
+  gsiToken String? @unique
+
   games    UserGame[]
   syncRuns SyncRun[]
   feedback Feedback[]
+  matches  Match[]
 
   @@map("users")
+}
+
+/// Uma partida de CS2, contada pelo próprio jogo.
+///
+/// Vem do Game State Integration, não da Web API. A diferença é o que este
+/// projeto inteiro vinha tentando contornar: os contadores da Steam são
+/// vitalícios e só dizem o total de hoje, então tudo precisava sair de deltas
+/// entre coletas — sujeitos a leitura atrasada, a modos misturados e a mapas
+/// que a Valve não conta. Aqui a partida chega pronta, com mapa e modo, e
+/// `de_anubis` aparece igual a `de_dust2`.
+model Match {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Nome interno do mapa, como o jogo publica: de_mirage, de_anubis…
+  map  String
+  /// competitive, casual, deathmatch, scrimcomp2v2… mesmas chaves que o
+  /// matchMode dos snapshots, para os dois recortes falarem a mesma língua.
+  mode String
+
+  /// Placar do jogador na partida, do bloco player_match_stats.
+  kills   Int @default(0)
+  deaths  Int @default(0)
+  assists Int @default(0)
+  mvps    Int @default(0)
+  score   Int @default(0)
+
+  /// Placar dos times, do bloco map. Nulo enquanto o jogo não reporta.
+  roundsWon  Int?
+  roundsLost Int?
+
+  /// Primeiro e último instante em que vimos esta partida. `finishedAt` só é
+  /// preenchido quando o jogo anuncia a fase "gameover" — enquanto for nulo,
+  /// esta é a partida em andamento do usuário, e é nela que os updates caem.
+  startedAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  finishedAt DateTime?
+
+  @@index([userId, startedAt])
+  @@index([userId, finishedAt])
+  @@map("matches")
 }
 
 model Game {

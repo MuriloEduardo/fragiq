@@ -2,6 +2,7 @@
 
 import { Filter, X } from "lucide-react";
 import type { ContextFilter } from "@/lib/series";
+import { rotularModo } from "@/lib/cs2-labels";
 import { cn } from "@/lib/utils";
 
 /**
@@ -13,22 +14,6 @@ import { cn } from "@/lib/utils";
  * nada só confunde.
  */
 
-const ROTULOS_MODO: Record<string, string> = {
-  competitive: "Competitivo",
-  casual: "Casual",
-  deathmatch: "Deathmatch",
-  premier: "Premier",
-  scrimcomp2v2: "Wingman",
-  retakes: "Retakes",
-  survival: "Danger Zone",
-  gungameprogressive: "Arms Race",
-  gungametrbomb: "Demolição",
-  training: "Treino",
-};
-
-export function rotularModo(modo: string) {
-  return ROTULOS_MODO[modo] ?? modo;
-}
 
 type Props = {
   modes: [string, number][];

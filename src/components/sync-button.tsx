@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import { rotularModo } from "./context-filter";
+import { rotularModo } from "@/lib/cs2-labels";
 import { cn } from "@/lib/utils";
 
 /**

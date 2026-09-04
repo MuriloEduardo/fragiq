@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
@@ -10,6 +11,7 @@ import { type Preset } from "@/components/explorer";
 import { GameAnalysis } from "@/components/game-analysis";
 import { CollectionStatus } from "@/components/collection-status";
 import { CounterScope } from "@/components/counter-scope";
+import { MatchList, type MatchRow } from "@/components/match-list";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,30 @@ export default async function GamePage({
     select: { personaName: true, avatarUrl: true, lastSyncedAt: true },
   });
   if (!user) redirect("/");
+
+  // Partidas relatadas pelo proprio jogo. Independem de userGame: existem
+  // mesmo para quem nunca sincronizou pela Web API.
+  const matches: MatchRow[] =
+    appId === 730
+      ? await prisma.match.findMany({
+          where: { userId: session.userId },
+          orderBy: { startedAt: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            map: true,
+            mode: true,
+            kills: true,
+            deaths: true,
+            assists: true,
+            mvps: true,
+            roundsWon: true,
+            roundsLost: true,
+            startedAt: true,
+            finishedAt: true,
+          },
+        })
+      : [];
 
   const userGame = await prisma.userGame.findUnique({
     where: { userId_gameAppId: { userId: session.userId, gameAppId: appId } },
@@ -127,6 +153,29 @@ export default async function GamePage({
           <CollectionStatus snapshotCount={rows.length} />
           <CounterScope appId={appId} gaugesStale={gaugesLookStale(rows)} />
         </div>
+
+        {appId === 730 && (
+          <section className="mt-10">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
+                Partidas
+              </h2>
+              <Link
+                href="/conexao"
+                className="text-xs text-ink-faint underline-offset-2 transition hover:text-accent hover:underline"
+              >
+                configurar a conexão com o jogo
+              </Link>
+            </div>
+            <p className="mt-1 text-sm text-ink-faint">
+              Contadas pelo próprio CS2, com mapa e modo — inclusive os mapas
+              que os contadores da Steam não conhecem.
+            </p>
+            <div className="mt-4">
+              <MatchList matches={matches} />
+            </div>
+          </section>
+        )}
 
         <div className="mt-10">
           <GameAnalysis
