@@ -201,22 +201,47 @@ export function buildSeries(
   }
 
   // Os demais modos são derivados: precisam de um par de pontos.
+  if (rows.length === 0) return points;
+
+  /**
+   * Base do par: a última leitura que podemos acreditar, não simplesmente a
+   * anterior. A Web API da Steam às vezes responde de um nó atrasado e devolve
+   * um contador vitalício MENOR que o da coleta passada. Descartar só o delta
+   * negativo não basta: a leitura baixa viraria base do par seguinte, e esse
+   * delta mediria a recuperação do atraso em vez da partida. Medido na conta
+   * real: 20159 → 20153 → 20165 vira uma "partida" de 12 abates em 2 minutos,
+   * quando de fato foram 6 desde o pico anterior.
+   */
+  let base = rows[0];
+  let abaixoDaBase = 0;
+
   for (let i = 1; i < rows.length; i++) {
-    const prev = rows[i - 1];
     const curr = rows[i];
+
+    const before = num(base, spec.metric);
+    const after = num(curr, spec.metric);
+
+    if (before !== null && after !== null && after < before) {
+      // Uma leitura sozinha abaixo da base é atraso da Steam. Duas seguidas
+      // não: aí o jogo zerou os contadores de verdade e o novo chão é este.
+      if (++abaixoDaBase >= 2) {
+        base = curr;
+        abaixoDaBase = 0;
+      }
+      continue;
+    }
+    abaixoDaBase = 0;
+
+    // A base avança mesmo quando o ponto é descartado pelo filtro, senão um
+    // delta passaria por cima da partida excluída e somaria o que ela rendeu.
+    const prev = base;
+    base = curr;
 
     // O delta pertence à partida descrita pelo snapshot final do par.
     if (!matchesFilter(curr, spec.filter)) continue;
-
-    const before = num(prev, spec.metric);
-    const after = num(curr, spec.metric);
     if (before === null || after === null) continue;
 
-    // Contadores só sobem; um negativo é reset de stats pelo jogo, não queda
-    // de desempenho. Descartamos em vez de plotar um pico impossível.
     const delta = after - before;
-    if (delta < 0) continue;
-
     const t = curr.capturedAt.getTime();
 
     if (spec.mode === "delta") {
