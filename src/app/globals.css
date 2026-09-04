@@ -16,6 +16,8 @@
 
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
   --color-danger: var(--danger);
   --color-warn: var(--warn);
   --color-steam: var(--steam);
@@ -34,20 +36,30 @@
 /* Claro é o padrão para o HTML servido antes de qualquer JS: se a primeira
    pintura for escura e o sistema pedir claro, o usuário vê um flash. */
 :root {
-  --canvas: #f6f7f9;
+  /* Cinzas puxados para o azul-grafite do HUD do CS2, em vez do cinza neutro
+     anterior. */
+  --canvas: #f4f5f7;
   --surface: #ffffff;
-  --surface-2: #eef0f4;
-  --line: #dde1e8;
-  --line-soft: #e9ecf1;
+  --surface-2: #e9ecf1;
+  --line: #d8dde5;
+  --line-soft: #e6eaf0;
 
   --ink: #0e1117;
   --ink-muted: #55606f;
   --ink-faint: #7c8797;
 
-  /* Verde escurecido: o #4ade80 do modo escuro tem contraste insuficiente
-     sobre branco. */
-  --accent: #15803d;
-  --accent-soft: #dcfce7;
+  /* Âmbar do CS2, escurecido para o fundo claro: o #dea835 do modo escuro dá
+     2,0:1 sobre branco e reprovaria como texto. Medido: 5,19:1 sobre
+     --surface, 4,76:1 sobre --canvas e 4,71:1 do accent sobre accent-soft,
+     que é o par usado nos selos (`bg-accent-soft text-accent`). */
+  --accent: #a15c00;
+  --accent-soft: #fdf3e0;
+
+  /* Verde de status, separado da cor de marca. Antes o --accent acumulava as
+     duas funções; com a marca em âmbar, "bom" em âmbar ficaria a um passo do
+     --warn e perderia o par verde/vermelho que o olho lê sem legenda. */
+  --good: #15803d;
+  --good-soft: #dcfce7;
   --danger: #c62828;
   --warn: #a16207;
   --steam: #0e6ba8;
@@ -66,18 +78,23 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #0a0b0f;
-    --surface: #12141a;
-    --surface-2: #181b23;
-    --line: #262a35;
-    --line-soft: #1d212a;
+    --canvas: #0a0d12;
+    --surface: #12161e;
+    --surface-2: #1a202b;
+    --line: #262d3a;
+    --line-soft: #1d2331;
 
     --ink: #e9ecf1;
     --ink-muted: #949cab;
     --ink-faint: #6b7280;
 
-    --accent: #4ade80;
-    --accent-soft: #14321d;
+    /* Âmbar do CS2. Medido: 8,42:1 sobre --surface e 6,85:1 sobre
+       accent-soft. */
+    --accent: #dea835;
+    --accent-soft: #33260d;
+
+    --good: #4ade80;
+    --good-soft: #14321d;
     --danger: #f87171;
     --warn: #fbbf24;
     --steam: #66c0f4;
