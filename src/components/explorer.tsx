@@ -227,20 +227,21 @@ export function Explorer({
         </span>
       </div>
 
-      {/* --------------------------------- números -------------------------------- */}
-      <SeriesSummary items={summary} />
+      {/* --------------------------- números + gráfico ---------------------------- */}
+      <div className="overflow-hidden rounded-xl border border-line bg-surface">
+        <SeriesSummary items={summary} />
 
-      {/* --------------------------------- gráfico -------------------------------- */}
-      <div className="rounded-xl border border-line bg-surface p-4">
-        <TimeSeriesChart series={results} />
+        <div className="border-t border-line p-4">
+          <TimeSeriesChart series={results} />
 
-        {maxPontos === 1 && (
-          <p className="mt-3 border-t border-line pt-3 text-xs leading-relaxed text-ink-faint">
-            Um ponto por série ainda não desenha tendência — o gráfico ganha
-            forma a partir da terceira coleta. Por enquanto, os números acima
-            dizem mais.
-          </p>
-        )}
+          {maxPontos === 1 && (
+            <p className="mt-3 border-t border-line pt-3 text-xs leading-relaxed text-ink-faint">
+              Um ponto por série ainda não desenha tendência — o gráfico ganha
+              forma a partir da terceira coleta. Por enquanto, os números acima
+              dizem mais.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* -------------------------------- queries --------------------------------- */}

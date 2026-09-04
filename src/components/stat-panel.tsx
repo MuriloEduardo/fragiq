@@ -156,7 +156,7 @@ function Tile({
 
       <div className="mt-3 h-8">
         {values.length >= 2 ? (
-          <Sparkline values={values} className="h-8 w-full" />
+          <Sparkline values={values} baseline={lifetime} className="h-8 w-full" />
         ) : (
           <div className="flex h-8 items-center text-[11px] text-ink-faint">
             {values.length === 1

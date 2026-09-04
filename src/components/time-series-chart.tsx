@@ -59,6 +59,30 @@ export function TimeSeriesChart({ series, height = 340 }: Props) {
 
   const data = [...byTime.values()].sort((a, b) => (a.t ?? 0)! - (b.t ?? 0)!);
 
+  /**
+   * O rótulo do eixo depende de quanto tempo a série cobre.
+   *
+   * Com data fixa, três coletas da mesma noite viravam "03 de set." repetido
+   * três vezes — um eixo que não distingue os pontos que está separando. A
+   * coleta reativa produz exatamente esse caso: vários pontos no mesmo dia.
+   */
+  const span =
+    data.length > 1 ? Number(data[data.length - 1].t) - Number(data[0].t) : 0;
+  const DIA = 86_400_000;
+
+  const rotularInstante = (v: number) => {
+    const d = new Date(v);
+    if (span < DIA) return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    if (span < 7 * DIA)
+      return d.toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  };
+
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -70,14 +94,12 @@ export function TimeSeriesChart({ series, height = 340 }: Props) {
             type="number"
             scale="time"
             domain={["dataMin", "dataMax"]}
-            tickFormatter={(v: number) =>
-              new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
-            }
+            tickFormatter={rotularInstante}
             stroke="var(--ink-faint)"
             tick={{ fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            minTickGap={32}
+            minTickGap={span < 7 * DIA ? 56 : 32}
           />
 
           <YAxis

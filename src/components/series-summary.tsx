@@ -27,7 +27,12 @@ export function SeriesSummary({ items }: { items: SummaryItem[] }) {
   if (items.length === 0) return null;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    // Faixa, não grade de cartões soltos: o resumo é o cabeçalho do gráfico
+    // que vem logo abaixo, dentro da mesma moldura. Como grade separada, uma
+    // série só ocupava um terço da linha e deixava dois terços de vazio ao
+    // lado — daí a sensação de peça avulsa. `flex-1` faz cada número esticar
+    // para preencher a faixa, seja um ou seis.
+    <div className="flex flex-wrap divide-x divide-y divide-line">
       {items.map((item) => (
         <Card key={item.id} item={item} />
       ))}
@@ -44,7 +49,7 @@ function Card({ item }: { item: SummaryItem }) {
       : null;
 
   return (
-    <div className="rounded-xl border border-line bg-surface p-4">
+    <div className="min-w-[13rem] flex-1 p-4">
       <div className="flex items-start gap-2">
         <span
           aria-hidden
