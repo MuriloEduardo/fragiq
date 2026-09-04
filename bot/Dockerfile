@@ -11,4 +11,6 @@ COPY tsconfig.json ./
 COPY src ./src
 
 # Sem porta exposta: o bot só faz conexões de saída.
-CMD ["npx", "tsx", "src/index.ts"]
+# Chamamos o binário local em vez de `npx`: o tsx é dependência de produção
+# justamente para já estar na imagem — nada de baixar nada a cada boot.
+CMD ["./node_modules/.bin/tsx", "src/index.ts"]

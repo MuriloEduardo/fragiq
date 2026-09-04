@@ -1,0 +1,17 @@
+# O bot mantém conexão TCP persistente com a Steam: nada de auto_stop, nada de
+# porta exposta. É uma máquina só, sempre ligada, fazendo só conexões de saída.
+app = "fragiq-bot"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  BOT_GRACE_MS = "90000"
+  BOT_AUTO_ACCEPT = "true"
+  FRAGIQ_WEBHOOK_URL = "https://fragiq-rouge.vercel.app/api/sync/steam-event"
+
+# Sem [http_service]: não há o que servir. Só o processo do steam-user.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
