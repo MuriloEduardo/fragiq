@@ -30,67 +30,64 @@
 /* Claro é o padrão para o HTML servido antes de qualquer JS: se a primeira
    pintura for escura e o sistema pedir claro, o usuário vê um flash. */
 :root {
-  /* Areia, não branco.
-     A paleta do CS2 não é neutra: os mapas são poeira e concreto quente, e o
-     HUD é grafite azulado. Branco puro no claro e quase-preto no escuro não
-     pertencem a nenhum dos dois — davam um site correto e anônimo. Aqui o
-     claro é a poeira; o escuro, mais abaixo, é o HUD. */
-  --canvas: #efe9de;
-  --surface: #f9f5ee;
-  --surface-2: #e4dccd;
-  --line: #d2c7b4;
-  --line-soft: #e0d8c9;
+  /* A cor da marca é o ambiente, não um detalhe.
+     Antes o fundo era neutro e o laranja aparecia só em números e ícones —
+     um site correto que poderia ser de qualquer coisa. Aqui o âmbar do CS2
+     é o próprio papel: poeira de mapa no claro, âmbar profundo no escuro. */
+  --canvas: #eee0c8;
+  --surface: #fdf7ee;
+  --surface-2: #e5d5b8;
+  --line: #d3bc98;
+  --line-soft: #e5d5b8;
 
-  /* Tinta quente: cinza-azulado sobre areia parece sujeira, não texto. */
-  --ink: #1c1a16;
-  --ink-muted: #5a5348;
-  --ink-faint: #857c6d;
+  /* Tinta quente. Cinza azulado sobre areia lê como sujeira, não como texto. */
+  --ink: #221c12;
+  --ink-muted: #5c503c;
+  --ink-faint: #877961;
 
-  /* Laranja do CS2, escurecido para o fundo claro — o tom do modo escuro
-     reprovaria como texto aqui. Medido: 5,03:1 sobre --surface e 4,74:1 do
-     accent sobre accent-soft, que é o par usado nos selos. */
-  --accent: #a9500b;
-  --accent-soft: #faeddb;
-  --danger: #a32017;
-  --warn: #8a6a00;
+  /* O acento precisa se destacar de um fundo que já é da mesma família, daí
+     ser bem mais escuro que o âmbar do modo escuro. Medido: 4,92:1 sobre
+     --surface, 4,63:1 sobre --canvas e 4,73:1 sobre accent-soft. */
+  --accent: #9c4809;
+  --accent-soft: #fbeed6;
+  --danger: #9c1d15;
+  /* Ocre escuro: com o ambiente âmbar, um aviso âmbar desaparece dentro do
+     próprio fundo. Este fica 1,4x mais escuro que o acento, que é o que
+     permite distinguir os dois sem depender só do ícone. */
+  --warn: #5e4700;
   --steam: #0e6ba8;
 
-  /* Azul CT e areia T. São as duas cores que qualquer pessoa que joga CS
-     reconhece sem legenda; entram como cor secundária de gráfico no lugar da
-     paleta categórica, que saiu junto com o gráfico de múltiplas séries. */
-  --ct: #2c6fb5;
-  --t: #8a6a2f;
+  --ct: #265f9e;
+  --t: #6f5322;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Ardósia azulada do HUD, não preto.
-       Terceira tentativa, e as duas anteriores estão registradas porque o
-       erro se repetiu: de #0a0d12 para #12171f, depois para #131a23, e as
-       duas vezes o relato foi que continuava preto demais. Estava certo — a
-       luminância relativa saía de 0,004 para 0,010, uma diferença que o olho
-       não separa do preto. Agora é 0,025, mais de duas vezes a anterior, e a
-       tela lê como painel de ardósia em vez de buraco. */
-    --canvas: #222d3c;
-    --surface: #2e3a49;
-    --surface-2: #3a4655;
-    --line: #4d5a6a;
-    --line-soft: #3a4655;
+    /* Âmbar profundo, não preto nem ardósia.
+       Três tentativas anteriores ficam no histórico porque o erro se repetiu:
+       #0a0d12, #12171f, #131a23 e #222d3c — as primeiras eram preto demais e
+       a última, neutra demais. O problema não era só luminância, era ausência
+       de cor: o fundo não pertencia a nada. Agora ele é a marca. */
+    --canvas: #241b10;
+    --surface: #372a16;
+    --surface-2: #463620;
+    --line: #5c482d;
+    --line-soft: #463620;
 
-    --ink: #eef1f5;
-    --ink-muted: #aeb8c4;
-    --ink-faint: #8b96a3;
+    --ink: #f6efe4;
+    --ink-muted: #c6b69e;
+    --ink-faint: #9d8e79;
 
-    /* Laranja do CS2, clareado junto com o fundo para manter a distância.
-       Medido: 5,80:1 sobre --surface, 5,69:1 sobre accent-soft. */
-    --accent: #f0a95c;
-    --accent-soft: #4a3719;
+    /* Medido: 8,31:1 sobre --surface, 9,70:1 sobre --canvas, 6,14:1 sobre
+       accent-soft. */
+    --accent: #f5b969;
+    --accent-soft: #503a17;
     --danger: #f79c93;
-    --warn: #ecd27a;
+    --warn: #f2d98a;
     --steam: #66c0f4;
 
     --ct: #8bbce8;
-    --t: #e0c496;
+    --t: #eed9b0;
   }
 }
 
