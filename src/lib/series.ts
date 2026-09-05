@@ -225,8 +225,14 @@ function* paresDerivados(
 }
 
 /**
- * O par mais recente de uma métrica, para descrever o período que o painel
- * está mostrando: de quando até quando, e o que aconteceu no meio.
+ * O par mais recente em que a métrica de fato se moveu.
+ *
+ * O "de fato" não é detalhe. O cron roda todo dia, jogando ou não, então o
+ * último par de coletas costuma ser um intervalo em que nada aconteceu. Usar
+ * esse par para descrever o período fazia o painel anunciar "0 partidas, 0
+ * rounds" acima de números que vinham de outro intervalo — os modos por round
+ * descartam denominador zero e caem no par anterior sozinhos. Cabeçalho
+ * falando de uma janela e números de outra.
  */
 export function ultimoPar(
   snapshots: SnapshotRow[],
@@ -235,8 +241,12 @@ export function ultimoPar(
   bucket: Bucket = "raw",
 ): { prev: SnapshotRow; curr: SnapshotRow } | null {
   let ultimo: { prev: SnapshotRow; curr: SnapshotRow } | null = null;
-  for (const { prev, curr } of paresDerivados(collapse(snapshots, bucket), metric, filter)) {
-    ultimo = { prev, curr };
+  for (const { prev, curr, before, after } of paresDerivados(
+    collapse(snapshots, bucket),
+    metric,
+    filter,
+  )) {
+    if (after > before) ultimo = { prev, curr };
   }
   return ultimo;
 }
