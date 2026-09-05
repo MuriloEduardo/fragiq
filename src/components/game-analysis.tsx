@@ -90,7 +90,7 @@ export function GameAnalysis({
           vitalício.
         </p>
         <div className="mt-4">
-          <MetricTable linhas={linhas} />
+          <MetricTable linhas={linhas} appId={appId} />
         </div>
       </section>
 

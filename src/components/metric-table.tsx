@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Search } from "lucide-react";
 import type { LinhaMetrica } from "@/lib/leituras";
 import { Sparkline } from "./sparkline";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,7 @@ function fmt(v: number | null, casas = 2) {
   return v.toLocaleString("pt-BR", { maximumFractionDigits: precisao });
 }
 
-export function MetricTable({ linhas }: { linhas: LinhaMetrica[] }) {
+export function MetricTable({ linhas, appId }: { linhas: LinhaMetrica[]; appId: number }) {
   const [busca, setBusca] = useState("");
 
   const filtradas = useMemo(() => {
@@ -58,18 +59,21 @@ export function MetricTable({ linhas }: { linhas: LinhaMetrica[] }) {
             Nenhuma métrica com esse nome.
           </p>
         ) : (
-          filtradas.map((l) => <Linha key={l.key} l={l} />)
+          filtradas.map((l) => <Linha key={l.key} l={l} appId={appId} />)
         )}
       </div>
     </div>
   );
 }
 
-function Linha({ l }: { l: LinhaMetrica }) {
+function Linha({ l, appId }: { l: LinhaMetrica; appId: number }) {
   const sobe = l.variacao !== null && l.variacao > 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line px-4 py-2.5 last:border-b-0">
+    <Link
+      href={`/games/${appId}/metricas/${encodeURIComponent(l.key)}`}
+      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line px-4 py-2.5 transition last:border-b-0 hover:bg-surface-2"
+    >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm">{l.label}</p>
         <p className="text-[11px] text-ink-faint">
@@ -123,6 +127,8 @@ function Linha({ l }: { l: LinhaMetrica }) {
           <Sparkline values={l.valores} baseline={l.vitalicio} className="h-7 w-full" />
         )}
       </div>
-    </div>
+
+      <ChevronRight className="size-4 shrink-0 text-ink-faint" aria-hidden />
+    </Link>
   );
 }

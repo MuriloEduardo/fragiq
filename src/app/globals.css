@@ -20,12 +20,8 @@
   --color-warn: var(--warn);
   --color-steam: var(--steam);
 
-  --color-s1: var(--s1);
-  --color-s2: var(--s2);
-  --color-s3: var(--s3);
-  --color-s4: var(--s4);
-  --color-s5: var(--s5);
-  --color-s6: var(--s6);
+  --color-ct: var(--ct);
+  --color-t: var(--t);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -34,66 +30,62 @@
 /* Claro é o padrão para o HTML servido antes de qualquer JS: se a primeira
    pintura for escura e o sistema pedir claro, o usuário vê um flash. */
 :root {
-  /* Cinzas puxados para o azul-grafite do HUD do CS2, em vez do cinza neutro
-     anterior. */
-  --canvas: #f4f5f7;
-  --surface: #ffffff;
-  --surface-2: #e9ecf1;
-  --line: #d8dde5;
-  --line-soft: #e6eaf0;
+  /* Areia, não branco.
+     A paleta do CS2 não é neutra: os mapas são poeira e concreto quente, e o
+     HUD é grafite azulado. Branco puro no claro e quase-preto no escuro não
+     pertencem a nenhum dos dois — davam um site correto e anônimo. Aqui o
+     claro é a poeira; o escuro, mais abaixo, é o HUD. */
+  --canvas: #efe9de;
+  --surface: #f9f5ee;
+  --surface-2: #e4dccd;
+  --line: #d2c7b4;
+  --line-soft: #e0d8c9;
 
-  --ink: #0e1117;
-  --ink-muted: #55606f;
-  --ink-faint: #7c8797;
+  /* Tinta quente: cinza-azulado sobre areia parece sujeira, não texto. */
+  --ink: #1c1a16;
+  --ink-muted: #5a5348;
+  --ink-faint: #857c6d;
 
-  /* Âmbar do CS2, escurecido para o fundo claro: o #dea835 do modo escuro dá
-     2,0:1 sobre branco e reprovaria como texto. Medido: 5,19:1 sobre
-     --surface, 4,76:1 sobre --canvas e 4,71:1 do accent sobre accent-soft,
-     que é o par usado nos selos (`bg-accent-soft text-accent`). */
-  --accent: #a15c00;
-  --accent-soft: #fdf3e0;
-  --danger: #c62828;
-  --warn: #a16207;
+  /* Laranja do CS2, escurecido para o fundo claro — o tom do modo escuro
+     reprovaria como texto aqui. Medido: 5,03:1 sobre --surface e 4,74:1 do
+     accent sobre accent-soft, que é o par usado nos selos. */
+  --accent: #a9500b;
+  --accent-soft: #faeddb;
+  --danger: #a32017;
+  --warn: #8a6a00;
   --steam: #0e6ba8;
 
-  /* Paleta categórica validada: as cores que eu tinha escolhido a olho
-     reprovavam em croma e em separação sob visão normal. Estas passam nos
-     seis checks nos dois modos, na ordem em que estão — a ordem faz parte
-     da validação e não pode ser embaralhada. */
-  --s1: #2a78d6;
-  --s2: #eb6834;
-  --s3: #1baf7a;
-  --s4: #eda100;
-  --s5: #e87ba4;
-  --s6: #008300;
+  /* Azul CT e areia T. São as duas cores que qualquer pessoa que joga CS
+     reconhece sem legenda; entram como cor secundária de gráfico no lugar da
+     paleta categórica, que saiu junto com o gráfico de múltiplas séries. */
+  --ct: #2c6fb5;
+  --t: #8a6a2f;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #0a0d12;
-    --surface: #12161e;
-    --surface-2: #1a202b;
-    --line: #262d3a;
-    --line-soft: #1d2331;
+    /* Grafite azulado do HUD, não preto. O #0a0d12 anterior era quase preto
+       puro: some com a moldura dos cartões e faz a tela parecer um buraco. */
+    --canvas: #12171f;
+    --surface: #1a212b;
+    --surface-2: #232c38;
+    --line: #313c4b;
+    --line-soft: #232c38;
 
-    --ink: #e9ecf1;
-    --ink-muted: #949cab;
-    --ink-faint: #6b7280;
+    --ink: #e8eaed;
+    --ink-muted: #9aa3ae;
+    --ink-faint: #727c88;
 
-    /* Âmbar do CS2. Medido: 8,42:1 sobre --surface e 6,85:1 sobre
+    /* Laranja do CS2. Medido: 7,51:1 sobre --surface, 6,40:1 sobre
        accent-soft. */
-    --accent: #dea835;
-    --accent-soft: #33260d;
-    --danger: #f87171;
-    --warn: #fbbf24;
+    --accent: #e9a24a;
+    --accent-soft: #3a2a12;
+    --danger: #f08a80;
+    --warn: #e3c765;
     --steam: #66c0f4;
 
-    --s1: #3987e5;
-    --s2: #d95926;
-    --s3: #199e70;
-    --s4: #c98500;
-    --s5: #d55181;
-    --s6: #008300;
+    --ct: #6fa8dc;
+    --t: #d4b483;
   }
 }
 

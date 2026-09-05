@@ -263,6 +263,8 @@ export type LinhaMetrica = {
    * é aritmética correta e informação nenhuma.
    */
   relevante: boolean;
+  /** Houve qualquer movimento deste contador no período. */
+  aconteceu: boolean;
   /**
    * Quantos eventos a mais (ou a menos) do que o seu normal previa, no
    * período: |período − vitalício| × rounds.
@@ -308,6 +310,7 @@ export function todasAsMetricas(
         valores: pts.map((p) => p.value),
         porRound: false,
         relevante: false,
+        aconteceu: pts.length > 0,
         impacto: 0,
       }];
     }
@@ -333,6 +336,7 @@ export function todasAsMetricas(
       valores: pts.map((p) => p.value),
       porRound,
       relevante: (total ?? 0) >= MINIMO_NO_PERIODO && (vitalicio ?? 0) > 0,
+      aconteceu: (total ?? 0) > 0,
       impacto:
         periodo !== null && vitalicio !== null
           ? Math.abs(periodo - vitalicio) * roundsDoPeriodo
@@ -340,14 +344,22 @@ export function todasAsMetricas(
     }];
   });
 
-  // Ordem é informação: o topo é o que mais pesou no período em relação ao
-  // seu normal. O resto vem depois, agrupado, para quem procura um contador
-  // específico.
+  // Ordem é informação, em três camadas.
+  //
+  // Primeiro o que aconteceu e pesou. Depois o que aconteceu pouco. Por
+  // último, e só por último, o que não aconteceu: contador parado no período
+  // é a maior parte da lista — quem nunca usou Negev tem dezenas deles — e
+  // deixar isso disputando as primeiras posições era esconder o que importa
+  // atrás de zeros.
+  const camada = (l: LinhaMetrica) => (l.aconteceu ? (l.relevante ? 0 : 1) : 2);
+
   return linhas
     .filter((l) => l.periodo !== null)
     .sort((a, b) => {
-      if (a.relevante !== b.relevante) return a.relevante ? -1 : 1;
-      if (a.relevante) return b.impacto - a.impacto;
+      const ca = camada(a);
+      const cb = camada(b);
+      if (ca !== cb) return ca - cb;
+      if (ca === 0) return b.impacto - a.impacto;
       return a.grupo.localeCompare(b.grupo) || a.label.localeCompare(b.label);
     });
 }
