@@ -2,56 +2,45 @@
 
 import { useMemo, useState } from "react";
 import { CS2_PANEL } from "@/lib/cs2-panel";
-import { StatPanel, type PanelStat } from "./stat-panel";
-import { Explorer, type Preset } from "./explorer";
-import { contextOptions, type ContextFilter, type MetricInfo, type SeriesSpec, type SnapshotRow } from "@/lib/series";
+import { StatPanel } from "./stat-panel";
+import { lerSerie, todasAsMetricas } from "@/lib/leituras";
+import { Leituras } from "./leituras";
+import { MetricTable } from "./metric-table";
+import { contextOptions, type ContextFilter, type MetricInfo, type SnapshotRow } from "@/lib/series";
 import { ContextFilterBar } from "./context-filter";
 import { PeriodSummary } from "./period-summary";
 
-type RawSnapshot = {
-  capturedAt: string;
-  playtimeForeverMin: number;
-  metrics: Record<string, number>;
-  matchMap?: string | null;
-  matchMode?: string | null;
-};
-
 /**
- * Junta o painel fixo e o explorador para que um alimente o outro: o painel
- * é para varrer todas as estatísticas de uma vez, o explorador é para
- * aprofundar em uma. Clicar num tile carrega aquela métrica embaixo.
+ * A análise de um jogo, em três alturas.
+ *
+ * Leituras dizem o que aconteceu, em português. O painel mostra as doze
+ * estatísticas que valem para qualquer jogador. A tabela cobre as outras
+ * todas, para quem quer o contador específico.
+ *
+ * Antes havia um explorador no lugar das duas últimas: você escolhia uma
+ * métrica, um modo e uma granularidade, e recebia uma linha sem escala. Era
+ * cobertura sem leitura — o trabalho de interpretar ficava todo com quem
+ * estava lendo.
  */
 export function GameAnalysis({
   appId,
-  snapshots,
   parsed,
   catalog,
-  presets,
 }: {
   appId: number;
-  snapshots: RawSnapshot[];
   parsed: SnapshotRow[];
   catalog: MetricInfo[];
-  presets: Preset[];
 }) {
-  const [specs, setSpecs] = useState<SeriesSpec[]>(() =>
-    presets[0]
-      ? presets[0].specs.map((s, i) => ({ ...s, id: `p${i}` }))
-      : catalog[0]
-        ? [{ id: "p0", metric: catalog[0].key, mode: parsed.length < 2 ? "cumulative" : "delta" }]
-        : [],
-  );
-  const [ativo, setAtivo] = useState<string | undefined>();
   const [filtro, setFiltro] = useState<ContextFilter>({});
 
   const opcoes = useMemo(() => contextOptions(parsed), [parsed]);
   const semContexto = parsed.filter((s) => !s.matchMode && !s.matchMap).length;
 
-  function selecionar(stat: PanelStat) {
-    setSpecs([{ ...stat.spec, id: `tile-${stat.key}` }]);
-    setAtivo(stat.key);
-    document.getElementById("explorador")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  const leituras = useMemo(() => lerSerie(parsed, filtro), [parsed, filtro]);
+  const linhas = useMemo(
+    () => todasAsMetricas(parsed, catalog.map((c) => c.key), filtro),
+    [parsed, catalog, filtro],
+  );
 
   return (
     <div className="space-y-10">
@@ -72,41 +61,39 @@ export function GameAnalysis({
           </h2>
           <PeriodSummary rows={parsed} filter={filtro} />
           <p className="mt-1 text-sm text-ink-faint">
-            Cada número é desse período, comparado ao seu vitalício. Clique
-            para abrir no explorador.
+            Cada número é desse período, comparado ao seu vitalício.
           </p>
           <div className="mt-4">
-            <StatPanel
-              stats={CS2_PANEL}
-              snapshots={parsed}
-              activeKey={ativo}
-              filter={filtro}
-              onSelect={selecionar}
-            />
+            <StatPanel stats={CS2_PANEL} snapshots={parsed} filter={filtro} />
           </div>
         </section>
       )}
 
-      <section id="explorador" className="scroll-mt-16">
+      <section>
         <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
-          Explorador
+          Leituras
         </h2>
         <p className="mt-1 text-sm text-ink-faint">
-          Qualquer um dos {catalog.length} contadores, no modo e na
-          granularidade que você escolher.
+          O que os números dizem, dito por extenso.
         </p>
         <div className="mt-4">
-          <Explorer
-            snapshots={snapshots}
-            catalog={catalog}
-            presets={presets}
-            specs={specs}
-            onSpecsChange={setSpecs}
-            onPresetApplied={() => setAtivo(undefined)}
-            filter={filtro}
-          />
+          <Leituras leituras={leituras} />
         </div>
       </section>
+
+      <section>
+        <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
+          Todas as métricas
+        </h2>
+        <p className="mt-1 text-sm text-ink-faint">
+          As {catalog.length} que o CS2 publica, cada uma comparada com o seu
+          vitalício.
+        </p>
+        <div className="mt-4">
+          <MetricTable linhas={linhas} />
+        </div>
+      </section>
+
     </div>
   );
 }

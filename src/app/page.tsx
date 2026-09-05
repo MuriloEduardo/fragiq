@@ -168,7 +168,7 @@ function MetricBuckets() {
     <Section
       eyebrow="O balde"
       title="178 estatísticas, não seis"
-      lead="O CS2 expõe muito mais do que os painéis mostram. Medimos: são 197 contadores, dos quais 178 viram série temporal. O painel traz as principais prontas; o explorador abre qualquer uma das outras."
+      lead="O CS2 expõe muito mais do que os painéis mostram. Medimos: são 197 contadores, dos quais 178 viram série temporal. O painel traz as principais prontas, e as outras aparecem todas comparadas com o seu vitalício."
     >
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {BUCKETS.map((b) => (
@@ -267,7 +267,7 @@ function Differentiators() {
         <Callout
           icon={<Layers className="size-4" />}
           title="Painel fixo, e o resto sob demanda"
-          body="As principais estatísticas ficam sempre à vista, cada uma com o valor do período e o vitalício ao lado. Quando quiser ir fundo, o explorador abre qualquer um dos 178 contadores."
+          body="As principais estatísticas ficam sempre à vista, cada uma com o valor do período e o vitalício ao lado. Antes delas, as leituras: o que os números dizem, escrito por extenso. E abaixo, os 178 contadores, ordenados pelo que mais se afastou do seu normal."
         />
       </div>
     </Section>

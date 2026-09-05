@@ -31,12 +31,10 @@ export type PanelStat = {
 type Props = {
   stats: PanelStat[];
   snapshots: SnapshotRow[];
-  activeKey?: string;
   filter?: ContextFilter;
-  onSelect?: (stat: PanelStat) => void;
 };
 
-export function StatPanel({ stats, snapshots, activeKey, filter, onSelect }: Props) {
+export function StatPanel({ stats, snapshots, filter }: Props) {
   const tiles = stats.map((stat) => {
     const spec: SeriesSpec = { ...stat.spec, id: stat.key, filter };
     // "raw": cada coleta é um ponto. Agrupar por dia colapsaria justamente a
@@ -70,8 +68,6 @@ export function StatPanel({ stats, snapshots, activeKey, filter, onSelect }: Pro
           values={values}
           current={current}
           lifetime={lifetime}
-          active={activeKey === stat.key}
-          onSelect={onSelect}
         />
       ))}
     </div>
@@ -83,15 +79,11 @@ function Tile({
   values,
   current,
   lifetime,
-  active,
-  onSelect,
 }: {
   stat: PanelStat;
   values: number[];
   current: number | null;
   lifetime: number | null;
-  active: boolean;
-  onSelect?: (stat: PanelStat) => void;
 }) {
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", {
@@ -108,19 +100,8 @@ function Tile({
       ? (current - lifetime) / Math.abs(lifetime)
       : null;
 
-  const Wrapper = onSelect ? "button" : "div";
-
   return (
-    <Wrapper
-      {...(onSelect
-        ? { onClick: () => onSelect(stat), type: "button" as const }
-        : {})}
-      className={cn(
-        "rounded-xl border bg-surface p-4 text-left transition",
-        active ? "border-accent/60 ring-1 ring-accent/30" : "border-line",
-        onSelect && "hover:border-accent/40",
-      )}
-    >
+    <div className="rounded-xl border border-line bg-surface p-4 text-left">
       <p className="text-xs leading-snug text-ink-muted">{stat.label}</p>
 
       <p className="tnum mt-1.5 text-2xl font-semibold">
@@ -165,6 +146,6 @@ function Tile({
           </div>
         )}
       </div>
-    </Wrapper>
+    </div>
   );
 }

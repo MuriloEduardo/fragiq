@@ -2,7 +2,7 @@
  * Motor de consulta das séries.
  *
  * O balde de dados é `StatSnapshot.metrics` — um JSONB com os contadores
- * crus do jogo no instante da coleta. Tudo que o explorador oferece é
+ * crus do jogo no instante da coleta. Tudo que a análise oferece é
  * derivado daqui em tempo de consulta; nada é pré-agregado, então adicionar
  * uma métrica nova não exige migração nem recoleta.
  */
@@ -336,7 +336,7 @@ export type MetricInfo = {
 };
 
 /**
- * O que o explorador oferece como opção. Sai dos próprios dados, não de uma
+ * O que a análise oferece como recorte. Sai dos próprios dados, não de uma
  * lista fixa: qualquer jogo Steam funciona sem alteração de código.
  */
 export function metricCatalog(
@@ -370,7 +370,7 @@ export function metricCatalog(
 
 /**
  * CS2 devolve ~200 contadores com nomes crus. Sem agrupar e sem rotular, o
- * seletor do explorador é inutilizável.
+ * lista plana de métricas é inutilizável.
  */
 export const GROUP_ORDER: string[] = [
   "Geral",

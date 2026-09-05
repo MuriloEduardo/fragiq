@@ -37,3 +37,40 @@ export function rotularMapa(mapa: string) {
   const semPrefixo = mapa.replace(/^(de|cs|ar|dz|gd|coop)_/, "");
   return semPrefixo.charAt(0).toUpperCase() + semPrefixo.slice(1);
 }
+
+const ARMAS: Record<string, string> = {
+  ak47: "AK-47",
+  m4a1: "M4A1",
+  awp: "AWP",
+  deagle: "Desert Eagle",
+  glock: "Glock",
+  hkp2000: "USP-S / P2000",
+  p250: "P250",
+  fiveseven: "Five-SeveN",
+  tec9: "Tec-9",
+  elite: "Dual Berettas",
+  galilar: "Galil AR",
+  famas: "FAMAS",
+  aug: "AUG",
+  sg556: "SG 553",
+  ssg08: "SSG 08",
+  scar20: "SCAR-20",
+  g3sg1: "G3SG1",
+  mac10: "MAC-10",
+  mp7: "MP7",
+  mp9: "MP9",
+  ump45: "UMP-45",
+  p90: "P90",
+  bizon: "PP-Bizon",
+  nova: "Nova",
+  xm1014: "XM1014",
+  mag7: "MAG-7",
+  sawedoff: "Sawed-Off",
+  m249: "M249",
+  negev: "Negev",
+  taser: "Zeus",
+};
+
+export function rotularArma(arma: string) {
+  return ARMAS[arma] ?? arma.toUpperCase();
+}

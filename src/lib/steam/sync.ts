@@ -270,7 +270,7 @@ async function captureSnapshot(
   // janela cada sync durante uma sessão rende aproximadamente um ponto por
   // partida — a granularidade mais fina que a Web API permite.
   //
-  // Isso não polui gráfico: o explorador agrega por dia, semana ou mês na
+  // Isso não polui gráfico: a análise agrega por dia, semana ou mês na
   // hora da consulta. Guardar cru e agregar na leitura é o desenho.
   if (latest && JSON.stringify(latest.metrics) === JSON.stringify(stats.metrics)) {
     return false;
