@@ -209,7 +209,12 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
       numero: `${num(top.periodo!, 1)}%`,
       texto:
         `Precisão com ${rotularArma(top.arma)} no período, contra ${num(top.vida!, 1)}% ` +
-        `de vitalício (${pct(top.var)}). É a sua arma mais acima do normal no recorte.`,
+        `de vitalício (${pct(top.var)}). ` +
+        // Quando toda arma caiu, chamar a melhor de "acima do normal" é
+        // mentira — ela está acima das outras, não do seu vitalício.
+        (top.var > 0
+          ? `É a sua arma mais acima do normal no recorte.`
+          : `Nenhuma arma ficou acima do seu vitalício neste período; esta foi a que menos caiu.`),
       base: `${top.tiros} tiros`,
       tom: top.var > 0 ? "bom" : "neutro",
     });
