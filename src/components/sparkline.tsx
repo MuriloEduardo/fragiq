@@ -69,8 +69,22 @@ export function Sparkline({ values, baseline, color = "var(--accent)", className
       <path d={d} fill="none" stroke={color} strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
             vectorEffect="non-scaling-stroke" />
-      {/* O último ponto ancora a leitura no valor atual. */}
-      <circle cx={ux} cy={uy} r="2.5" fill={color} />
+      {/*
+        O último ponto ancora a leitura no valor atual.
+
+        É um caminho de comprimento zero com ponta arredondada, não um
+        <circle>: o preserveAspectRatio="none" estica o viewBox só na
+        horizontal, e um círculo comum sai achatado em elipse — largo e baixo.
+        A ponta do traço é medida em pixels de tela por causa do
+        vectorEffect, então continua redonda em qualquer largura de cartão.
+      */}
+      <path
+        d={`M${ux.toFixed(1)},${uy.toFixed(1)} L${ux.toFixed(1)},${uy.toFixed(1)}`}
+        stroke={color}
+        strokeWidth="5"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
     </svg>
   );
 }
