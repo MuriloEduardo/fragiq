@@ -65,30 +65,32 @@
 @media (prefers-color-scheme: dark) {
   :root {
     /* Ardósia azulada do HUD, não preto.
-       Primeira tentativa foi tímida: saí de #0a0d12 para #12171f e, no
-       escuro, a diferença mal se percebia — o relato foi "não mudou nada", e
-       estava certo. Agora o azul é assumido e a superfície dos cartões se
-       separa do fundo em 1,25:1, contra 1,14:1 de antes, que os fazia sumir. */
-    --canvas: #131a23;
-    --surface: #212d3a;
-    --surface-2: #2b3846;
-    --line: #3a4757;
-    --line-soft: #2b3846;
+       Terceira tentativa, e as duas anteriores estão registradas porque o
+       erro se repetiu: de #0a0d12 para #12171f, depois para #131a23, e as
+       duas vezes o relato foi que continuava preto demais. Estava certo — a
+       luminância relativa saía de 0,004 para 0,010, uma diferença que o olho
+       não separa do preto. Agora é 0,025, mais de duas vezes a anterior, e a
+       tela lê como painel de ardósia em vez de buraco. */
+    --canvas: #222d3c;
+    --surface: #2e3a49;
+    --surface-2: #3a4655;
+    --line: #4d5a6a;
+    --line-soft: #3a4655;
 
-    --ink: #e9edf2;
-    --ink-muted: #9fa9b6;
-    --ink-faint: #76818f;
+    --ink: #eef1f5;
+    --ink-muted: #aeb8c4;
+    --ink-faint: #8b96a3;
 
-    /* Laranja do CS2. Medido: 6,69:1 sobre --surface, 6,40:1 sobre
-       accent-soft. */
-    --accent: #eda454;
-    --accent-soft: #3d2c14;
-    --danger: #f4938a;
-    --warn: #e5c96a;
+    /* Laranja do CS2, clareado junto com o fundo para manter a distância.
+       Medido: 5,80:1 sobre --surface, 5,69:1 sobre accent-soft. */
+    --accent: #f0a95c;
+    --accent-soft: #4a3719;
+    --danger: #f79c93;
+    --warn: #ecd27a;
     --steam: #66c0f4;
 
-    --ct: #74acdf;
-    --t: #d9ba8b;
+    --ct: #8bbce8;
+    --t: #e0c496;
   }
 }
 
