@@ -113,21 +113,26 @@ async function runSync(
     });
   }
 
-  // Estado anterior lido ANTES do upsert — é a base da comparação de playtime.
+  // Base da comparação de playtime: o último PONTO GRAVADO de cada jogo, não
+  // o userGame. O upsert abaixo atualiza o playtime do userGame mesmo quando
+  // nenhum snapshot é gravado (stats iguais às anteriores) — e aí a coleta
+  // seguinte acharia que nada mudou e nem consultaria as stats. Foi o que
+  // quebrou a retentativa do bot: a Steam publica a partida minutos depois,
+  // e o segundo aviso precisa refazer a busca.
   const previous = new Map(
     (
       await prisma.userGame.findMany({
         where: { userId },
         select: {
           gameAppId: true,
-          playtimeForeverMin: true,
-          _count: { select: { snapshots: true } },
+          snapshots: {
+            orderBy: { capturedAt: "desc" },
+            take: 1,
+            select: { playtimeForeverMin: true },
+          },
         },
       })
-    ).map((ug) => [
-      ug.gameAppId,
-      { playtime: ug.playtimeForeverMin, snapshots: ug._count.snapshots },
-    ]),
+    ).map((ug) => [ug.gameAppId, ug.snapshots[0]?.playtimeForeverMin ?? null]),
   );
 
   const played = await listarJogados(steamId, previous.size > 0);
@@ -138,10 +143,9 @@ async function runSync(
   // ainda não tem nenhum ponto na série (primeira carga).
   const dirty = played.filter((g) => {
     if (g.playtime_forever < MIN_PLAYTIME_MIN) return false;
-    const prev = previous.get(g.appid);
-    if (!prev) return true;
-    if (prev.snapshots === 0) return true;
-    return g.playtime_forever > prev.playtime;
+    const ultimo = previous.get(g.appid);
+    if (ultimo == null) return true;
+    return g.playtime_forever > ultimo;
   });
 
   // Prioridade: quem jogou mais recentemente primeiro, caso o teto corte.
