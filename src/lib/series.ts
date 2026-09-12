@@ -77,6 +77,7 @@ export type SnapshotRow = {
   /** Observado pelo bot de presença; ausente nas coletas sem bot. */
   matchMap?: string | null;
   matchMode?: string | null;
+  matchScore?: string | null;
 };
 
 export type SeriesPoint = { t: number; value: number };
@@ -249,6 +250,25 @@ export function ultimoPar(
     if (after > before) ultimo = { prev, curr };
   }
   return ultimo;
+}
+
+/**
+ * Todos os pares em que a métrica subiu, na ordem em que aconteceram.
+ *
+ * É a lista de "intervalos com jogo" — o que o analista lê como partidas
+ * quando o bot registrou mapa e modo, e como sessões quando não registrou.
+ * Mesma caminhada de `ultimoPar`, para que a lista e o cabeçalho concordem.
+ */
+export function paresDeMovimento(
+  snapshots: SnapshotRow[],
+  metric: string,
+  filter?: ContextFilter,
+): { prev: SnapshotRow; curr: SnapshotRow }[] {
+  const pares: { prev: SnapshotRow; curr: SnapshotRow }[] = [];
+  for (const { prev, curr, before, after } of paresDerivados(snapshots, metric, filter)) {
+    if (after > before) pares.push({ prev, curr });
+  }
+  return pares;
 }
 
 /** Delta de uma métrica dentro de um par já escolhido. */

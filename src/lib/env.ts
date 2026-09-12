@@ -52,3 +52,29 @@ export function appUrl(): string {
 
   return "http://localhost:3000";
 }
+
+/**
+ * Conexão com o cogniflow, o serviço que responde às perguntas do analista.
+ *
+ * Opcional de propósito: sem as três variáveis a seção "Pergunte ao analista"
+ * não aparece, e o resto do site não sabe que ela existe. Exigir no boot
+ * quebraria o dev local de quem só quer mexer nos gráficos.
+ *
+ * O segredo assina os dois sentidos — o que enviamos ao webhook e o que o
+ * cogniflow nos devolve no callback e pede no endpoint de dados — então é um
+ * valor só, o mesmo que está em `tenants.fragiq.webhook.web` no segredo de
+ * plataforma deles.
+ */
+export type Cogniflow = {
+  webhookUrl: string;
+  clientId: string;
+  signingSecret: string;
+};
+
+export function cogniflow(): Cogniflow | null {
+  const webhookUrl = process.env.COGNIFLOW_WEBHOOK_URL?.trim();
+  const clientId = process.env.COGNIFLOW_CLIENT_ID?.trim();
+  const signingSecret = process.env.COGNIFLOW_SIGNING_SECRET?.trim();
+  if (!webhookUrl || !clientId || !signingSecret) return null;
+  return { webhookUrl, clientId, signingSecret };
+}

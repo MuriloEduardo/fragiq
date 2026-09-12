@@ -30,6 +30,7 @@ model User {
   games    UserGame[]
   syncRuns SyncRun[]
   feedback Feedback[]
+  analyses Analysis[]
 
   @@map("users")
 }
@@ -198,4 +199,46 @@ enum SyncTrigger {
   CRON
   /// Disparado pelo bot de presença quando o jogador sai de uma partida.
   EVENT
+}
+
+/// Uma pergunta feita ao analista sobre um jogo, e a resposta quando chega.
+///
+/// O analista é um agente do cogniflow, e a conversa com ele é assíncrona:
+/// a pergunta sai por webhook, a resposta volta por callback segundos
+/// depois. A linha existe para que a tela tenha o que mostrar nesse meio
+/// tempo e para que a resposta tenha onde pousar quando o request que
+/// perguntou já acabou.
+model Analysis {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  gameAppId Int
+
+  question String
+  answer   String?
+
+  status AnalysisStatus @default(PENDING)
+  error  String?
+
+  /// ID da resposta no cogniflow. É determinístico por turno: uma entrega
+  /// repetida chega com o mesmo ID, e é assim que a repetição é descartada.
+  replyId String? @unique
+
+  createdAt      DateTime  @default(now())
+  acknowledgedAt DateTime?
+  answeredAt     DateTime?
+
+  @@index([userId, gameAppId, createdAt])
+  @@map("analyses")
+}
+
+enum AnalysisStatus {
+  /// Enviada ao cogniflow; nenhuma confirmação ainda.
+  PENDING
+  /// O cogniflow confirmou o recebimento e está respondendo.
+  ACKNOWLEDGED
+  ANSWERED
+  FAILED
 }

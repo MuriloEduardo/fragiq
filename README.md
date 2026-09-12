@@ -188,6 +188,16 @@ Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:
 - [docs/roadmap-dados.md](docs/roadmap-dados.md) — qual atacar primeiro, e
   qual medição decide isso
 
+## O analista
+
+"Pergunte ao analista", na página do jogo, é um agente que lê a mesma série e
+responde em texto. Ele não roda aqui: o FragIQ é um tenant do **cogniflow**,
+conectado pelo canal webhook — a pergunta sai assinada, a resposta volta por
+callback, e durante o turno o agente consulta `/api/cogniflow/data`, que
+expõe as mesmas derivações de `series.ts` como views. Provisionamento,
+contrato das views e prompt do agente em
+[docs/cogniflow-tenant.md](docs/cogniflow-tenant.md).
+
 ## Estrutura
 
 ```
@@ -198,6 +208,8 @@ src/lib/
   session.ts                  sessão JWT em cookie
   series.ts                   motor de consulta do explorador
   stats.ts                    formatação e métricas derivadas de CS2
+  analista.ts                 views que o analista consulta (data.read)
+  cogniflow.ts                assinatura e envio de perguntas ao cogniflow
   steam/openid.ts             OpenID 2.0
   steam/api.ts                cliente da Web API
   steam/sync.ts               ingestão com gate de playtime
@@ -208,4 +220,6 @@ src/app/
   api/auth/steam/             login OpenID
   api/sync/                   coleta manual
   api/cron/sync/              coleta agendada
+  api/analises/               perguntas ao analista
+  api/cogniflow/              callback e dados, assinados pelo cogniflow
 ```
