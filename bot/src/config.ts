@@ -1,7 +1,16 @@
 import "dotenv/config";
+import { lerSegredos } from "./segredos.js";
+
+// Segredo tem precedência sobre ambiente: em produção o .env nem existe, e
+// em dev quem define FRAGIQ_SECRET_ID quer testar o caminho real.
+const segredos = await lerSegredos();
+
+function ler(nome: string): string | null {
+  return segredos[nome]?.trim() || process.env[nome]?.trim() || null;
+}
 
 function obrigatoria(nome: string): string {
-  const v = process.env[nome]?.trim();
+  const v = ler(nome);
   if (!v) {
     console.error(`Variável de ambiente ausente: ${nome}`);
     process.exit(1);
@@ -18,8 +27,8 @@ export const config = {
    * evita manter a senha em variável de ambiente e dispensa o Steam Guard
    * nas reconexões.
    */
-  refreshToken: process.env.STEAM_BOT_REFRESH_TOKEN?.trim() || null,
-  password: process.env.STEAM_BOT_PASSWORD?.trim() || null,
+  refreshToken: ler("STEAM_BOT_REFRESH_TOKEN"),
+  password: ler("STEAM_BOT_PASSWORD"),
 
   /** Para onde avisamos que alguém terminou de jogar. */
   webhookUrl: obrigatoria("FRAGIQ_WEBHOOK_URL"),

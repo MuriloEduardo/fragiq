@@ -15,3 +15,8 @@ primary_region = "gru"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+
+# O processo sai com código 1 em erro de conexão (index.ts) e conta com o host
+# para voltar. Sem isto, a máquina ficaria parada depois da primeira queda.
+[[restart]]
+  policy = "always"

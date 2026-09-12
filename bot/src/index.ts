@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import SteamUser from "steam-user";
 import { CS2_APPID, config } from "./config.js";
+import { gravarRefreshToken, secretId } from "./segredos.js";
 
 /**
  * Bot de presença.
@@ -49,6 +50,14 @@ if (config.refreshToken) {
 }
 
 client.on("refreshToken", (token: string) => {
+  if (secretId) {
+    gravarRefreshToken(token).then(
+      () => console.log(`Refresh token renovado gravado em ${secretId}.`),
+      (err) => console.error("Falha ao gravar o refresh token no Secrets Manager:", err),
+    );
+    return;
+  }
+
   // Grava sozinho e apaga a senha: pedir para copiar à mão é onde se erra,
   // e senha esquecida no arquivo é senha vazada mais cedo ou mais tarde.
   try {

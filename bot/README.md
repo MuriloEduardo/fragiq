@@ -22,6 +22,28 @@ chave, e é a maior causa de dashboard vazio.
 Um cliente Steam mantém conexão TCP persistente. Serverless não comporta.
 Precisa de um host sempre ligado: Railway, Fly.io ou um VPS pequeno.
 
+## EC2
+
+Roda numa `t2.micro` (free tier) em `us-east-1`, instância `fragiq-bot`,
+Amazon Linux 2023 com Docker. O Fly ficou como plano B: o `fly.toml` continua
+válido, mas o trial acabou antes do primeiro deploy.
+
+- Acesso: `ssh -i ~/.ssh/fragiq-bot.pem ec2-user@<ip>`. O security group só
+  abre a 22 para o IP de quem criou a instância; mudou de rede, atualize a
+  regra.
+- Não há `.env` no servidor. O refresh token e o segredo do webhook vivem no
+  Secrets Manager (`fragiq/bot`, JSON com as mesmas chaves das variáveis);
+  a instância tem a role `fragiq-bot-ec2`, que só pode ler e escrever esse
+  segredo. O bot lê no boot e grava de volta quando o steam-user renova o
+  token — sem isso o próximo reboot logaria com token morto.
+- Variáveis não sensíveis (conta, URL do webhook, grace) ficam no
+  `/opt/fragiq-bot/run.sh`, que reconstrói a imagem e sobe o container com
+  `--restart unless-stopped`. `./deploy.sh` faz rsync do código e chama ele.
+- Para trocar um valor do segredo: `aws secretsmanager put-secret-value
+  --secret-id fragiq/bot --secret-string '{...}'` e `sudo docker restart
+  fragiq-bot`.
+- Logs: `sudo docker logs -f fragiq-bot`.
+
 ## Primeiro login
 
 A conta precisa ser **dedicada**. Ela ficará amiga de desconhecidos, e um
