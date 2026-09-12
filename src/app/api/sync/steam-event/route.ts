@@ -28,6 +28,8 @@ const schema = z.object({
 // um evento real de fim de partida.
 const COOLDOWN_MS = 60_000;
 
+const CS2_APPID = 730;
+
 export async function POST(request: NextRequest) {
   const secret = process.env.BOT_WEBHOOK_SECRET;
   if (!secret) {
@@ -64,6 +66,18 @@ export async function POST(request: NextRequest) {
       mode: parsed.data.mode,
       score: parsed.data.score,
     });
+
+    // A Steam publica as stats minutos depois do fim da partida, e o prazo
+    // varia. Se o CS2 veio igual ao último ponto, a partida que o bot viu
+    // ainda não chegou: nada foi gravado, o contexto não foi gasto, e o 202
+    // diz ao bot para tentar de novo mais tarde.
+    if (result.unchanged.includes(CS2_APPID)) {
+      return NextResponse.json(
+        { pending: "stats ainda não publicadas pela Steam", ...result },
+        { status: 202 },
+      );
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     console.error("[steam-event] sync falhou", err);

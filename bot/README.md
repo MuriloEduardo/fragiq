@@ -17,6 +17,14 @@ Como efeito colateral, a amizade também destrava perfis marcados como
 "somente amigos" — a Web API respeita a privacidade em relação ao dono da
 chave, e é a maior causa de dashboard vazio.
 
+## A Steam demora
+
+`BOT_GRACE_MS` é só a primeira espera. Se a aplicação responder `202`, as
+stats do CS2 vieram iguais ao último ponto — a Steam ainda não publicou a
+partida (medido: mais de 5 min depois de sair do jogo). O bot então tenta
+de novo em 2, 4, 8 e 16 min, segurando o mapa e o modo até a partida
+aparecer, e só depois disso descarta o contexto.
+
 ## Por que não roda na Vercel
 
 Um cliente Steam mantém conexão TCP persistente. Serverless não comporta.

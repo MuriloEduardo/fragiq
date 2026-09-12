@@ -35,6 +35,13 @@ export type SyncResult = {
   gamesStored: number;
   snapshotsCreated: number;
   statCallsSpent: number;
+  /**
+   * appIds cujas stats foram buscadas e vieram iguais ao último ponto. Para
+   * o bot de presença isso significa "a Steam ainda não publicou a partida":
+   * ela demora minutos, não segundos, e o valor varia — então quem avisou
+   * precisa saber que deve tentar de novo.
+   */
+  unchanged: number[];
 };
 
 /**
@@ -144,6 +151,7 @@ async function runSync(
 
   let snapshotsCreated = 0;
   let statCallsSpent = 0;
+  const unchanged: number[] = [];
 
   for (const game of dirty) {
     if (statCallsSpent >= MAX_GAMES_WITH_STATS) break;
@@ -155,7 +163,9 @@ async function runSync(
     if (record && !record.supportsStats) continue; // já sabemos que não expõe stats.
 
     statCallsSpent++;
-    if (await captureSnapshot(userId, steamId, game, context)) snapshotsCreated++;
+    const outcome = await captureSnapshot(userId, steamId, game, context);
+    if (outcome === "created") snapshotsCreated++;
+    if (outcome === "unchanged") unchanged.push(game.appid);
   }
 
   return {
@@ -163,6 +173,7 @@ async function runSync(
     gamesStored: played.length,
     snapshotsCreated,
     statCallsSpent,
+    unchanged,
   };
 }
 
@@ -229,13 +240,16 @@ async function upsertGameAndOwnership(userId: string, game: OwnedGame) {
   });
 }
 
-/** Retorna true se um novo ponto foi gravado na série. */
+/**
+ * "created" se um novo ponto foi gravado; "unchanged" se as stats vieram
+ * iguais ao último ponto; "skipped" se não havia o que comparar.
+ */
 async function captureSnapshot(
   userId: string,
   steamId: string,
   game: OwnedGame,
   context?: MatchContext,
-): Promise<boolean> {
+): Promise<"created" | "unchanged" | "skipped"> {
   const stats = await getUserStatsForGame(steamId, game.appid);
 
   if (!stats) {
@@ -244,7 +258,7 @@ async function captureSnapshot(
       where: { appId: game.appid },
       data: { supportsStats: false },
     });
-    return false;
+    return "skipped";
   }
 
   await ensureStatSchema(game.appid);
@@ -253,7 +267,7 @@ async function captureSnapshot(
     where: { userId_gameAppId: { userId, gameAppId: game.appid } },
     select: { id: true },
   });
-  if (!userGame) return false;
+  if (!userGame) return "skipped";
 
   const latest = await prisma.statSnapshot.findFirst({
     where: { userGameId: userGame.id },
@@ -272,8 +286,14 @@ async function captureSnapshot(
   //
   // Isso não polui gráfico: a análise agrega por dia, semana ou mês na
   // hora da consulta. Guardar cru e agregar na leitura é o desenho.
-  if (latest && JSON.stringify(latest.metrics) === JSON.stringify(stats.metrics)) {
-    return false;
+  //
+  // A comparação é por chave, não por JSON.stringify: a coluna é jsonb, e o
+  // Postgres devolve as chaves em outra ordem da que a Steam manda. Com
+  // stringify o check nunca batia, e a série ganhava pontos idênticos toda
+  // vez que o playtime subia sem partida — tempo em menu, warmup, servidor
+  // comunitário.
+  if (latest && metricasIguais(latest.metrics as Record<string, number>, stats.metrics)) {
+    return "unchanged";
   }
 
   await prisma.statSnapshot.create({
@@ -291,7 +311,13 @@ async function captureSnapshot(
     },
   });
 
-  return true;
+  return "created";
+}
+
+function metricasIguais(a: Record<string, number>, b: Record<string, number>): boolean {
+  const chavesA = Object.keys(a);
+  if (chavesA.length !== Object.keys(b).length) return false;
+  return chavesA.every((k) => a[k] === b[k]);
 }
 
 async function ensureStatSchema(appId: number) {

@@ -156,8 +156,10 @@ client.on("user", (steamID, user) => {
 
   if (agora) {
     console.log(`${id} entrou no CS2`);
-    // Entrar cancela um aviso pendente: voltou a jogar, então a partida
-    // anterior ainda não é o estado final.
+    // Entrar cancela um aviso pendente (inclusive uma retentativa): voltou
+    // a jogar, então a partida anterior ainda não é o estado final. O
+    // contexto fica; se a próxima partida for em outro mapa ele é
+    // substituído, e o delta das duas entra com o mapa da última.
     limparPendente(id);
     return;
   }
@@ -187,10 +189,21 @@ function limparPendente(id: string) {
 
 /* --------------------------------- webhook -------------------------------- */
 
-async function avisar(steamId: string) {
-  const ctx = contexto.get(steamId);
-  contexto.delete(steamId);
+/**
+ * Esperas entre tentativas quando a aplicação responde 202: a Steam ainda
+ * não publicou a partida. Medido em 12/09/2026: mais de 5 minutos depois de
+ * sair do jogo as stats continuavam as velhas. O prazo varia, então um
+ * grace fixo ou erra ou desperdiça — o jeito é perguntar até mudar.
+ */
+const RETRY_MS = [2, 4, 8, 16].map((min) => min * 60_000);
 
+async function avisar(steamId: string, tentativa = 0) {
+  // O contexto só é descartado quando a partida entrou de fato (ou quando
+  // desistimos). Se for apagado na primeira tentativa, o mapa se perde e o
+  // delta real, capturado mais tarde, entra sem atribuição.
+  const ctx = contexto.get(steamId);
+
+  let status: number | null = null;
   try {
     const res = await fetch(config.webhookUrl, {
       method: "POST",
@@ -206,12 +219,35 @@ async function avisar(steamId: string) {
         score: ctx?.score,
       }),
     });
-
+    status = res.status;
     const corpo = await res.text();
     console.log(`Webhook ${steamId}: ${res.status} ${corpo.slice(0, 120)}`);
   } catch (err) {
     console.error(`Webhook falhou para ${steamId}:`, err);
   }
+
+  // 202 = stats ainda velhas; null = rede falhou. Os dois merecem nova
+  // tentativa. Qualquer outra resposta encerra: ou gravou, ou é erro nosso.
+  if (status !== 202 && status !== null) {
+    contexto.delete(steamId);
+    return;
+  }
+
+  const espera = RETRY_MS[tentativa];
+  if (espera === undefined) {
+    console.warn(`Desistindo de ${steamId}: partida não apareceu em ${RETRY_MS.length} tentativas.`);
+    contexto.delete(steamId);
+    return;
+  }
+
+  console.log(`${steamId}: nova tentativa em ${espera / 60_000} min`);
+  pendentes.set(
+    steamId,
+    setTimeout(() => {
+      pendentes.delete(steamId);
+      void avisar(steamId, tentativa + 1);
+    }, espera),
+  );
 }
 
 /* ------------------------------- encerramento ------------------------------ */
