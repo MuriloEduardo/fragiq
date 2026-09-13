@@ -396,9 +396,11 @@ model Match {
   jogadaEm DateTime?
   duracaoS Int?
   rounds   Int?
-  /// Mapa quando dá para saber: pelo bot de presença (rich presence de
-  /// quem estava na partida) ou pelo game_type do GC.
+  /// Mapa lido do cabeçalho da demo (o GC não diz); reserva é o bot de
+  /// presença de quem estava na partida.
   mapa     String?
+  /// Nome do servidor da Valve, do mesmo cabeçalho ("south_america … gru1").
+  servidor String?
   gameType Int?
   placarA  Int?
   placarB  Int?

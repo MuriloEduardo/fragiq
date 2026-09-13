@@ -47,3 +47,22 @@ declare module "globaloffensive-sharecode" {
     decode(): { matchId: string; outcomeId: string; token: string };
   }
 }
+
+declare module "steamcommunity" {
+  import type { SteamID } from "steam-user";
+  export interface CSteamGroup {
+    name: string;
+    steamID: SteamID;
+    postAnnouncement(headline: string, content: string, hidden: boolean, callback: (err: Error | null, aid?: string) => void): void;
+  }
+  export default class SteamCommunity {
+    setCookies(cookies: string[]): void;
+    getSteamGroup(id: string, callback: (err: Error | null, group: CSteamGroup) => void): void;
+    postGroupAnnouncement(gid: string, headline: string, content: string, hidden: boolean, callback: (err: Error | null, aid?: string) => void): void;
+  }
+}
+
+declare module "unbzip2-stream" {
+  import type { Duplex } from "node:stream";
+  export default function unbzip2(): Duplex;
+}

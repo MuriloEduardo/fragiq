@@ -87,6 +87,7 @@ declare module "steam-user" {
     on(event: "friendRelationship", cb: (steamID: SteamID, relationship: number) => void): this;
     on(event: "user", cb: (steamID: SteamID, user: PersonaUser) => void): this;
     on(event: "appOwnershipCached", cb: () => void): this;
+    on(event: "webSession", cb: (sessionID: string, cookies: string[]) => void): this;
     on(event: "accountLimitations", cb: (limited: boolean, communityBanned: boolean, locked: boolean, canInviteFriends: boolean) => void): this;
   }
 }

@@ -2,6 +2,7 @@ import type SteamUser from "steam-user";
 import GlobalOffensive, { type MatchInfo } from "globaloffensive";
 import { ShareCode } from "globaloffensive-sharecode";
 import { CS2_APPID, config } from "./config.js";
+import { lerCabecalhoDaDemo } from "./demo-header.js";
 
 /**
  * A ponte com o Game Coordinator do CS2.
@@ -15,6 +16,7 @@ import { CS2_APPID, config } from "./config.js";
  */
 
 type Pendente = { id: string; shareCode: string };
+type SemMapa = { shareCode: string; demoUrl: string };
 
 type Resultado = {
   shareCode: string;
@@ -27,6 +29,8 @@ type Resultado = {
     rounds: number;
     gameType: number | null;
     demoUrl: string | null;
+    mapa: string | null;
+    servidor: string | null;
     contas: number[];
     kills: number[];
     assists: number[];
@@ -95,22 +99,31 @@ export function ligarPartidas(client: SteamUser) {
         console.warn(`Fila de partidas: ${res.status}`);
         return;
       }
-      const { partidas } = (await res.json()) as { partidas: Pendente[] };
+      const { partidas, semMapa = [] } = (await res.json()) as { partidas: Pendente[]; semMapa?: SemMapa[] };
       for (const p of partidas) {
         const resultado = await consultar(p.shareCode);
         console.log(`Partida ${p.shareCode}: ${resultado.status}${resultado.error ? ` (${resultado.error})` : ""}`);
-        await fetch(config.partidasUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", authorization: `Bearer ${config.webhookSecret}` },
-          body: JSON.stringify(resultado),
-        }).catch((err) => console.error("Fila de partidas: não gravou:", err));
+        await gravar(resultado);
         await new Promise((r) => setTimeout(r, 1500));
+      }
+      for (const p of semMapa) {
+        const cabecalho = await lerCabecalhoDaDemo(p.demoUrl).catch(() => ({ mapa: null, servidor: null }));
+        console.log(`Mapa ${p.shareCode}: ${cabecalho.mapa ?? "não lido"}`);
+        await gravar({ shareCode: p.shareCode, status: "MAPA", ...cabecalho });
       }
     } catch (err) {
       console.error("Fila de partidas falhou:", err);
     } finally {
       rodando = false;
     }
+  }
+
+  async function gravar(resultado: Resultado | { shareCode: string; status: "MAPA"; mapa: string | null; servidor: string | null }) {
+    await fetch(config.partidasUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", authorization: `Bearer ${config.webhookSecret}` },
+      body: JSON.stringify(resultado),
+    }).catch((err) => console.error("Fila de partidas: não gravou:", err));
   }
 
   async function consultar(shareCode: string): Promise<Resultado> {
@@ -127,6 +140,14 @@ export function ligarPartidas(client: SteamUser) {
     const contas = fim?.reservation?.account_ids ?? [];
     if (!fim || contas.length === 0) return { shareCode, status: "FAILED", error: "resposta do GC sem scoreboard" };
 
+    const demoUrl = fim.map ?? null;
+    const cabecalho = demoUrl
+      ? await lerCabecalhoDaDemo(demoUrl).catch((err) => {
+          console.warn("Cabeçalho da demo falhou:", err instanceof Error ? err.message : err);
+          return { mapa: null, servidor: null };
+        })
+      : { mapa: null, servidor: null };
+
     return {
       shareCode,
       status: "DONE",
@@ -136,7 +157,9 @@ export function ligarPartidas(client: SteamUser) {
         duracaoS: fim.match_duration ?? 0,
         rounds: (fim.team_scores?.[0] ?? 0) + (fim.team_scores?.[1] ?? 0),
         gameType: fim.reservation?.game_type ?? null,
-        demoUrl: fim.map ?? null,
+        demoUrl,
+        mapa: cabecalho.mapa,
+        servidor: cabecalho.servidor,
         contas,
         kills: fim.kills ?? [],
         assists: fim.assists ?? [],

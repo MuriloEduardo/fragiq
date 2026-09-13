@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { gravarPartidaDoGC, registrarFalhaDoGC } from "@/lib/partidas";
+import { gravarMapaDaDemo, gravarPartidaDoGC, registrarFalhaDoGC } from "@/lib/partidas";
 import { garantirAnaliseDaSessao } from "@/lib/analises";
 
 export const dynamic = "force-dynamic";
@@ -20,20 +20,32 @@ function autorizado(request: NextRequest) {
 export async function GET(request: NextRequest) {
   if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
-  const partidas = await prisma.match.findMany({
-    where: { status: "PENDING" },
-    orderBy: { createdAt: "asc" },
-    take: 5,
-    select: { id: true, shareCode: true },
-  });
-  return NextResponse.json({ partidas });
+  const [partidas, semMapa] = await Promise.all([
+    prisma.match.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "asc" },
+      take: 5,
+      select: { id: true, shareCode: true },
+    }),
+    // Gravadas antes de o bot ler o cabeçalho da demo, ou quando a leitura
+    // falhou: só o mapa falta, e só a demo é consultada.
+    prisma.match.findMany({
+      where: { status: "DONE", mapa: null, demoUrl: { not: null }, tentativas: { lt: 3 } },
+      orderBy: { createdAt: "asc" },
+      take: 3,
+      select: { shareCode: true, demoUrl: true },
+    }),
+  ]);
+  return NextResponse.json({ partidas, semMapa });
 }
 
 const numeros = z.array(z.number().int().nonnegative());
 const resultado = z.object({
   shareCode: z.string().min(1),
-  status: z.enum(["DONE", "EXPIRED", "FAILED"]),
+  status: z.enum(["DONE", "EXPIRED", "FAILED", "MAPA"]),
   error: z.string().max(400).optional(),
+  mapa: z.string().max(64).nullable().optional(),
+  servidor: z.string().max(200).nullable().optional(),
   partida: z
     .object({
       matchId: z.string().min(1),
@@ -42,6 +54,8 @@ const resultado = z.object({
       rounds: z.number().int().nonnegative(),
       gameType: z.number().int().nullable(),
       demoUrl: z.string().nullable(),
+      mapa: z.string().max(64).nullable().optional(),
+      servidor: z.string().max(200).nullable().optional(),
       contas: z.array(z.number().int().positive()).min(2).max(10),
       kills: numeros,
       assists: numeros,
@@ -60,8 +74,10 @@ export async function POST(request: NextRequest) {
   const parsed = resultado.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
 
-  const { shareCode, status, error, partida } = parsed.data;
-  if (status === "DONE" && partida) {
+  const { shareCode, status, error, partida, mapa, servidor } = parsed.data;
+  if (status === "MAPA") {
+    await gravarMapaDaDemo(shareCode, mapa ?? null, servidor ?? null);
+  } else if (status === "DONE" && partida) {
     const usuarios = await gravarPartidaDoGC(shareCode, partida);
     // O scoreboard chegou: agora a análise da sessão de quem estava nela
     // tem a partida inteira para ler. Quem já tem análise não ganha outra.

@@ -193,6 +193,9 @@ export type PartidaDoGC = {
   rounds: number;
   gameType: number | null;
   demoUrl: string | null;
+  /** Do cabeçalho da demo, quando o bot conseguiu ler. */
+  mapa?: string | null;
+  servidor?: string | null;
   /** accountids na ordem da reserva: cinco do time A, cinco do time B. */
   contas: number[];
   kills: number[];
@@ -246,7 +249,7 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
     };
   });
 
-  const mapa = await mapaPelaPresenca([...userPorSteam.values()], jogadaEm, p.duracaoS);
+  const mapa = p.mapa ?? (await mapaPelaPresenca([...userPorSteam.values()], jogadaEm, p.duracaoS));
 
   await prisma.$transaction([
     prisma.match.update({
@@ -262,6 +265,7 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
         placarA: a,
         placarB: b,
         mapa,
+        servidor: p.servidor ?? null,
       },
     }),
     prisma.matchPlayer.deleteMany({ where: { matchId } }),
@@ -271,9 +275,10 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
 }
 
 /**
- * O GC não diz o mapa. O bot de presença, sim — para quem o adicionou —
- * e grava no snapshot da coleta que veio logo depois da partida. Se algum
- * dos dez jogadores tem um snapshot com mapa na janela certa, é este.
+ * Reserva para quando o bot não leu o cabeçalho da demo: o bot de
+ * presença grava o mapa no snapshot da coleta que veio logo depois da
+ * partida. Se algum dos dez jogadores tem um snapshot assim na janela
+ * certa, é este.
  */
 async function mapaPelaPresenca(userIds: string[], jogadaEm: Date, duracaoS: number): Promise<string | null> {
   if (userIds.length === 0) return null;
@@ -288,6 +293,14 @@ async function mapaPelaPresenca(userIds: string[], jogadaEm: Date, duracaoS: num
     select: { matchMap: true },
   });
   return snap?.matchMap ?? null;
+}
+
+/** Só o mapa, lido depois. Sem mapa conta como tentativa, para não ficar pedindo para sempre. */
+export async function gravarMapaDaDemo(shareCode: string, mapa: string | null, servidor: string | null) {
+  await prisma.match.updateMany({
+    where: { shareCode, status: "DONE" },
+    data: mapa ? { mapa, servidor } : { tentativas: { increment: 1 } },
+  });
 }
 
 export async function registrarFalhaDoGC(shareCode: string, motivo: "EXPIRED" | "FAILED", error?: string) {
