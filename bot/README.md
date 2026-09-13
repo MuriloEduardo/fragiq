@@ -87,3 +87,12 @@ Com o alvo **dentro de uma partida**, imprime os campos de rich presence que
 o CS2 publica e responde se o mapa está entre eles. Se estiver, dá para
 rastrear mapa sem parsear demo — o que contornaria a ausência de Mirage,
 Ancient, Anubis e Overpass nos contadores da Steam.
+
+## Mensagens no chat
+
+O site enfileira a análise de cada sessão em `GET /api/bot/outbox` (mesmo
+Bearer do webhook). O bot busca a cada 20 s (`BOT_OUTBOX_POLL_MS`), entrega
+por `client.chat.sendFriendMessage` a quem é amigo e confirma em
+`POST /api/bot/outbox` com `SENT` ou `FAILED`. Quem não é amigo não recebe
+— o chat da Steam só existe entre amigos. `FRAGIQ_OUTBOX_URL` sobrescreve a
+URL, que por padrão deriva de `FRAGIQ_WEBHOOK_URL`.

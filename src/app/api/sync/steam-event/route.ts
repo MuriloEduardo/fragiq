@@ -75,10 +75,12 @@ export async function POST(request: NextRequest) {
     const result = await syncUser(user.id, user.steamId, "EVENT", contexto);
 
     // A Steam publica as stats minutos depois do fim da partida, e o prazo
-    // varia. Se o CS2 veio igual ao último ponto, ou a partida que o bot viu
-    // ainda não chegou — e o 202 diz ao bot para tentar de novo — ou ela já
-    // foi capturada por outra coleta sem contexto, e o contexto vai para lá.
-    if (result.unchanged.includes(CS2_APPID)) {
+    // varia. Se nenhum ponto nasceu — o CS2 veio igual ao último, ou o
+    // playtime parado fez o sync nem consultar as stats — ou a partida que o
+    // bot viu ainda não chegou (e o 202 diz ao bot para tentar de novo), ou
+    // ela já foi capturada por outra coleta sem contexto, e o contexto vai
+    // para lá.
+    if (result.snapshotsCreated === 0) {
       if (await anexarContexto(user.id, contexto)) {
         return NextResponse.json({ attached: "contexto gravado no ponto anterior", ...result });
       }
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
 }
 
 /** Janela em que um ponto sem contexto ainda é "a partida que o bot viu". */
-const JANELA_ANEXO_MS = 20 * 60_000;
+const JANELA_ANEXO_MS = 30 * 60_000;
 
 /**
  * Dá mapa e modo ao último ponto de CS2 quando ele nasceu sem — e há pouco.
@@ -121,8 +123,10 @@ async function anexarContexto(
       },
     },
   });
+  // Um ponto que já tem mapa veio do bot e fica. Um que só tem modo foi
+  // marcado à mão no site — o bot sabe mais (mapa e placar) e prevalece.
   const ultimo = userGame?.snapshots[0];
-  if (!ultimo || ultimo.matchMode || ultimo.matchMap) return false;
+  if (!ultimo || ultimo.matchMap) return false;
   if (Date.now() - ultimo.capturedAt.getTime() > JANELA_ANEXO_MS) return false;
 
   await prisma.statSnapshot.update({

@@ -33,6 +33,15 @@ export const config = {
   /** Para onde avisamos que alguém terminou de jogar. */
   webhookUrl: obrigatoria("FRAGIQ_WEBHOOK_URL"),
   webhookSecret: obrigatoria("FRAGIQ_WEBHOOK_SECRET"),
+  /**
+   * De onde buscamos as mensagens a entregar no chat. Deriva do webhook por
+   * padrão: é o mesmo site e o mesmo segredo.
+   */
+  outboxUrl:
+    ler("FRAGIQ_OUTBOX_URL") ??
+    obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/outbox"),
+  /** Intervalo entre buscas na fila de mensagens. */
+  outboxPollMs: Number(process.env.BOT_OUTBOX_POLL_MS ?? 20_000),
 
   /**
    * A Steam demora a gravar as estatísticas depois que o jogo fecha. Avisar

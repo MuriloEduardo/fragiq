@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { lerCorpoAssinado, parseConversationId } from "@/lib/cogniflow";
+import { enfileirarAnaliseNoSteam } from "@/lib/mensagem-steam";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,12 @@ export async function POST(request: NextRequest) {
       answeredAt: new Date(),
     },
   });
+
+  // A análise de sessão também vai para o chat da Steam, pelo bot. Falha
+  // aqui não pode derrubar o callback — a resposta já está gravada.
+  await enfileirarAnaliseNoSteam(aberta.id).catch((e) =>
+    console.error("[cogniflow] não enfileirou a mensagem da Steam:", e instanceof Error ? e.message : e),
+  );
 
   return NextResponse.json({ ok: true });
 }

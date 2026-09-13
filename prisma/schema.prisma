@@ -28,6 +28,10 @@ model User {
   /// página inteira.
   perfilPublico Boolean @default(true)
 
+  /// Receber a análise de cada sessão no chat da Steam, pelo bot. Só chega
+  /// para quem adicionou o bot; desligar aqui silencia mesmo sendo amigo.
+  avisoSteam Boolean @default(true)
+
   lastSyncedAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -37,8 +41,9 @@ model User {
   feedback    Feedback[]
   analyses    Analysis[]
   participant Participant?
-  seguindo    Follow[]     @relation("seguidor")
-  seguidores  Follow[]     @relation("seguido")
+  seguindo    Follow[]       @relation("seguidor")
+  seguidores  Follow[]       @relation("seguido")
+  mensagens   SteamMessage[]
 
   @@map("users")
 }
@@ -326,4 +331,35 @@ model Follow {
 enum FollowStatus {
   PENDING
   ACCEPTED
+}
+
+/// Uma mensagem para o bot entregar no chat da Steam.
+///
+/// O bot não recebe chamadas: ele mora numa EC2 sem porta aberta e só faz
+/// saída. Então o site enfileira aqui e o bot busca de tempos em tempos,
+/// entrega e marca. Uma linha por mensagem, com o resultado da entrega —
+/// é o que permite ver no painel o que chegou e o que não chegou.
+model SteamMessage {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  steamId String
+  texto   String
+
+  status SteamMessageStatus @default(PENDING)
+  error  String?
+
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+
+  @@index([status, createdAt])
+  @@map("steam_messages")
+}
+
+enum SteamMessageStatus {
+  PENDING
+  SENT
+  FAILED
 }

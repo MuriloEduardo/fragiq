@@ -37,6 +37,12 @@ declare module "steam-user" {
     constructor(options?: { autoRelogin?: boolean });
 
     readonly steamID: SteamID | null;
+    /** SteamID64 -> EFriendRelationship, mantido pelo cliente enquanto logado. */
+    readonly myFriends: Record<string, number>;
+    readonly chat: {
+      /** Resolve quando a Steam confirma a entrega; rejeita se o chat recusar. */
+      sendFriendMessage(steamID: SteamID | string, message: string): Promise<unknown>;
+    };
 
     static EPersonaState: { Offline: 0; Online: 1; Busy: 2; Away: 3 };
     static EFriendRelationship: {

@@ -39,11 +39,18 @@ export function listarSessoes(rows: SnapshotRow[], filter?: ContextFilter): Sess
     const deaths = d("total_deaths");
     const headshots = d("total_kills_headshot");
     const dano = d("total_damage_done");
+    // total_time_played conta segundos EM PARTIDA e sobe junto com os rounds;
+    // o playtime_forever da Steam só avança quando o jogo fecha e mede
+    // sessão (menu, warmup) — dava "67 min" para três partidas.
+    const emPartida = d("total_time_played");
     return {
       snapshotId: par.curr.id ?? null,
       de: par.prev.capturedAt,
       ate: par.curr.capturedAt,
-      minutos: par.curr.playtimeForeverMin - par.prev.playtimeForeverMin,
+      minutos:
+        emPartida !== null && emPartida > 0
+          ? Math.round(emPartida / 60)
+          : par.curr.playtimeForeverMin - par.prev.playtimeForeverMin,
       rounds,
       partidas: d("total_matches_played"),
       vitorias: d("total_matches_won"),

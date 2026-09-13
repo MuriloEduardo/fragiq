@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/site-header";
 import { BotAmigo } from "@/components/bot-amigo";
 import { ApagarConta } from "@/components/apagar-conta";
 import { PerfilPublicoToggle } from "@/components/perfil-publico-toggle";
+import { AvisoSteamToggle } from "@/components/aviso-steam-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export default async function SegurancaPage() {
     session
       ? prisma.user.findUnique({
           where: { id: session.userId },
-          select: { personaName: true, avatarUrl: true, lastSyncedAt: true, perfilPublico: true, steamId: true },
+          select: { personaName: true, avatarUrl: true, lastSyncedAt: true, perfilPublico: true, avisoSteam: true, steamId: true },
         })
       : null,
     session ? seloDe(session.userId) : null,
@@ -98,6 +99,7 @@ export default async function SegurancaPage() {
           <section className="mt-10 space-y-4">
             <h2 className="hud">Os seus dados</h2>
             <PerfilPublicoToggle publico={user.perfilPublico} steamId={user.steamId} />
+            <AvisoSteamToggle ligado={user.avisoSteam} amigo={amigo} />
             <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Baixar tudo</p>

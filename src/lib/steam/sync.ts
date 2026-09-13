@@ -31,6 +31,8 @@ const SCHEMA_TTL_DAYS = 30;
 // Abaixo disso o jogo é ruído na biblioteca (demo, teste, jogo de bundle).
 const MIN_PLAYTIME_MIN = 30;
 
+const CS2_APPID = 730;
+
 export type SyncResult = {
   gamesSeen: number;
   gamesStored: number;
@@ -67,7 +69,7 @@ export async function syncUser(
   });
 
   try {
-    const result = await runSync(userId, steamId, context);
+    const result = await runSync(userId, steamId, trigger, context);
 
     await prisma.$transaction([
       prisma.syncRun.update({
@@ -99,6 +101,7 @@ export async function syncUser(
 async function runSync(
   userId: string,
   steamId: string,
+  trigger: SyncTrigger,
   context?: MatchContext,
 ): Promise<SyncResult> {
   const summary = await getPlayerSummary(steamId);
@@ -142,10 +145,19 @@ async function runSync(
 
   // Só vale gastar chamadas em quem jogou desde a última coleta — ou em quem
   // ainda não tem nenhum ponto na série (primeira carga).
+  //
+  // Exceto o CS2 fora do cron. O playtime_forever da Steam só avança quando
+  // o jogo FECHA: quem sincroniza entre duas partidas, com o CS2 aberto, via
+  // "nada mudou" com a partida já contada nas stats. Medido em 13/09: três
+  // syncs manuais durante a tarde não gravaram nada, e as três partidas
+  // entraram juntas às 15:48 como uma "sessão" de 66 rounds. Uma chamada a
+  // mais por sync manual ou por evento do bot é o preço de um ponto por
+  // partida; no cron, que roda para todo mundo, o portão continua valendo.
   const dirty = played.filter((g) => {
     if (g.playtime_forever < MIN_PLAYTIME_MIN) return false;
     const ultimo = previous.get(g.appid);
     if (ultimo == null) return true;
+    if (g.appid === CS2_APPID && trigger !== "CRON") return true;
     return g.playtime_forever > ultimo;
   });
 

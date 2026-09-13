@@ -63,10 +63,11 @@ export async function BotAmigo({ amigo, compacto }: { amigo: boolean | null; com
             cada sessão sua no FragIQ, minutos depois de a partida acabar.
           </div>
           <div>
-            <p className="hud mb-1">O que ele não faz</p>
-            Não manda mensagem, não convida, não entra em partida, não acessa inventário,
-            trocas nem qualquer coisa da sua conta. Remova da lista de amigos quando quiser
-            — o site continua funcionando com a coleta diária.
+            <p className="hud mb-1">O que ele faz, e o que não</p>
+            Manda uma mensagem por sessão — a análise, minutos depois de você fechar o jogo —
+            e nada mais: não convida, não entra em partida, não acessa inventário, trocas nem
+            qualquer coisa da sua conta. A mensagem se desliga em Segurança e dados; o bot se
+            remove da lista de amigos quando quiser, e o site segue com a coleta diária.
           </div>
         </div>
       )}

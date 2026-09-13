@@ -250,12 +250,78 @@ async function avisar(steamId: string, tentativa = 0) {
   );
 }
 
+/* ------------------------------ chat da Steam ------------------------------ */
+
+/**
+ * A fila de mensagens do site, entregue no chat.
+ *
+ * O site enfileira a análise de cada sessão; este loop busca, manda para
+ * quem é amigo e devolve o resultado. Quem não é amigo não recebe — o
+ * chat da Steam só existe entre amigos, e é assim que tem que ser: a
+ * pessoa que não adicionou o bot não pediu nada.
+ */
+type Mensagem = { id: string; steamId: string; texto: string };
+
+let entregando = false;
+
+async function entregarFila() {
+  if (entregando || !client.steamID) return;
+  entregando = true;
+  try {
+    const res = await fetch(config.outboxUrl, {
+      headers: { authorization: `Bearer ${config.webhookSecret}` },
+    });
+    if (!res.ok) {
+      console.warn(`Fila: ${res.status}`);
+      return;
+    }
+    const { mensagens } = (await res.json()) as { mensagens: Mensagem[] };
+    for (const m of mensagens) await entregar(m);
+  } catch (err) {
+    console.error("Fila falhou:", err);
+  } finally {
+    entregando = false;
+  }
+}
+
+async function entregar(m: Mensagem) {
+  const relacao = client.myFriends[m.steamId];
+  const amigo = relacao === SteamUser.EFriendRelationship.Friend;
+  let status: "SENT" | "FAILED" = "SENT";
+  let error: string | undefined;
+
+  if (!amigo) {
+    status = "FAILED";
+    error = "não é amigo do bot";
+  } else {
+    try {
+      await client.chat.sendFriendMessage(m.steamId, m.texto);
+    } catch (err) {
+      status = "FAILED";
+      error = String(err instanceof Error ? err.message : err).slice(0, 300);
+    }
+  }
+  console.log(`Chat ${m.steamId}: ${status}${error ? ` (${error})` : ""}`);
+
+  await fetch(config.outboxUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${config.webhookSecret}`,
+    },
+    body: JSON.stringify({ id: m.id, status, error }),
+  }).catch((err) => console.error("Fila: não confirmou entrega:", err));
+}
+
+const filaTimer = setInterval(() => void entregarFila(), config.outboxPollMs);
+
 /* ------------------------------- encerramento ------------------------------ */
 
 for (const sinal of ["SIGINT", "SIGTERM"] as const) {
   process.on(sinal, () => {
     console.log("Encerrando…");
     for (const t of pendentes.values()) clearTimeout(t);
+    clearInterval(filaTimer);
     client.logOff();
     process.exit(0);
   });
