@@ -50,10 +50,10 @@ rollout); (2) segredo e canal; (3) tenant e agente no Postgres; (4) env na
 Vercel. Tudo isto foi executado em 2026-09-13 e está no ar; fica registrado
 para o próximo tenant ou para reconstruir.
 
-No canal webhook o orchestration entrega o texto final do agente mesmo que o
-modelo não chame `messaging.send` — no primeiro turno real ele consultou os
-dados, escreveu a resposta e não chamou a ferramenta. O prompt ainda pede a
-chamada, mas a entrega não depende dela.
+O orchestration entrega o texto final do agente mesmo que o modelo não chame
+`messaging.send` — regra do runtime, em qualquer canal; no primeiro turno real
+ele consultou os dados, escreveu a resposta e não chamou a ferramenta. O
+prompt ainda pede a chamada, mas a entrega não depende dela.
 
 ### 1. Segredo de plataforma (`cogniflow/prod`, Secrets Manager)
 
