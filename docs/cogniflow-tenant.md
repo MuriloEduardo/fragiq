@@ -44,8 +44,16 @@ O que mora em cada lado:
 ## Provisionamento
 
 Ordem: (1) deploy dos dois serviços do cogniflow com o canal `webhook` e o
-`data.read`; (2) segredo e canal; (3) tenant e agente no Postgres; (4) env na
-Vercel. Nada aqui é idempotente por acidente — releia antes de repetir.
+`data.read` (`cogniflow/deploy-service.sh <serviço>`: build, push com a tag do
+commit, nova revisão de task definition em cada serviço ECS, espera o
+rollout); (2) segredo e canal; (3) tenant e agente no Postgres; (4) env na
+Vercel. Tudo isto foi executado em 2026-09-13 e está no ar; fica registrado
+para o próximo tenant ou para reconstruir.
+
+No canal webhook o orchestration entrega o texto final do agente mesmo que o
+modelo não chame `messaging.send` — no primeiro turno real ele consultou os
+dados, escreveu a resposta e não chamou a ferramenta. O prompt ainda pede a
+chamada, mas a entrega não depende dela.
 
 ### 1. Segredo de plataforma (`cogniflow/prod`, Secrets Manager)
 
@@ -91,52 +99,28 @@ aws dynamodb put-item --table-name cogniflow-channels --item '{
 `external_id` é o `client_id` que o FragIQ manda em cada pergunta
 (`COGNIFLOW_CLIENT_ID`).
 
-### 3. Tenant e agente (Postgres do orchestration-service, schema `app`)
+### 3. Tenant e agente (Postgres do orchestration-service)
 
-```sql
-begin;
+O banco fica na VPC da plataforma, então o provisionador roda como task avulsa
+do ECS com a imagem do orchestration. É idempotente: cria o que falta, mantém
+o que existe e nunca substitui uma versão publicada.
 
-insert into app.tenants (id, name, status, monthly_budget_usd)
-values ('fragiq', 'FragIQ', 'active', 20.00);
-
-insert into app.channels (id, tenant_id, provider, product, connection_id, label, status)
-values (gen_random_uuid(), 'fragiq', 'webhook', 'http', 'web', 'FragIQ (site)', 'active');
-
-insert into app.agents (id, tenant_id, slug, name, status)
-values (gen_random_uuid(), 'fragiq', 'analista', 'Analista do FragIQ', 'active');
-
-insert into app.agent_versions (id, agent_id, version, system_prompt, model, graph, notes, created_by)
-select gen_random_uuid(), a.id, 1, $prompt$
-<cole aqui o prompt da seção "Prompt do agente">
-$prompt$, 'openai:gpt-4o-mini',
-  '{"nodes":[{"key":"main","order":0}],"edges":[]}'::jsonb,
-  'v1: analista do FragIQ', 'provisionamento'
-from app.agents a where a.tenant_id = 'fragiq' and a.slug = 'analista';
-
-insert into app.agent_version_capabilities (agent_version_id, capability_id, enabled)
-select v.id, c.capability_id, true
-from app.agent_versions v
-join app.agents a on a.id = v.agent_id
-cross join (values ('messaging.send'), ('data.read')) as c(capability_id)
-where a.tenant_id = 'fragiq' and a.slug = 'analista' and v.version = 1;
-
-update app.agents a
-set published_version_id = v.id
-from app.agent_versions v
-where v.agent_id = a.id and v.version = 1 and a.tenant_id = 'fragiq' and a.slug = 'analista';
-
-insert into app.channel_agents (channel_id, agent_id)
-select c.id, a.id
-from app.channels c join app.agents a on a.tenant_id = c.tenant_id
-where c.tenant_id = 'fragiq' and c.connection_id = 'web' and a.slug = 'analista';
-
-commit;
+```bash
+aws ecs run-task --cluster cogniflow --launch-type FARGATE \
+  --task-definition orchestration-service \
+  --network-configuration "$(aws ecs describe-services --cluster cogniflow \
+      --services orchestration-worker --query 'services[0].networkConfiguration' --output json)" \
+  --overrides '{"containerOverrides":[{"name":"orchestration-service","command":[
+    "python","-m","app.admin.provision",
+    "--tenant","fragiq","--name","FragIQ","--connection","web",
+    "--agent-slug","analista","--agent-name","Analista do FragIQ",
+    "--model","openai:gpt-4o-mini","--monthly-budget-usd","20",
+    "--prompt","<o prompt da seção abaixo>"]}]}'
 ```
 
-`graph` é o `DEFAULT_GRAPH` do orchestration — um nó só, chave `main`
-(`SINGLE_NODE_KEY` em `app/graph/models.py`; confira antes de rodar). O
-orçamento mensal de US$ 20 é um teto de segurança; sem ele o tenant não tem
-limite.
+A saída (`created: …` / `kept: …`) fica no log group `/ecs/orchestration-service`,
+stream `ecs/orchestration-service/<id da task>`. Feito em 2026-09-13; v1 do
+prompt publicada.
 
 Versões seguintes do prompt entram pelo painel admin
 (`POST /admin/agents/fragiq/analista/versions` com `publish=true`), que copia
