@@ -10,10 +10,9 @@ import { SessaoHero } from "@/components/sessao-hero";
 import { Analista } from "@/components/analista";
 import { Leituras } from "@/components/leituras";
 import { StatPanel } from "@/components/stat-panel";
-import { CollectionStatus } from "@/components/collection-status";
+import { PrimeirosPassos } from "@/components/primeiros-passos";
 import { Secao } from "@/components/secao";
 import { SemDados } from "@/components/sem-dados";
-import { BotAmigo } from "@/components/bot-amigo";
 import { botEhAmigo } from "@/lib/bot";
 
 export const dynamic = "force-dynamic";
@@ -32,12 +31,13 @@ export default async function ResumoPage({ params }: { params: Promise<{ appId: 
   const fonte = await carregarFonte(session.userId, appId);
   if (!fonte) {
     if (appId !== 730) notFound();
-    return <SemDados />;
+    return <SemDados botAmigo={await botEhAmigo(session.steamId)} />;
   }
   const { rows } = fonte;
 
   const sessao = ultimaSessao(rows);
   const amigoDoBot = appId === 730 ? await botEhAmigo(session.steamId) : true;
+  const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true);
   const leituras = lerSerie(rows).filter((l) => l.id !== "modo" && l.id !== "mapas");
   const analista =
     cogniflow() && rows.length >= 2
@@ -46,19 +46,13 @@ export default async function ResumoPage({ params }: { params: Promise<{ appId: 
 
   return (
     <>
-      {rows.length < 2 && (
-        <div className="mb-6">
-          <CollectionStatus snapshotCount={rows.length} />
+      {onboarding && (
+        <div className="mb-8">
+          <PrimeirosPassos statsVisiveis botAmigo={amigoDoBot} coletas={rows.length} />
         </div>
       )}
 
       {sessao && <SessaoHero sessao={sessao} vitalicio={vitaliciosDoHero(rows)} />}
-
-      {amigoDoBot !== true && (
-        <Secao titulo="Mapa e modo em cada sessão" href="/seguranca" acao="o que o bot vê">
-          <BotAmigo amigo={amigoDoBot} compacto />
-        </Secao>
-      )}
 
       {analista && (
         <Secao titulo="Análise" href={`/games/${appId}/analista`} acao="conversar">

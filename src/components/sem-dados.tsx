@@ -1,24 +1,23 @@
+import { PrimeirosPassos } from "./primeiros-passos";
+
 /**
  * Um usuário novo cujo perfil está restrito, ou que ainda não jogou CS2,
  * cairia num 404 — o que parece defeito do site em vez de estado do dado.
+ * Em vez disso, os três primeiros passos, com o primeiro em aberto.
  */
-export function SemDados() {
+export function SemDados({ botAmigo }: { botAmigo: boolean | null }) {
   return (
-    <main className="mx-auto max-w-5xl px-6 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight">
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
         Ainda não encontramos seu Counter-Strike 2
       </h1>
-      <p className="mt-4 max-w-xl leading-relaxed text-ink-muted">
-        Isso acontece quando o perfil da Steam está restrito. Em{" "}
-        <strong className="font-medium text-ink">Perfil → Editar perfil → Privacidade</strong>,
-        deixe <strong className="font-medium text-ink">Detalhes do jogo</strong> como
-        público — é o que permite ler suas estatísticas. Depois clique em Sincronizar
-        aqui em cima.
+      <p className="mt-2 max-w-xl text-sm text-ink-muted">
+        Quase sempre é a privacidade da Steam. Se o perfil já estiver público e isto continuar,
+        pode ser que a conta ainda não tenha partidas registradas de CS2.
       </p>
-      <p className="mt-4 max-w-xl text-sm text-ink-faint">
-        Se o perfil já estiver público e a mensagem continuar, pode ser que a conta
-        ainda não tenha partidas registradas de CS2.
-      </p>
+      <div className="mt-6">
+        <PrimeirosPassos statsVisiveis={false} botAmigo={botAmigo} coletas={0} />
+      </div>
     </main>
   );
 }
