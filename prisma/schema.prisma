@@ -23,6 +23,11 @@ model User {
   profileUrl  String?
   countryCode String?
 
+  /// A página pública em /p/<steamId>. Mostra só o que a Steam já mostra a
+  /// qualquer um; a curva e as leituras nunca saem daqui. Desligar esconde a
+  /// página inteira.
+  perfilPublico Boolean @default(true)
+
   lastSyncedAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

@@ -169,3 +169,21 @@ export function gameIconUrl(appId: number, iconHash: string | null) {
 export function gameHeaderUrl(appId: number) {
   return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
 }
+
+/* ------------------------------- vanity URL -------------------------------- */
+
+/**
+ * steamcommunity.com/id/<apelido> → SteamID64. Null quando o apelido não
+ * existe. É a única forma de aceitar o link do perfil como as pessoas o
+ * copiam da barra de endereço.
+ */
+export async function resolveVanityUrl(vanity: string): Promise<string | null> {
+  const data = await call(
+    "/ISteamUser/ResolveVanityURL/v1/",
+    { vanityurl: vanity },
+    z.object({
+      response: z.object({ success: z.number(), steamid: z.string().optional() }),
+    }),
+  );
+  return data.response.success === 1 ? (data.response.steamid ?? null) : null;
+}

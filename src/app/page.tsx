@@ -117,6 +117,22 @@ function Hero({ erro }: { erro?: string }) {
           </span>
         </div>
 
+        <form action="/api/perfil/buscar" className="mt-5 flex max-w-xl items-center gap-2">
+          <input
+            name="q"
+            required
+            placeholder="Ou veja qualquer perfil: link da Steam, apelido ou SteamID"
+            className="min-h-11 w-full rounded-xl bg-surface/80 px-4 text-sm ring-1 ring-line outline-none transition placeholder:text-ink-faint focus:ring-accent/50"
+          />
+          <button
+            type="submit"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-medium ring-1 ring-line transition hover:ring-accent/60"
+          >
+            Ver
+            <ArrowRight className="size-4" />
+          </button>
+        </form>
+
         <Revelar className="mt-14">
           <DemoHud />
         </Revelar>

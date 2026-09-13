@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { SteamMark } from "@/components/steam-mark";
 import { Participar } from "@/components/participar";
+import { PerfilPublicoToggle } from "@/components/perfil-publico-toggle";
 import { Selo } from "@/components/selo";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function ComunidadePage() {
   const session = await getSession();
 
-  const [testers, feedbacks, eu] = await Promise.all([
+  const [testers, feedbacks, eu, conta] = await Promise.all([
     // Todo mundo que entrou no beta, do primeiro ao último; quem pediu para
     // não aparecer some da lista, mas o selo continua sendo dele.
     prisma.user.findMany({
@@ -43,6 +44,9 @@ export default async function ComunidadePage() {
           where: { userId: session.userId },
           select: { githubLogin: true, papeis: true, mensagem: true, visivel: true },
         })
+      : null,
+    session
+      ? prisma.user.findUnique({ where: { id: session.userId }, select: { perfilPublico: true, steamId: true } })
       : null,
   ]);
 
@@ -75,8 +79,11 @@ export default async function ComunidadePage() {
         </div>
 
         <div>
-          {session ? (
-            <Participar inicial={eu} />
+          {session && conta ? (
+            <div className="space-y-4">
+              <Participar inicial={eu} />
+              <PerfilPublicoToggle publico={conta.perfilPublico} steamId={conta.steamId} />
+            </div>
           ) : (
             <div className="rounded-2xl bg-surface p-6 ring-1 ring-line">
               <p className="text-sm text-ink-muted">Entrou no beta? Você já é beta tester. Entre com a Steam para completar o perfil.</p>
