@@ -220,6 +220,7 @@ src/app/
   api/auth/steam/             login OpenID
   api/sync/                   coleta manual
   api/cron/sync/              coleta agendada
+  admin/                      painel de operação (ADMIN_STEAM_IDS)
   api/analises/               perguntas ao analista
   api/cogniflow/              callback e dados, assinados pelo cogniflow
 ```

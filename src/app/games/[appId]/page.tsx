@@ -12,6 +12,7 @@ import { CounterScope } from "@/components/counter-scope";
 import { Analista } from "@/components/analista";
 import { cogniflow } from "@/lib/env";
 import { listarAnalises, sessaoSemAnalise } from "@/lib/analises";
+import { isAdmin } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +96,7 @@ export default async function GamePage({
 
   return (
     <>
-      <SiteHeader {...user} />
+      <SiteHeader {...user} admin={isAdmin(session.steamId)} />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { LogOut } from "lucide-react";
+import { Gauge, LogOut } from "lucide-react";
 import { SyncButton } from "./sync-button";
 import { FeedbackButton } from "./feedback-button";
 
@@ -8,6 +8,8 @@ type Props = {
   personaName: string;
   avatarUrl: string | null;
   lastSyncedAt: Date | null;
+  /** Mostra o atalho para /admin. Só quem está em ADMIN_STEAM_IDS. */
+  admin?: boolean;
 };
 
 /**
@@ -21,7 +23,7 @@ type Props = {
  * duplicar o componente — duas instâncias de SyncButton seriam dois estados
  * de seleção de modo divergindo em silêncio.
  */
-export function SiteHeader({ personaName, avatarUrl, lastSyncedAt }: Props) {
+export function SiteHeader({ personaName, avatarUrl, lastSyncedAt, admin }: Props) {
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 sm:flex-nowrap sm:gap-x-4 sm:px-6 sm:py-3">
@@ -31,6 +33,17 @@ export function SiteHeader({ personaName, avatarUrl, lastSyncedAt }: Props) {
         >
           Frag<span className="text-accent">IQ</span>
         </Link>
+
+        {admin && (
+          <Link
+            href="/admin"
+            className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
+            aria-label="Painel"
+            title="Painel"
+          >
+            <Gauge className="size-4" />
+          </Link>
+        )}
 
         {/* Identidade e ações ficam sempre na primeira linha: são o que
             precisa estar alcançável mesmo com o teclado aberto. */}
