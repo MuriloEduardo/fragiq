@@ -64,7 +64,7 @@ export async function BotAmigo({ amigo, compacto }: { amigo: boolean | null; com
           </div>
           <div>
             <p className="hud mb-1">O que ele faz, e o que não</p>
-            Manda uma mensagem por sessão — a análise, minutos depois de você fechar o jogo —
+            Manda uma mensagem por partida — três linhas, minutos depois de ela terminar —
             e nada mais: não convida, não entra em partida, não acessa inventário, trocas nem
             qualquer coisa da sua conta. A mensagem se desliga em Segurança e dados; o bot se
             remove da lista de amigos quando quiser, e o site segue com a coleta diária.

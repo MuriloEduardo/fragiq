@@ -88,7 +88,7 @@ export async function PrimeirosPassos({
         coletas >= 2
           ? "A curva existe: cada nova partida vira um ponto."
           : coletas === 1
-            ? "A primeira coleta já está gravada. A curva nasce na segunda — o bot registra sozinho quando você fecha o jogo, ou clique em Sincronizar depois de jogar. Todo dia às 02:00 coletamos de qualquer jeito."
+            ? "A primeira coleta já está gravada. A curva nasce na segunda — o bot registra sozinho no fim de cada partida (quando você volta ao lobby), ou clique em Sincronizar depois de jogar. Todo dia às 02:00 coletamos de qualquer jeito."
             : "Depois do passo 1, a primeira coleta entra na hora e a curva começa na partida seguinte.",
       acao: null,
     },

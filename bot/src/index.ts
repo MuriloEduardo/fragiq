@@ -34,6 +34,14 @@ const pendentes = new Map<string, NodeJS.Timeout>();
  */
 type Contexto = { map?: string; mode?: string; score?: string };
 const contexto = new Map<string, Contexto>();
+/** steamId -> estava dentro de uma partida (rich presence com mapa) na última atualização. */
+const emPartida = new Map<string, boolean>();
+/**
+ * steamId -> contexto da partida que acabou de terminar, congelado no
+ * instante em que a pessoa voltou ao lobby. É o que vai no aviso mesmo
+ * que ela já tenha entrado em outra partida antes de a Steam publicar.
+ */
+const encerrada = new Map<string, Contexto>();
 
 /* ---------------------------------- login --------------------------------- */
 
@@ -159,6 +167,24 @@ client.on("user", (steamID, user) => {
         score: rp.get("game:score"),
       });
     }
+    // Fim de partida sem fechar o jogo: o rich presence tinha mapa e agora
+    // tem só o lobby. Só vale quando a Steam mandou o rich presence de
+    // fato — uma atualização parcial, sem a lista, não é "saiu do mapa".
+    if (rp.size > 0) {
+      const naPartida = Boolean(mapa);
+      if (antes && emPartida.get(id) && !naPartida) {
+        const ctx = contexto.get(id);
+        if (ctx) encerrada.set(id, ctx);
+        console.log(
+          `${id} terminou a partida — sincronizando em ${config.graceMs / 1000}s` +
+            (ctx?.map ? ` (${ctx.mode ?? "?"} em ${ctx.map}${ctx.score ? ` ${ctx.score}` : ""})` : ""),
+        );
+        agendar(id);
+      }
+      emPartida.set(id, naPartida);
+    }
+  } else {
+    emPartida.set(id, false);
   }
 
   if (agora === antes) return;
@@ -166,19 +192,22 @@ client.on("user", (steamID, user) => {
 
   if (agora) {
     console.log(`${id} entrou no CS2`);
-    // Entrar cancela um aviso pendente (inclusive uma retentativa): voltou
-    // a jogar, então a partida anterior ainda não é o estado final. O
-    // contexto fica; se a próxima partida for em outro mapa ele é
-    // substituído, e o delta das duas entra com o mapa da última.
-    limparPendente(id);
+    // Reabrir o jogo não cancela mais o aviso da partida anterior: com o
+    // fim de partida detectado pelo lobby, o que está pendente é uma
+    // partida inteira que a Steam ainda não publicou, e ela continua
+    // valendo. O contexto dela já está congelado em `encerrada`.
     return;
   }
 
-  const ctx = contexto.get(id);
+  const ctx = encerrada.get(id) ?? contexto.get(id);
   console.log(
     `${id} saiu do CS2 — sincronizando em ${config.graceMs / 1000}s` +
       (ctx?.map ? ` (${ctx.mode ?? "?"} em ${ctx.map}${ctx.score ? ` ${ctx.score}` : ""})` : ""),
   );
+  agendar(id);
+});
+
+function agendar(id: string) {
   limparPendente(id);
   pendentes.set(
     id,
@@ -187,7 +216,7 @@ client.on("user", (steamID, user) => {
       void avisar(id);
     }, config.graceMs),
   );
-});
+}
 
 function limparPendente(id: string) {
   const t = pendentes.get(id);
@@ -210,8 +239,9 @@ const RETRY_MS = [2, 4, 8, 16].map((min) => min * 60_000);
 async function avisar(steamId: string, tentativa = 0) {
   // O contexto só é descartado quando a partida entrou de fato (ou quando
   // desistimos). Se for apagado na primeira tentativa, o mapa se perde e o
-  // delta real, capturado mais tarde, entra sem atribuição.
-  const ctx = contexto.get(steamId);
+  // delta real, capturado mais tarde, entra sem atribuição. O congelado no
+  // fim da partida tem prioridade sobre o que está sendo jogado agora.
+  const ctx = encerrada.get(steamId) ?? contexto.get(steamId);
 
   let status: number | null = null;
   try {
@@ -239,14 +269,16 @@ async function avisar(steamId: string, tentativa = 0) {
   // 202 = stats ainda velhas; null = rede falhou. Os dois merecem nova
   // tentativa. Qualquer outra resposta encerra: ou gravou, ou é erro nosso.
   if (status !== 202 && status !== null) {
-    contexto.delete(steamId);
+    encerrada.delete(steamId);
+    if (!emPartida.get(steamId)) contexto.delete(steamId);
     return;
   }
 
   const espera = RETRY_MS[tentativa];
   if (espera === undefined) {
     console.warn(`Desistindo de ${steamId}: partida não apareceu em ${RETRY_MS.length} tentativas.`);
-    contexto.delete(steamId);
+    encerrada.delete(steamId);
+    if (!emPartida.get(steamId)) contexto.delete(steamId);
     return;
   }
 
