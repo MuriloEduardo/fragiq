@@ -138,6 +138,9 @@ client.on("friendRelationship", (steamID, relationship) => {
 /* ----------------------------- estado de jogo ----------------------------- */
 
 client.on("user", (steamID, user) => {
+  // Com a sessão do GC aberta a Steam nos mostra "jogando CS2" também; a
+  // nossa própria presença não é de ninguém.
+  if (steamID.getSteamID64() === client.steamID?.getSteamID64()) return;
   const id = steamID.getSteamID64();
   // gameid vem como string; "0" ou ausente significa fora de jogo.
   const agora = String(user.gameid ?? "0") === String(CS2_APPID);
