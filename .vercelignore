@@ -19,4 +19,4 @@ docker-compose.yml
 
 # Cliente do Prisma é gerado no build pelo postinstall
 src/generated
-bot
+/bot
