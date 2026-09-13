@@ -27,10 +27,11 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  games    UserGame[]
-  syncRuns SyncRun[]
-  feedback Feedback[]
-  analyses Analysis[]
+  games       UserGame[]
+  syncRuns    SyncRun[]
+  feedback    Feedback[]
+  analyses    Analysis[]
+  participant Participant?
 
   @@map("users")
 }
@@ -133,6 +134,11 @@ model Feedback {
   /// De onde a pessoa enviou. "Está confuso" significa coisas diferentes no
   /// dashboard e no explorador.
   path String?
+
+  /// A pessoa escolheu que este relato apareça na página da comunidade, com
+  /// o nome dela. Padrão privado: feedback é confissão até se dizer o
+  /// contrário.
+  publico Boolean @default(false)
 
   createdAt DateTime @default(now())
 
@@ -258,4 +264,29 @@ enum AnalysisStatus {
   ACKNOWLEDGED
   ANSWERED
   FAILED
+}
+
+/// Quem escolheu fazer parte do desenvolvimento.
+///
+/// Uma linha por usuário. Existir aqui é o que dá o selo de beta tester; o
+/// GitHub é para quem quer código, e a mensagem é o que a pessoa disse que
+/// quer fazer. `visivel` decide se aparece na lista pública.
+model Participant {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  githubLogin String?
+  /// O que a pessoa se dispôs a fazer: testar, desenvolver, trazer dados…
+  papeis      String[]
+  mensagem    String?
+
+  visivel Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("participants")
 }

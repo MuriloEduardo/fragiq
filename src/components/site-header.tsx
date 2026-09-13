@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Gauge, LogOut } from "lucide-react";
+import { Gauge, LogOut, Users } from "lucide-react";
+import { Selo } from "./selo";
 import { SyncButton } from "./sync-button";
 import { FeedbackButton } from "./feedback-button";
 
@@ -10,6 +11,8 @@ type Props = {
   lastSyncedAt: Date | null;
   /** Mostra o atalho para /admin. Só quem está em ADMIN_STEAM_IDS. */
   admin?: boolean;
+  /** Selo da comunidade, quando a pessoa entrou. */
+  selo?: "fundador" | "beta" | null;
 };
 
 /**
@@ -23,7 +26,7 @@ type Props = {
  * duplicar o componente — duas instâncias de SyncButton seriam dois estados
  * de seleção de modo divergindo em silêncio.
  */
-export function SiteHeader({ personaName, avatarUrl, lastSyncedAt, admin }: Props) {
+export function SiteHeader({ personaName, avatarUrl, lastSyncedAt, admin, selo }: Props) {
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-canvas/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 sm:flex-nowrap sm:gap-x-4 sm:px-6 sm:py-3">
@@ -60,7 +63,10 @@ export function SiteHeader({ personaName, avatarUrl, lastSyncedAt, admin }: Prop
               />
             )}
             <div className="hidden sm:block">
-              <p className="text-sm leading-tight">{personaName}</p>
+              <p className="flex items-center gap-2 text-sm leading-tight">
+                {personaName}
+                {selo && <Selo tipo={selo} />}
+              </p>
               <p className="text-[11px] leading-tight text-ink-faint">
                 {lastSyncedAt
                   ? `sync ${lastSyncedAt.toLocaleDateString("pt-BR")}`
@@ -68,6 +74,15 @@ export function SiteHeader({ personaName, avatarUrl, lastSyncedAt, admin }: Prop
               </p>
             </div>
           </div>
+
+          <Link
+            href="/comunidade"
+            aria-label="Comunidade"
+            title="Comunidade"
+            className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
+          >
+            <Users className="size-4" />
+          </Link>
 
           <FeedbackButton />
 

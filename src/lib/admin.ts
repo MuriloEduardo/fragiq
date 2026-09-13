@@ -1,3 +1,5 @@
+import { prisma } from "./prisma";
+
 /**
  * Quem pode abrir /admin.
  *
@@ -12,4 +14,18 @@ export function isAdmin(steamId: string | null | undefined): boolean {
     .map((s) => s.trim())
     .filter(Boolean);
   return lista.includes(steamId);
+}
+
+/**
+ * O selo de quem entrou na comunidade: fundador para os cem primeiros,
+ * beta para os demais, nada para quem não entrou.
+ */
+export async function seloDe(userId: string): Promise<"fundador" | "beta" | null> {
+  const eu = await prisma.participant.findUnique({
+    where: { userId },
+    select: { createdAt: true },
+  });
+  if (!eu) return null;
+  const antes = await prisma.participant.count({ where: { createdAt: { lt: eu.createdAt } } });
+  return antes < 100 ? "fundador" : "beta";
 }

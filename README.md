@@ -221,6 +221,7 @@ src/app/
   api/sync/                   coleta manual
   api/cron/sync/              coleta agendada
   admin/                      painel de operação (ADMIN_STEAM_IDS)
+  comunidade/                 quem participa, selo, feedback público
   api/analises/               perguntas ao analista
   api/cogniflow/              callback e dados, assinados pelo cogniflow
 ```

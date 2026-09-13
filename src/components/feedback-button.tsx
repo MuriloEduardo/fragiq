@@ -11,6 +11,7 @@ export function FeedbackButton() {
   const pathname = usePathname();
   const dialog = useRef<HTMLDialogElement>(null);
   const [message, setMessage] = useState("");
+  const [publico, setPublico] = useState(false);
   const [estado, setEstado] = useState<Estado>("parado");
   const [erro, setErro] = useState<string | null>(null);
 
@@ -31,7 +32,7 @@ export function FeedbackButton() {
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, path: pathname }),
+        body: JSON.stringify({ message, path: pathname, publico }),
       });
 
       if (!res.ok) {
@@ -99,6 +100,19 @@ export function FeedbackButton() {
               placeholder="Ex.: cliquei em Sincronizar depois de jogar e não apareceu ponto novo…"
               className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none transition focus:border-accent/50"
             />
+
+            <label className="mt-3 flex items-start gap-2 text-sm text-ink-muted">
+              <input
+                type="checkbox"
+                checked={publico}
+                onChange={(e) => setPublico(e.target.checked)}
+                className="mt-1 accent-accent"
+              />
+              <span>
+                Publicar na comunidade, com o meu nome.{" "}
+                <span className="text-ink-faint">Sem marcar, só a equipe lê.</span>
+              </span>
+            </label>
 
             {erro && <p className="mt-2 text-sm text-danger">{erro}</p>}
 

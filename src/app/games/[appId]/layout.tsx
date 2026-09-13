@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { gameHeaderUrl } from "@/lib/steam/api";
 import { formatPlaytime } from "@/lib/stats";
-import { isAdmin } from "@/lib/admin";
+import { isAdmin, seloDe } from "@/lib/admin";
 import { SiteHeader } from "@/components/site-header";
 import { NavJogo } from "@/components/nav-jogo";
 
@@ -28,7 +28,7 @@ export default async function GameLayout({
   const appId = Number((await params).appId);
   if (!Number.isInteger(appId)) notFound();
 
-  const [user, userGame] = await Promise.all([
+  const [user, userGame, selo] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: { personaName: true, avatarUrl: true, lastSyncedAt: true },
@@ -42,12 +42,13 @@ export default async function GameLayout({
         _count: { select: { snapshots: true } },
       },
     }),
+    seloDe(session.userId),
   ]);
   if (!user) redirect("/");
 
   return (
     <>
-      <SiteHeader {...user} admin={isAdmin(session.steamId)} />
+      <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} />
 
       {userGame ? (
         <>

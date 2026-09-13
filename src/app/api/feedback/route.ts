@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   message: z.string().trim().min(4, "Escreva um pouco mais.").max(4000),
   path: z.string().max(200).optional(),
+  /** Aparecer na página da comunidade, com o nome. Padrão privado. */
+  publico: z.boolean().optional(),
 });
 
 // Feedback autenticado não tem problema de spam anônimo, mas ainda cabe um
@@ -57,6 +59,7 @@ export async function POST(request: NextRequest) {
       userId: session.userId,
       message: parsed.data.message,
       path: parsed.data.path ?? null,
+      publico: parsed.data.publico ?? false,
     },
   });
 
