@@ -1,39 +1,40 @@
 import { prisma } from "./prisma";
 import { appUrl } from "./env";
-import { formatarQuando } from "./sessoes";
+import { carregarFonte } from "./fonte";
+import { listarSessoes, vitaliciosDoHero, type Sessao } from "./sessoes";
+import { listarPartidas, type PartidaLinha } from "./partidas";
+import { rotularMapa } from "./cs2-labels";
 
 /**
- * A análise da sessão, no chat da Steam.
+ * A sessão no chat da Steam, em três linhas.
  *
- * Quem adicionou o bot já recebe mapa e modo por ele; receber também a
- * leitura, minutos depois de fechar o jogo, é o produto chegando onde a
- * pessoa está. A mensagem é enfileirada aqui e o bot a entrega; ele só
- * consegue falar com quem é amigo, e quem não quiser desliga em
- * /seguranca.
+ * Quem adicionou o bot recebe, minutos depois de fechar o jogo, o que o
+ * csstats manda: a manchete da partida, um número ou dois, e o link. A
+ * leitura inteira do analista fica no site — no chat ela vira um paredão
+ * de texto que ninguém lê no celular. Por isso a mensagem é montada
+ * daqui, dos mesmos números da tela, e não do texto do modelo: fica curta
+ * porque é curta por construção.
  *
- * O texto é o do analista, inteiro, com cabeçalho e o link de volta. Sem
- * markdown: o chat da Steam não renderiza, e asteriscos soltos leem como
- * ruído.
+ * Linha 1: placar e mapa (da partida oficial, quando a corrente está
+ * ligada; senão rounds e contexto da sessão). Linha 2: os dois números
+ * que mais fugiram do normal. Linha 3: o link. Quem não quiser desliga em
+ * /seguranca — e isso vai dito na primeira mensagem, só nela.
  */
-const LIMITE = 1800;
-
 export async function enfileirarAnaliseNoSteam(analysisId: string): Promise<boolean> {
   const analise = await prisma.analysis.findUnique({
     where: { id: analysisId },
     select: {
       answer: true,
       kind: true,
+      gameAppId: true,
       user: { select: { id: true, steamId: true, avisoSteam: true } },
-      snapshot: { select: { capturedAt: true, matchMode: true, matchMap: true } },
+      snapshot: { select: { id: true, capturedAt: true } },
     },
   });
-  if (!analise?.answer || analise.kind !== "SESSION" || !analise.user.avisoSteam) return false;
+  if (!analise?.answer || analise.kind !== "SESSION" || !analise.user.avisoSteam || !analise.snapshot) return false;
 
-  const quando = analise.snapshot ? formatarQuando(analise.snapshot.capturedAt) : "agora";
-  const cabecalho = `FragIQ · sessão de ${quando}`;
-  const corpo = semMarkdown(analise.answer);
-  const rodape = `Curva completa: ${appUrl()}/cs2 · Para parar de receber: ${appUrl()}/seguranca`;
-  const texto = [cabecalho, "", corpo, "", rodape].join("\n").slice(0, LIMITE);
+  const texto = await montarTextoDaSessao(analise.user.id, analise.user.steamId, analise.gameAppId, analise.snapshot.id);
+  if (!texto) return false;
 
   await prisma.steamMessage.create({
     data: { userId: analise.user.id, steamId: analise.user.steamId, texto },
@@ -41,6 +42,59 @@ export async function enfileirarAnaliseNoSteam(analysisId: string): Promise<bool
   return true;
 }
 
-function semMarkdown(t: string) {
-  return t.replace(/\*\*(.+?)\*\*/g, "$1").replace(/^\s*[-•*]\s+/gm, "• ");
+/** As três linhas, ou null se a sessão não existe mais na série. */
+export async function montarTextoDaSessao(userId: string, steamId: string, appId: number, snapshotId: string): Promise<string | null> {
+  const fonte = await carregarFonte(userId, appId);
+  if (!fonte) return null;
+  const sessao = listarSessoes(fonte.rows).find((s) => s.snapshotId === snapshotId);
+  if (!sessao) return null;
+
+  const partidas = (await listarPartidas(steamId, 10)).filter(
+    (p) => p.jogadaEm >= new Date(sessao.de.getTime() - 5 * 60_000) && p.jogadaEm <= sessao.ate,
+  );
+  const primeira = (await prisma.steamMessage.count({ where: { userId } })) === 0;
+
+  return [
+    `FragIQ · ${manchete(sessao, partidas)}`,
+    desvios(sessao, vitaliciosDoHero(fonte.rows)),
+    `Leitura completa: ${appUrl()}/cs2${primeira ? ` · para não receber mais: ${appUrl()}/seguranca` : ""}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function manchete(s: Sessao, partidas: PartidaLinha[]): string {
+  if (partidas.length === 1) {
+    const [p] = partidas;
+    const resultado = p.eu.venceu === null ? "empate" : p.eu.venceu ? "vitória" : "derrota";
+    const mapa = p.mapa ? rotularMapa(p.mapa) : "partida";
+    return `${mapa} ${p.placar[0]}–${p.placar[1]}, ${resultado} · ${p.eu.kills}/${p.eu.assists}/${p.eu.deaths}, ${p.eu.hs} HS`;
+  }
+  if (partidas.length > 1) {
+    const v = partidas.filter((p) => p.eu.venceu === true).length;
+    const lista = partidas
+      .slice()
+      .reverse()
+      .map((p) => `${p.mapa ? rotularMapa(p.mapa) : "?"} ${p.placar[0]}–${p.placar[1]}`)
+      .join(", ");
+    return `${partidas.length} partidas, ${v}V ${partidas.length - v}D · ${lista}`;
+  }
+  const contexto = [s.modo, s.mapa ? rotularMapa(s.mapa) : null, s.placar].filter(Boolean).join(" ");
+  const partes = s.partidas ? ` em ${s.partidas} partida${s.partidas === 1 ? "" : "s"}` : "";
+  return `${s.rounds} rounds${partes}${contexto ? ` · ${contexto}` : ""}`;
+}
+
+/** Os dois números que mais se afastaram do vitalício, em termos relativos. */
+function desvios(s: Sessao, normal: { kd: number | null; danoPorRound: number | null; hs: number | null }): string {
+  const n = (v: number, casas: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+  const candidatos = [
+    { rotulo: "K/D", atual: s.kd, base: normal.kd, fmt: (v: number) => n(v, 2) },
+    { rotulo: "Dano/round", atual: s.danoPorRound, base: normal.danoPorRound, fmt: (v: number) => n(v, 0) },
+    { rotulo: "HS", atual: s.hs, base: normal.hs, fmt: (v: number) => `${n(v, 0)}%` },
+  ]
+    .filter((c): c is typeof c & { atual: number; base: number } => c.atual !== null && c.base !== null && c.base > 0)
+    .map((c) => ({ ...c, desvio: Math.abs(c.atual / c.base - 1) }))
+    .sort((a, b) => b.desvio - a.desvio)
+    .slice(0, 2);
+  return candidatos.map((c) => `${c.rotulo} ${c.fmt(c.atual)} (seu normal ${c.fmt(c.base)})`).join(" · ");
 }
