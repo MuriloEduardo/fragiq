@@ -19,16 +19,17 @@ export const dynamic = "force-dynamic";
 export default async function ComunidadePage() {
   const session = await getSession();
 
-  const [participantes, feedbacks, eu] = await Promise.all([
-    prisma.participant.findMany({
-      where: { visivel: true },
+  const [testers, feedbacks, eu] = await Promise.all([
+    // Todo mundo que entrou no beta, do primeiro ao último; quem pediu para
+    // não aparecer some da lista, mas o selo continua sendo dele.
+    prisma.user.findMany({
       orderBy: { createdAt: "asc" },
       select: {
-        githubLogin: true,
-        papeis: true,
-        mensagem: true,
+        personaName: true,
+        avatarUrl: true,
+        steamId: true,
         createdAt: true,
-        user: { select: { personaName: true, avatarUrl: true, steamId: true } },
+        participant: { select: { githubLogin: true, papeis: true, mensagem: true, visivel: true } },
       },
     }),
     prisma.feedback.findMany({
@@ -44,6 +45,10 @@ export default async function ComunidadePage() {
         })
       : null,
   ]);
+
+  const visiveis = testers
+    .map((t, ordem) => ({ ...t, ordem }))
+    .filter((t) => t.participant?.visivel !== false);
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12 sm:py-16">
@@ -74,7 +79,7 @@ export default async function ComunidadePage() {
             <Participar inicial={eu} />
           ) : (
             <div className="rounded-2xl bg-surface p-6 ring-1 ring-line">
-              <p className="text-sm text-ink-muted">Entre com a Steam para participar. É o mesmo login do dashboard.</p>
+              <p className="text-sm text-ink-muted">Entrou no beta? Você já é beta tester. Entre com a Steam para completar o perfil.</p>
               <a
                 href="/api/auth/steam"
                 className="borda-viva mt-4 inline-flex items-center gap-3 rounded-xl px-5 py-3 font-medium text-ink transition hover:text-accent"
@@ -89,36 +94,36 @@ export default async function ComunidadePage() {
 
       <section className="mt-16">
         <div className="flex items-baseline gap-3">
-          <h2 className="hud">Quem participa</h2>
-          <span className="num text-xs text-ink-faint">{participantes.length}</span>
+          <h2 className="hud">Beta testers</h2>
+          <span className="num text-xs text-ink-faint">{testers.length}</span>
         </div>
-        {participantes.length === 0 ? (
+        {visiveis.length === 0 ? (
           <p className="mt-4 rounded-2xl border border-dashed border-line px-6 py-10 text-center text-sm text-ink-faint">
             Ninguém ainda. A primeira pessoa fica no topo desta lista para sempre.
           </p>
         ) : (
           <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {participantes.map((p, i) => (
-              <li key={p.user.steamId} className="rounded-2xl bg-surface p-4 ring-1 ring-line">
+            {visiveis.map((p) => (
+              <li key={p.steamId} className="rounded-2xl bg-surface p-4 ring-1 ring-line">
                 <div className="flex items-center gap-3">
-                  {p.user.avatarUrl ? (
-                    <Image src={p.user.avatarUrl} alt="" width={40} height={40} className="size-10 rounded-full ring-1 ring-line" unoptimized />
+                  {p.avatarUrl ? (
+                    <Image src={p.avatarUrl} alt="" width={40} height={40} className="size-10 rounded-full ring-1 ring-line" unoptimized />
                   ) : (
                     <span className="size-10 rounded-full bg-surface-2" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{p.user.personaName}</p>
+                    <p className="truncate text-sm font-medium">{p.personaName}</p>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      <Selo tipo={i < 100 ? "fundador" : "beta"} />
-                      {p.githubLogin && <Selo tipo="dev" />}
+                      <Selo tipo={p.ordem < 100 ? "fundador" : "beta"} />
+                      {p.participant?.githubLogin && <Selo tipo="dev" />}
                     </div>
                   </div>
-                  {p.githubLogin && (
+                  {p.participant?.githubLogin && (
                     <a
-                      href={`https://github.com/${p.githubLogin}`}
+                      href={`https://github.com/${p.participant.githubLogin}`}
                       target="_blank"
                       rel="noreferrer"
-                      aria-label={`GitHub de ${p.user.personaName}`}
+                      aria-label={`GitHub de ${p.personaName}`}
                       className="text-ink-faint transition hover:text-ink"
                     >
                       <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden>
@@ -127,9 +132,13 @@ export default async function ComunidadePage() {
                     </a>
                   )}
                 </div>
-                {p.mensagem && <p className="mt-3 text-sm leading-relaxed text-ink-muted">{p.mensagem}</p>}
+                {p.participant?.mensagem && (
+                  <p className="mt-3 text-sm leading-relaxed text-ink-muted">{p.participant.mensagem}</p>
+                )}
                 <p className="mt-3 text-[11px] text-ink-faint">
-                  {p.papeis.join(" · ")} · desde {p.createdAt.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(".", "")}
+                  {p.participant?.papeis.length ? `${p.participant.papeis.join(" · ")} · ` : ""}
+                  #{p.ordem + 1} · desde{" "}
+                  {p.createdAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "")}
                 </p>
               </li>
             ))}

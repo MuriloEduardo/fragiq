@@ -17,15 +17,16 @@ export function isAdmin(steamId: string | null | undefined): boolean {
 }
 
 /**
- * O selo de quem entrou na comunidade: fundador para os cem primeiros,
- * beta para os demais, nada para quem não entrou.
+ * O selo vem da conta, não do formulário.
+ *
+ * Quem entrou com a Steam durante o beta é beta tester — foi o que a landing
+ * pediu e o que a pessoa aceitou ao logar. Os cem primeiros são Fundadores.
+ * O formulário da comunidade acrescenta papéis, GitHub e uma frase; não é
+ * ele que dá o selo, senão o primeiro usuário do site ficaria sem.
  */
 export async function seloDe(userId: string): Promise<"fundador" | "beta" | null> {
-  const eu = await prisma.participant.findUnique({
-    where: { userId },
-    select: { createdAt: true },
-  });
+  const eu = await prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true } });
   if (!eu) return null;
-  const antes = await prisma.participant.count({ where: { createdAt: { lt: eu.createdAt } } });
+  const antes = await prisma.user.count({ where: { createdAt: { lt: eu.createdAt } } });
   return antes < 100 ? "fundador" : "beta";
 }

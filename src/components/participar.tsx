@@ -128,7 +128,7 @@ export function Participar({ inicial }: { inicial: Inicial }) {
           disabled={estado !== "parado" || papeis.length === 0}
           className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-canvas transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {estado === "enviando" ? "Salvando…" : inicial ? "Atualizar" : "Entrar para a comunidade"}
+          {estado === "enviando" ? "Salvando…" : inicial ? "Atualizar" : "Completar meu perfil"}
         </button>
         {inicial && <span className="text-xs text-ink-faint">Você já está dentro.</span>}
       </div>
