@@ -130,3 +130,104 @@ body {
 .glow {
   box-shadow: 0 0 0 1px var(--line), 0 0 40px var(--accent-glow);
 }
+
+/* ------------------------------ landing ---------------------------------- */
+
+@keyframes revelar {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@supports (animation-timeline: view()) {
+  .revelar {
+    animation: revelar linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+}
+
+/* Cartão com inclinação e brilho que segue o cursor (variáveis vêm do Tilt). */
+.tilt {
+  --rx: 0deg;
+  --ry: 0deg;
+  --mx: 50%;
+  --my: 50%;
+  transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 0.25s ease;
+  position: relative;
+}
+.tilt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(360px circle at var(--mx) var(--my), var(--accent-glow), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.tilt:hover::after {
+  opacity: 1;
+}
+
+/* Botão com borda de luz girando. */
+@keyframes girar {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.borda-viva {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.borda-viva::before {
+  content: "";
+  position: absolute;
+  inset: -150%;
+  z-index: -2;
+  background: conic-gradient(from 0deg, transparent 0 60%, var(--accent) 80%, transparent 100%);
+  animation: girar 3.2s linear infinite;
+}
+.borda-viva::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--canvas);
+}
+
+/* Aurora: dois blobs de luz lentos atrás do hero. */
+@keyframes flutuar {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(6%, -4%) scale(1.08); }
+}
+.aurora {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(80px);
+  opacity: 0.55;
+  animation: flutuar 14s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Varredura horizontal de HUD, uma linha fina que atravessa. */
+@keyframes varrer {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(100vh); }
+}
+.varredura {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
+  animation: varrer 9s linear infinite;
+  pointer-events: none;
+}

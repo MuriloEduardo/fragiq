@@ -1,43 +1,46 @@
 import { redirect } from "next/navigation";
-import {
-  ArrowRight,
-  Database,
-  GitCompareArrows,
-  Layers,
-  Lock,
-  ShieldCheck,
-  SlidersHorizontal,
-  TriangleAlert,
-} from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Lock, TriangleAlert } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { SteamMark } from "@/components/steam-mark";
 import { ThesisChart } from "@/components/thesis-chart";
 import { Comparison } from "@/components/landing/comparison";
+import { Particulas } from "@/components/landing/particulas";
+import { Revelar } from "@/components/landing/revelar";
+import { Contador } from "@/components/landing/contador";
+import { Tilt } from "@/components/landing/tilt";
+import { DemoHud } from "@/components/landing/demo-hud";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Landing.
+ *
+ * Quem chega aqui joga CS2 e reconhece um HUD à distância. A página fala
+ * pouco e mostra muito: o hero é o produto em miniatura, com os mesmos
+ * componentes do dashboard; o resto são três frases e uma comparação
+ * honesta. O movimento é contido — partículas atrás do hero, o gráfico se
+ * desenhando, números contando — e para quando a pessoa pede menos.
+ */
 export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<{ erro?: string }>;
 }) {
   if (await getSession()) redirect("/cs2");
-
   const { erro } = await searchParams;
 
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-dvh overflow-x-hidden">
       <TopBar />
-
       <main>
         <Hero erro={erro} />
-        <MetricBuckets />
-        <HowItWorks />
-        <Differentiators />
-        <Beta />
-        <Privacy />
+        <Numeros />
+        <Pilares />
+        <Tese />
+        <Comparacao />
+        <Chamada />
       </main>
-
       <Footer />
     </div>
   );
@@ -47,29 +50,20 @@ export default async function Home({
 
 function TopBar() {
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-canvas/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3.5">
+    <header className="sticky top-0 z-20 border-b border-line/60 bg-canvas/70 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3.5">
         <span className="font-mono text-sm font-bold tracking-tight">
           Frag<span className="text-accent">IQ</span>
         </span>
-        <BetaTag />
-
-        <a
-          href="#beta"
-          className="ml-auto hidden text-sm text-ink-muted transition hover:text-ink sm:block"
-        >
-          Beta
-        </a>
-        <a
-          href="#diferenciais"
-          className="hidden text-sm text-ink-muted transition hover:text-ink sm:block"
-        >
-          Comparação
-        </a>
-
+        <span className="hud rounded-full border border-accent/30 px-2 py-0.5 text-[10px] text-accent">beta</span>
+        <nav className="ml-auto hidden items-center gap-6 text-sm text-ink-muted sm:flex">
+          <a href="#tese" className="transition hover:text-ink">A tese</a>
+          <a href="#comparacao" className="transition hover:text-ink">Comparação</a>
+          <Link href="/comunidade" className="transition hover:text-ink">Comunidade</Link>
+        </nav>
         <a
           href="/api/auth/steam"
-          className="ml-auto inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium transition hover:border-steam/50 hover:text-steam sm:ml-4"
+          className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-sm font-medium ring-1 ring-line transition hover:ring-accent/60 sm:ml-2"
         >
           <SteamMark className="size-4" />
           Entrar
@@ -79,41 +73,26 @@ function TopBar() {
   );
 }
 
-function BetaTag() {
-  return (
-    <span className="rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 font-mono text-[10px] font-medium tracking-widest text-accent uppercase">
-      beta
-    </span>
-  );
-}
-
 /* ---------------------------------- hero ---------------------------------- */
 
 function Hero({ erro }: { erro?: string }) {
   return (
     <section className="relative overflow-hidden border-b border-line">
-      {/* Malha sutil atrás do hero: dá profundidade sem competir com o gráfico. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(var(--line-soft)_1px,transparent_1px),linear-gradient(90deg,var(--line-soft)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,#000_20%,transparent_75%)]"
-      />
+      <div className="aurora -top-40 -left-32 size-[34rem] bg-accent/40" aria-hidden />
+      <div className="aurora top-40 -right-40 size-[28rem] bg-steam/25 [animation-delay:-6s]" aria-hidden />
+      <Particulas className="pointer-events-none absolute inset-0 size-full" />
+      <div className="varredura" aria-hidden />
 
-      <div className="relative mx-auto max-w-5xl px-6 pt-16 pb-14 sm:pt-24">
-        <p className="font-mono text-[11px] tracking-[0.2em] text-ink-faint uppercase">
-          Counter-Strike 2 · Análise temporal de desempenho
-        </p>
-
+      <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-16 sm:pt-28">
+        <p className="hud">Counter-Strike 2 · análise temporal</p>
         <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
-          Suas estatísticas de CS2,{" "}
-          <span className="text-accent">ao longo do tempo</span>.
+          A Steam guarda o total.
+          <br />
+          <span className="text-accent">O FragIQ guarda a curva.</span>
         </h1>
-
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-muted">
-          A Steam guarda só o total de hoje, acumulado desde sempre. Depois de
-          duas mil horas, esse número não se move mais — um mês excelente e um mês
-          péssimo produzem o mesmo K/D. O FragIQ coleta periodicamente e mostra a{" "}
-          <strong className="font-medium text-ink">diferença entre as coletas</strong>:
-          como você está jogando agora, não como jogou na vida inteira.
+        <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-muted">
+          Depois de mil horas, seu K/D vitalício não se move. Cada sessão sua, comparada com o
+          seu normal, analisada sozinha.
         </p>
 
         {erro && (
@@ -123,339 +102,180 @@ function Hero({ erro }: { erro?: string }) {
           </p>
         )}
 
-        <div className="mt-9 flex flex-wrap items-center gap-3">
+        <div className="mt-9 flex flex-wrap items-center gap-4">
           <a
             href="/api/auth/steam"
-            className="group inline-flex items-center gap-3 rounded-xl bg-steam px-5 py-3 font-medium text-white shadow-sm transition hover:brightness-110"
+            className="borda-viva group inline-flex items-center gap-3 rounded-xl px-6 py-3.5 font-medium text-ink transition hover:text-accent"
           >
             <SteamMark />
             Entrar com Steam
             <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
           </a>
-
-          <a
-            href="#diferenciais"
-            className="rounded-xl border border-line px-5 py-3 text-sm font-medium text-ink-muted transition hover:border-ink-faint hover:text-ink"
-          >
-            Como se compara ao csstats
-          </a>
+          <span className="flex items-center gap-1.5 text-xs text-ink-faint">
+            <Lock className="size-3" />
+            senha na Valve; recebemos só o SteamID
+          </span>
         </div>
 
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-faint">
-          <Lock className="size-3" />
-          Você digita a senha no site da Valve. Recebemos apenas o seu SteamID.
-        </p>
+        <Revelar className="mt-14">
+          <DemoHud />
+        </Revelar>
+      </div>
+    </section>
+  );
+}
 
-        <div className="mt-14">
+/* --------------------------------- números -------------------------------- */
+
+const NUMEROS = [
+  { ate: 178, rotulo: "estatísticas em série temporal" },
+  { ate: 94, rotulo: "por arma" },
+  { ate: 30, rotulo: "por mapa" },
+  { ate: 1, sufixo: "/dia", rotulo: "coleta automática, sem instalar nada" },
+];
+
+function Numeros() {
+  return (
+    <section className="border-b border-line">
+      <div className="mx-auto grid max-w-6xl gap-8 px-6 py-12 sm:grid-cols-4">
+        {NUMEROS.map((n, i) => (
+          <Revelar key={n.rotulo} atraso={i * 80}>
+            <p className="num text-4xl font-semibold text-accent">
+              <Contador ate={n.ate} sufixo={n.sufixo} />
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">{n.rotulo}</p>
+          </Revelar>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* --------------------------------- pilares -------------------------------- */
+
+const PILARES = [
+  {
+    titulo: "Cada sessão, analisada sozinha",
+    texto: "Terminou de jogar, a leitura já está lá: o que mudou, o que pesou, o que fazer. Sem digitar nada.",
+  },
+  {
+    titulo: "Você contra o seu normal",
+    texto: "Nenhum número aparece sem o seu vitalício ao lado. A distância entre os dois é a informação.",
+  },
+  {
+    titulo: "Cada gráfico, uma página",
+    texto: "Um tile é um olhar; a página é a série inteira, com a granularidade que você escolher.",
+  },
+];
+
+function Pilares() {
+  return (
+    <section className="border-b border-line">
+      <div className="mx-auto grid max-w-6xl gap-4 px-6 py-16 sm:grid-cols-3">
+        {PILARES.map((p, i) => (
+          <Revelar key={p.titulo} atraso={i * 100}>
+            <Tilt className="h-full rounded-2xl bg-surface p-6 ring-1 ring-line">
+              <p className="hud">0{i + 1}</p>
+              <h2 className="mt-3 text-lg font-semibold tracking-tight">{p.titulo}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-ink-muted">{p.texto}</p>
+            </Tilt>
+          </Revelar>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------------------------------- tese ---------------------------------- */
+
+function Tese() {
+  return (
+    <section id="tese" className="scroll-mt-14 border-b border-line">
+      <div className="mx-auto max-w-6xl px-6 py-16">
+        <Revelar>
+          <p className="hud">A tese</p>
+          <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-balance">
+            A média vitalícia esconde a queda. A curva por período mostra.
+          </h2>
+        </Revelar>
+        <Revelar className="mt-8" atraso={120}>
           <ThesisChart />
-        </div>
+        </Revelar>
       </div>
     </section>
   );
 }
 
-/* ------------------------------ o que dá pra ver --------------------------- */
+/* ------------------------------- comparação ------------------------------- */
 
-const BUCKETS = [
-  { count: 36, label: "Gerais", example: "kills, mortes, dano, MVPs, rounds" },
-  { count: 94, label: "Por arma", example: "kills, tiros e acertos de cada arma" },
-  { count: 30, label: "Por mapa", example: "rounds e vitórias em cada mapa" },
-  { count: 18, label: "Última partida", example: "o resultado da partida mais recente" },
-];
-
-function MetricBuckets() {
+function Comparacao() {
   return (
-    <Section
-      eyebrow="O balde"
-      title="178 estatísticas, não seis"
-      lead="O CS2 expõe muito mais do que os painéis mostram. Medimos: são 197 contadores, dos quais 178 viram série temporal. O painel traz as principais prontas, e as outras aparecem todas comparadas com o seu vitalício."
-    >
-      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {BUCKETS.map((b) => (
-          <div
-            key={b.label}
-            className="rounded-xl border border-line bg-surface p-4 transition hover:border-accent/40"
-          >
-            <dt className="tnum font-mono text-3xl font-semibold text-accent">
-              {b.count}
-            </dt>
-            <dd className="mt-1">
-              <span className="block text-sm font-medium">{b.label}</span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-ink-faint">
-                {b.example}
-              </span>
-            </dd>
-          </div>
-        ))}
-      </dl>
-
-      <p className="mt-5 text-sm leading-relaxed text-ink-muted">
-        Nem todo contador se comporta igual, e a Valve não documenta isso.
-        Medimos jogando: os contadores globais e por arma somam casual junto com
-        competitivo, e os por mapa estão congelados em mapas legados. O FragIQ
-        diz isso na tela em vez de deixar você concluir errado.
-      </p>
-    </Section>
-  );
-}
-
-/* ------------------------------- como funciona ----------------------------- */
-
-const STEPS = [
-  {
-    icon: <SteamMark className="size-4" />,
-    title: "Entre com a Steam",
-    body: "Sem senha, sem código de autenticação, sem instalar nada. O login por OpenID devolve só o seu SteamID.",
-  },
-  {
-    icon: <Database className="size-4" />,
-    title: "Coletamos todo dia",
-    body: "Um job diário registra o estado das suas estatísticas. Se você não jogou, não gravamos ponto — a série não ganha ruído.",
-  },
-  {
-    icon: <SlidersHorizontal className="size-4" />,
-    title: "Você monta o gráfico",
-    body: "Escolha a métrica, o modo (total, por período, por hora jogada, razão entre duas) e a granularidade. Sobreponha quantas séries quiser.",
-  },
-];
-
-function HowItWorks() {
-  return (
-    <Section
-      eyebrow="Como funciona"
-      title="Três passos, e o primeiro é o único que exige você"
-      muted
-    >
-      <ol className="grid gap-4 sm:grid-cols-3">
-        {STEPS.map((s, i) => (
-          <li key={s.title} className="rounded-xl border border-line bg-surface p-5">
-            <div className="flex items-center gap-3">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
-                {s.icon}
-              </span>
-              <span className="tnum font-mono text-xs text-ink-faint">
-                0{i + 1}
-              </span>
-            </div>
-            <h3 className="mt-3 font-medium">{s.title}</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">{s.body}</p>
-          </li>
-        ))}
-      </ol>
-    </Section>
-  );
-}
-
-/* ------------------------------- diferenciais ------------------------------ */
-
-function Differentiators() {
-  return (
-    <Section
-      id="diferenciais"
-      eyebrow="Comparação"
-      title="Onde ganhamos, e onde ainda não"
-      lead="csstats.gg, csrep.gg e Leetify parseiam demos: por isso têm ADR, KAST e rating, e nós ainda não. Em compensação, eles graficam pouca coisa ao longo do tempo — o csstats só o CS Rating do Premier. É essa lacuna que o FragIQ ocupa."
-    >
-      <Comparison />
-
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Callout
-          icon={<GitCompareArrows className="size-4" />}
-          title="A conta que ninguém faz"
-          body="Todas mostram a sua precisão vitalícia com a AK. Nenhuma mostra se ela subiu ou caiu no último mês — que é a única versão da informação sobre a qual dá pra agir."
-        />
-        <Callout
-          icon={<Layers className="size-4" />}
-          title="Painel fixo, e o resto sob demanda"
-          body="As principais estatísticas ficam sempre à vista, cada uma com o valor do período e o vitalício ao lado. Antes delas, as leituras: o que os números dizem, escrito por extenso. E abaixo, os 178 contadores, ordenados pelo que mais se afastou do seu normal."
-        />
-      </div>
-    </Section>
-  );
-}
-
-/* ----------------------------------- beta ---------------------------------- */
-
-function Beta() {
-  return (
-    <section id="beta" className="border-t border-line bg-surface">
-      <div className="mx-auto max-w-5xl px-6 py-16">
-        <div className="flex items-center gap-3">
-          <BetaTag />
-          <span className="font-mono text-[11px] tracking-widest text-ink-faint uppercase">
-            aberto · gratuito
-          </span>
-        </div>
-
-        <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-balance">
-          Procuramos beta testers que joguem de verdade
-        </h2>
-
-        <p className="mt-4 max-w-2xl leading-relaxed text-ink-muted">
-          A plataforma está no ar e funcionando, mas é honesto dizer o que isso
-          significa: só conseguimos validar o produto com gente jogando ao longo de
-          semanas, porque a série temporal precisa de tempo para existir.
-        </p>
-
-        <div className="mt-8 grid gap-6 sm:grid-cols-2">
-          <div>
-            <h3 className="font-mono text-[11px] tracking-widest text-ink-faint uppercase">
-              O que você ganha
-            </h3>
-            <ul className="mt-3 space-y-2.5 text-sm text-ink-muted">
-              <Item>Acesso completo, sem cobrança, durante todo o beta</Item>
-              <Item>
-                Seu histórico começa a ser gravado hoje — e ele não é recuperável
-                depois
-              </Item>
-              <Item>Peso real nas próximas métricas e telas</Item>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="font-mono text-[11px] tracking-widest text-ink-faint uppercase">
-              O que pedimos
-            </h3>
-            <ul className="mt-3 space-y-2.5 text-sm text-ink-muted">
-              <Item>Perfil da Steam com &ldquo;Detalhes do jogo&rdquo; público</Item>
-              <Item>Voltar depois de algumas semanas de jogo</Item>
-              <Item>Dizer o que está confuso, faltando ou errado</Item>
-            </ul>
-          </div>
-        </div>
-
-        <div className="mt-9">
-          <a
-            href="/api/auth/steam"
-            className="group inline-flex items-center gap-3 rounded-xl bg-steam px-5 py-3 font-medium text-white transition hover:brightness-110"
-          >
-            <SteamMark />
-            Entrar e começar a gravar
-            <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
-          </a>
-
-          <p className="mt-3 text-sm text-ink-faint">
-            O canal de feedback fica dentro do app, no topo da página — assim
-            cada relato já chega junto com a sua série.
+    <section id="comparacao" className="scroll-mt-14 border-b border-line">
+      <div className="mx-auto max-w-6xl px-6 py-16">
+        <Revelar>
+          <p className="hud">Comparação</p>
+          <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-balance">
+            Onde ganhamos, e onde ainda não.
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-muted">
+            csstats, csrep e Leetify parseiam demos: têm ADR e rating, e nós ainda não. Nenhum
+            deles grafica a sua evolução.
           </p>
-        </div>
-
-        <p className="mt-6 flex max-w-2xl items-start gap-2 rounded-lg border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-ink-muted">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" />
-          <span>
-            Software em beta: pode haver bug, indisponibilidade e mudança de
-            estrutura de dados. Nada aqui altera nada na sua conta Steam — só
-            lemos.
-          </span>
-        </p>
+        </Revelar>
+        <Revelar className="mt-8" atraso={120}>
+          <Comparison />
+        </Revelar>
       </div>
     </section>
   );
 }
 
-function Item({ children }: { children: React.ReactNode }) {
+/* --------------------------------- chamada -------------------------------- */
+
+function Chamada() {
   return (
-    <li className="flex items-start gap-2.5">
-      <span
-        aria-hidden
-        className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent"
-      />
-      <span className="leading-relaxed">{children}</span>
-    </li>
-  );
-}
-
-/* --------------------------------- privacidade ----------------------------- */
-
-function Privacy() {
-  return (
-    <Section eyebrow="Privacidade" title="O que lemos, e o que não tocamos" muted>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Callout
-          icon={<ShieldCheck className="size-4" />}
-          title="Nunca vemos sua senha"
-          body="O login usa OpenID 2.0, o mecanismo oficial da Valve para sites de terceiros. Você autentica no domínio da Steam e nós recebemos uma afirmação assinada com o seu SteamID — nada além disso."
-        />
-        <Callout
-          icon={<Lock className="size-4" />}
-          title="Somente leitura, e só do público"
-          body="Lemos perfil, biblioteca e estatísticas — os mesmos dados que qualquer pessoa vê no seu perfil público. Não temos permissão para inventário, trades ou qualquer ação na sua conta."
-        />
-      </div>
-    </Section>
-  );
-}
-
-/* --------------------------------- estrutura ------------------------------- */
-
-function Section({
-  id,
-  eyebrow,
-  title,
-  lead,
-  muted,
-  children,
-}: {
-  id?: string;
-  eyebrow: string;
-  title: string;
-  lead?: string;
-  muted?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      className={`border-t border-line ${muted ? "bg-surface/40" : ""} scroll-mt-14`}
-    >
-      <div className="mx-auto max-w-5xl px-6 py-16">
-        <p className="font-mono text-[11px] tracking-[0.2em] text-ink-faint uppercase">
-          {eyebrow}
-        </p>
-        <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-balance">
-          {title}
-        </h2>
-        {lead && (
-          <p className="mt-4 max-w-2xl leading-relaxed text-ink-muted">{lead}</p>
-        )}
-        <div className="mt-8">{children}</div>
+    <section className="relative overflow-hidden border-b border-line">
+      <div className="aurora -bottom-40 left-1/3 size-[30rem] bg-accent/30" aria-hidden />
+      <div className="relative mx-auto max-w-6xl px-6 py-20 text-center">
+        <Revelar>
+          <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+            Seu histórico começa a ser gravado hoje.
+          </h2>
+          <p className="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+            E não é recuperável depois: a Steam só sabe o total de hoje.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <a
+              href="/api/auth/steam"
+              className="borda-viva group inline-flex items-center gap-3 rounded-xl px-6 py-3.5 font-medium text-ink transition hover:text-accent"
+            >
+              <SteamMark />
+              Entrar com Steam
+              <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+            </a>
+            <Link
+              href="/comunidade"
+              className="text-sm text-ink-muted transition hover:text-ink"
+            >
+              Participar do desenvolvimento →
+            </Link>
+          </div>
+        </Revelar>
       </div>
     </section>
   );
 }
 
-function Callout({
-  icon,
-  title,
-  body,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-surface p-5">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
-        {icon}
-      </span>
-      <h3 className="mt-3 font-medium">{title}</h3>
-      <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">{body}</p>
-    </div>
-  );
-}
+/* ---------------------------------- rodapé -------------------------------- */
 
 function Footer() {
   return (
-    <footer className="border-t border-line">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-8 text-xs text-ink-faint">
-        <span className="font-mono">
-          Frag<span className="text-accent">IQ</span>
-        </span>
-        <span>Beta aberto</span>
-        <span className="ml-auto">
-          Powered by Steam. Não afiliado à Valve Corporation.
-        </span>
-      </div>
+    <footer className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-8 text-xs text-ink-faint">
+      <span className="font-mono font-bold text-ink-muted">
+        Frag<span className="text-accent">IQ</span>
+      </span>
+      <span>Só leitura do que já é público no seu perfil. Nada na sua conta é alterado.</span>
+      <span className="ml-auto">beta · gratuito</span>
     </footer>
   );
 }

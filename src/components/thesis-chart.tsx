@@ -54,8 +54,8 @@ export function ThesisChart() {
   const max = Math.max(...all) + 0.08;
 
   return (
-    <figure className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line px-5 py-3">
+    <figure className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line-soft px-5 py-3">
         <Legend color="var(--ink-faint)" dashed label="Média vitalícia" />
         <Legend color="var(--accent)" label="Desempenho por período" />
         <span className="ml-auto font-mono text-[11px] tracking-wide text-ink-faint uppercase">
@@ -66,6 +66,7 @@ export function ThesisChart() {
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="block h-44 w-full sm:h-56"
+        preserveAspectRatio="none"
         role="img"
         aria-label="Duas linhas sobre os mesmos dados: a média vitalícia permanece quase reta enquanto o desempenho por período cai visivelmente."
       >
@@ -99,6 +100,7 @@ export function ThesisChart() {
           stroke="var(--ink-faint)"
           strokeWidth="2"
           strokeDasharray="5 4"
+          vectorEffect="non-scaling-stroke"
         />
 
         <path
@@ -108,10 +110,12 @@ export function ThesisChart() {
           strokeWidth="2.5"
           strokeLinejoin="round"
           strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+          className="tracar"
         />
       </svg>
 
-      <figcaption className="border-t border-line px-5 py-3 text-sm leading-relaxed text-ink-muted">
+      <figcaption className="border-t border-line-soft px-5 py-3 text-sm leading-relaxed text-ink-muted">
         A linha tracejada é o que a Steam te mostra: caiu{" "}
         <strong className="tnum font-medium text-ink">0,08</strong> em três meses.
         A linha cheia é o que realmente aconteceu:{" "}
