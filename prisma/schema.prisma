@@ -30,7 +30,7 @@ model User {
 
   /// Receber a análise de cada sessão no chat da Steam, pelo bot. Só chega
   /// para quem adicionou o bot; desligar aqui silencia mesmo sendo amigo.
-  avisoSteam Boolean @default(true)
+  avisoSteam         Boolean   @default(true)
   /// Quando o bot avisou, no chat, que a Steam não deixa ler as estatísticas
   /// ("Detalhes do jogo" privado). Uma vez só.
   avisoPrivacidadeEm DateTime?
@@ -54,13 +54,14 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   partidas    MatchPlayer[]
+  captura     PendingCapture?
   games       UserGame[]
   syncRuns    SyncRun[]
   feedback    Feedback[]
   analyses    Analysis[]
   participant Participant?
-  seguindo    Follow[]       @relation("seguidor")
-  seguidores  Follow[]       @relation("seguido")
+  seguindo    Follow[]        @relation("seguidor")
+  seguidores  Follow[]        @relation("seguido")
   mensagens   SteamMessage[]
 
   @@map("users")
@@ -462,4 +463,33 @@ model MatchPlayer {
   @@index([steamId])
   @@index([userId])
   @@map("match_players")
+}
+
+/// Uma coleta que o bot pediu e ainda não deu certo.
+///
+/// O bot é um sensor: vê o fim da partida, avisa, e esquece. Quem lembra
+/// é esta tabela — o contexto observado, quantas vezes já tentamos e
+/// quando é a próxima. Reiniciar o bot não perde nada, e o cron pode
+/// retomar o que a Steam demorou. Uma por pessoa: uma partida nova
+/// substitui a anterior (o delta cobre as duas).
+model PendingCapture {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  steamId String
+
+  matchMap   String?
+  matchMode  String?
+  matchScore String?
+
+  tentativa Int      @default(0)
+  proximaEm DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([proximaEm])
+  @@map("pending_captures")
 }

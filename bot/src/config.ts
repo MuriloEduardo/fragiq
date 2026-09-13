@@ -44,14 +44,13 @@ export const config = {
   partidasUrl:
     ler("FRAGIQ_PARTIDAS_URL") ??
     obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/partidas"),
+  /** O relógio das capturas pendentes: o site processa, nós só chamamos. */
+  tickUrl:
+    ler("FRAGIQ_TICK_URL") ??
+    obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/tick"),
+  tickMs: Number(process.env.BOT_TICK_MS ?? 30_000),
   /** Intervalo entre buscas na fila de mensagens. */
   outboxPollMs: Number(process.env.BOT_OUTBOX_POLL_MS ?? 20_000),
-
-  /**
-   * A Steam demora a gravar as estatísticas depois que o jogo fecha. Avisar
-   * no instante em que a pessoa sai da partida traria os números velhos.
-   */
-  graceMs: Number(process.env.BOT_GRACE_MS ?? 90_000),
 
   /** Aceitar pedidos de amizade automaticamente. */
   autoAccept: process.env.BOT_AUTO_ACCEPT !== "false",

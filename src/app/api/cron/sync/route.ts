@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncUser } from "@/lib/steam/sync";
+import { processarCapturasDevidas } from "@/lib/capturas";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,10 @@ export async function GET(request: NextRequest) {
   // Registra a invocação antes de qualquer trabalho: uma execução sem
   // candidatos precisa deixar rastro, senão não há como distinguir
   // "agendador parado" de "nada a coletar".
+  // O que o bot deixou pendente e o tick não alcançou (bot fora do ar, por
+  // exemplo) entra antes da varredura geral, com o contexto que ele viu.
+  await processarCapturasDevidas(20).catch((e) => console.error("[cron] capturas pendentes:", e));
+
   const run = await prisma.cronRun.create({
     data: { status: "RUNNING", candidates: users.length },
   });

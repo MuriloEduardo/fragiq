@@ -21,8 +21,6 @@ const client = new SteamUser({ autoRelogin: true });
 
 /** steamId -> estava jogando CS2 na última atualização de estado. */
 const jogando = new Map<string, boolean>();
-/** steamId -> timer de espera antes de avisar. */
-const pendentes = new Map<string, NodeJS.Timeout>();
 
 /**
  * steamId -> última partida observada.
@@ -36,12 +34,6 @@ type Contexto = { map?: string; mode?: string; score?: string };
 const contexto = new Map<string, Contexto>();
 /** steamId -> estava dentro de uma partida (rich presence com mapa) na última atualização. */
 const emPartida = new Map<string, boolean>();
-/**
- * steamId -> contexto da partida que acabou de terminar, congelado no
- * instante em que a pessoa voltou ao lobby. É o que vai no aviso mesmo
- * que ela já tenha entrado em outra partida antes de a Steam publicar.
- */
-const encerrada = new Map<string, Contexto>();
 
 /* ---------------------------------- login --------------------------------- */
 
@@ -138,13 +130,22 @@ client.on("friendRelationship", (steamID, relationship) => {
   if (relationship === SteamUser.EFriendRelationship.None) {
     jogando.delete(id);
     contexto.delete(id);
-    limparPendente(id);
+    emPartida.delete(id);
     console.log(`Removido da lista: ${id}`);
   }
 });
 
 /* ----------------------------- estado de jogo ----------------------------- */
 
+/**
+ * O bot é um sensor, não uma fila.
+ *
+ * Ele vê duas coisas: a pessoa voltou ao lobby (o rich presence perdeu o
+ * mapa) ou saiu do CS2. Nas duas, avisa o site na hora, com o contexto da
+ * partida — e esquece. Prazo da Steam, retentativas e desistência vivem
+ * no banco do site, processados a cada tick (abaixo). Reiniciar este
+ * processo não perde nada.
+ */
 client.on("user", (steamID, user) => {
   // Com a sessão do GC aberta a Steam nos mostra "jogando CS2" também; a
   // nossa própria presença não é de ninguém.
@@ -161,26 +162,14 @@ client.on("user", (steamID, user) => {
     const rp = new Map((user.rich_presence ?? []).map((kv) => [kv.key, kv.value]));
     const mapa = rp.get("game:map");
     if (mapa) {
-      contexto.set(id, {
-        map: mapa,
-        mode: rp.get("game:mode"),
-        score: rp.get("game:score"),
-      });
+      contexto.set(id, { map: mapa, mode: rp.get("game:mode"), score: rp.get("game:score") });
     }
-    // Fim de partida sem fechar o jogo: o rich presence tinha mapa e agora
-    // tem só o lobby. Só vale quando a Steam mandou o rich presence de
-    // fato — uma atualização parcial, sem a lista, não é "saiu do mapa".
+    // Fim de partida sem fechar o jogo: tinha mapa e agora tem só o lobby.
+    // Só vale quando a Steam mandou o rich presence de fato — uma
+    // atualização parcial, sem a lista, não é "saiu do mapa".
     if (rp.size > 0) {
       const naPartida = Boolean(mapa);
-      if (antes && emPartida.get(id) && !naPartida) {
-        const ctx = contexto.get(id);
-        if (ctx) encerrada.set(id, ctx);
-        console.log(
-          `${id} terminou a partida — sincronizando em ${config.graceMs / 1000}s` +
-            (ctx?.map ? ` (${ctx.mode ?? "?"} em ${ctx.map}${ctx.score ? ` ${ctx.score}` : ""})` : ""),
-        );
-        agendar(id);
-      }
+      if (antes && emPartida.get(id) && !naPartida) void avisar(id, "terminou a partida");
       emPartida.set(id, naPartida);
     }
   } else {
@@ -192,106 +181,52 @@ client.on("user", (steamID, user) => {
 
   if (agora) {
     console.log(`${id} entrou no CS2`);
-    // Reabrir o jogo não cancela mais o aviso da partida anterior: com o
-    // fim de partida detectado pelo lobby, o que está pendente é uma
-    // partida inteira que a Steam ainda não publicou, e ela continua
-    // valendo. O contexto dela já está congelado em `encerrada`.
     return;
   }
-
-  const ctx = encerrada.get(id) ?? contexto.get(id);
-  console.log(
-    `${id} saiu do CS2 — sincronizando em ${config.graceMs / 1000}s` +
-      (ctx?.map ? ` (${ctx.mode ?? "?"} em ${ctx.map}${ctx.score ? ` ${ctx.score}` : ""})` : ""),
-  );
-  agendar(id);
+  void avisar(id, "saiu do CS2");
 });
-
-function agendar(id: string) {
-  limparPendente(id);
-  pendentes.set(
-    id,
-    setTimeout(() => {
-      pendentes.delete(id);
-      void avisar(id);
-    }, config.graceMs),
-  );
-}
-
-function limparPendente(id: string) {
-  const t = pendentes.get(id);
-  if (t) {
-    clearTimeout(t);
-    pendentes.delete(id);
-  }
-}
 
 /* --------------------------------- webhook -------------------------------- */
 
-/**
- * Esperas entre tentativas quando a aplicação responde 202: a Steam ainda
- * não publicou a partida. Medido em 12/09/2026: mais de 5 minutos depois de
- * sair do jogo as stats continuavam as velhas. O prazo varia, então um
- * grace fixo ou erra ou desperdiça — o jeito é perguntar até mudar.
- */
-const RETRY_MS = [2, 4, 8, 16].map((min) => min * 60_000);
-
-async function avisar(steamId: string, tentativa = 0) {
-  // O contexto só é descartado quando a partida entrou de fato (ou quando
-  // desistimos). Se for apagado na primeira tentativa, o mapa se perde e o
-  // delta real, capturado mais tarde, entra sem atribuição. O congelado no
-  // fim da partida tem prioridade sobre o que está sendo jogado agora.
-  const ctx = encerrada.get(steamId) ?? contexto.get(steamId);
-
-  let status: number | null = null;
+async function avisar(steamId: string, motivo: string) {
+  const ctx = contexto.get(steamId);
+  console.log(
+    `${steamId} ${motivo}` + (ctx?.map ? ` (${ctx.mode ?? "?"} em ${ctx.map}${ctx.score ? ` ${ctx.score}` : ""})` : ""),
+  );
   try {
     const res = await fetch(config.webhookUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: `Bearer ${config.webhookSecret}`,
-      },
-      body: JSON.stringify({
-        steamId,
-        event: "match_ended",
-        map: ctx?.map,
-        mode: ctx?.mode,
-        score: ctx?.score,
-        tentativa,
-      }),
+      headers: { "Content-Type": "application/json", authorization: `Bearer ${config.webhookSecret}` },
+      body: JSON.stringify({ steamId, event: "match_ended", map: ctx?.map, mode: ctx?.mode, score: ctx?.score }),
     });
-    status = res.status;
     const corpo = await res.text();
     console.log(`Webhook ${steamId}: ${res.status} ${corpo.slice(0, 120)}`);
+    if (res.ok) contexto.delete(steamId);
   } catch (err) {
+    // A rede falhou e o pedido não chegou. O site não sabe desta partida;
+    // o próximo evento desta pessoa (ou o cron) a alcança.
     console.error(`Webhook falhou para ${steamId}:`, err);
   }
-
-  // 202 = stats ainda velhas; null = rede falhou. Os dois merecem nova
-  // tentativa. Qualquer outra resposta encerra: ou gravou, ou é erro nosso.
-  if (status !== 202 && status !== null) {
-    encerrada.delete(steamId);
-    if (!emPartida.get(steamId)) contexto.delete(steamId);
-    return;
-  }
-
-  const espera = RETRY_MS[tentativa];
-  if (espera === undefined) {
-    console.warn(`Desistindo de ${steamId}: partida não apareceu em ${RETRY_MS.length} tentativas.`);
-    encerrada.delete(steamId);
-    if (!emPartida.get(steamId)) contexto.delete(steamId);
-    return;
-  }
-
-  console.log(`${steamId}: nova tentativa em ${espera / 60_000} min`);
-  pendentes.set(
-    steamId,
-    setTimeout(() => {
-      pendentes.delete(steamId);
-      void avisar(steamId, tentativa + 1);
-    }, espera),
-  );
 }
+
+/* ---------------------------------- tick ---------------------------------- */
+
+/** O relógio das capturas: o site processa o que venceu; nós só chamamos. */
+async function tick() {
+  if (!client.steamID) return;
+  try {
+    const res = await fetch(config.tickUrl, { headers: { authorization: `Bearer ${config.webhookSecret}` } });
+    if (!res.ok) {
+      console.warn(`Tick: ${res.status}`);
+      return;
+    }
+    const r = (await res.json()) as { processadas: number; gravadas: number; reagendadas: number; desistidas: number };
+    if (r.processadas > 0) console.log(`Tick: ${r.gravadas} gravada(s), ${r.reagendadas} reagendada(s), ${r.desistidas} desistida(s)`);
+  } catch (err) {
+    console.error("Tick falhou:", err);
+  }
+}
+const tickTimer = setInterval(() => void tick(), config.tickMs);
 
 /* ------------------------------ chat da Steam ------------------------------ */
 
@@ -364,7 +299,7 @@ const partidasTimer = ligarPartidas(client);
 for (const sinal of ["SIGINT", "SIGTERM"] as const) {
   process.on(sinal, () => {
     console.log("Encerrando…");
-    for (const t of pendentes.values()) clearTimeout(t);
+    clearInterval(tickTimer);
     clearInterval(filaTimer);
     clearInterval(partidasTimer);
     client.logOff();

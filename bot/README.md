@@ -9,21 +9,30 @@ A coleta agendada roda uma vez por dia e captura o que houver. Se a pessoa
 jogou cinco partidas entre duas execuções, a série ganha um ponto só — a
 diferença agregada, não a evolução dentro da sessão.
 
-O bot troca isso por coleta reativa: percebe o fim da sessão e dispara o sync
-naquele momento. Como as estatísticas do CS2 são gravadas ao fim da partida,
-isso rende aproximadamente um ponto por sessão sem o usuário clicar em nada.
+O bot troca isso por coleta reativa: percebe o fim de cada partida — o rich
+presence perde o mapa quando a pessoa volta ao lobby, ou ela fecha o jogo —
+e avisa a aplicação naquele momento. Como as estatísticas do CS2 são gravadas
+ao fim da partida, isso rende um ponto por partida sem o usuário clicar em
+nada.
 
 Como efeito colateral, a amizade também destrava perfis marcados como
 "somente amigos" — a Web API respeita a privacidade em relação ao dono da
 chave, e é a maior causa de dashboard vazio.
 
-## A Steam demora
+## O bot é um sensor; a memória é do site
 
-`BOT_GRACE_MS` é só a primeira espera. Se a aplicação responder `202`, as
-stats do CS2 vieram iguais ao último ponto — a Steam ainda não publicou a
-partida (medido: mais de 5 min depois de sair do jogo). O bot então tenta
-de novo em 2, 4, 8 e 16 min, segurando o mapa e o modo até a partida
-aparecer, e só depois disso descarta o contexto.
+O aviso (`POST /api/sync/steam-event`) só grava um pedido de coleta, com o
+mapa, modo e placar observados. A Steam demora a publicar (medido: mais de
+5 min depois de sair do jogo), então o site espera 90 s e tenta; se as stats
+vieram iguais, tenta de novo em 2, 4, 8 e 16 min; depois desiste — e, se a
+pessoa nunca teve um ponto, avisa no chat que os "Detalhes do jogo" estão
+privados. Tudo isso vive na tabela `pending_captures`. O bot só chama
+`GET /api/bot/tick` a cada 30 s (`BOT_TICK_MS`) para o site processar o que
+venceu: reiniciar o bot não perde nada, e o cron processa o mesmo balde.
+
+Além do tick, o bot busca duas filas do site: mensagens de chat
+(`/api/bot/outbox`) e share codes para perguntar ao Game Coordinator
+(`/api/bot/partidas`).
 
 ## Por que não roda na Vercel
 
