@@ -14,6 +14,7 @@ import { PrimeirosPassos } from "@/components/primeiros-passos";
 import { Secao } from "@/components/secao";
 import { SemDados } from "@/components/sem-dados";
 import { botEhAmigo } from "@/lib/bot";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,11 @@ export default async function ResumoPage({ params }: { params: Promise<{ appId: 
 
   const sessao = ultimaSessao(rows);
   const amigoDoBot = appId === 730 ? await botEhAmigo(session.steamId) : true;
-  const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true);
+  const partidasAtivas =
+    appId === 730
+      ? Boolean((await prisma.user.findUnique({ where: { id: session.userId }, select: { partidasAtivadasEm: true } }))?.partidasAtivadasEm)
+      : true;
+  const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true || !partidasAtivas);
   const leituras = lerSerie(rows).filter((l) => l.id !== "modo" && l.id !== "mapas");
   const analista =
     cogniflow() && rows.length >= 2
@@ -48,7 +53,7 @@ export default async function ResumoPage({ params }: { params: Promise<{ appId: 
     <>
       {onboarding && (
         <div className="mb-8">
-          <PrimeirosPassos statsVisiveis botAmigo={amigoDoBot} coletas={rows.length} />
+          <PrimeirosPassos statsVisiveis botAmigo={amigoDoBot} coletas={rows.length} partidasAtivas={partidasAtivas} />
         </div>
       )}
 

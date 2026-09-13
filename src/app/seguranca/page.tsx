@@ -9,6 +9,7 @@ import { BotAmigo } from "@/components/bot-amigo";
 import { ApagarConta } from "@/components/apagar-conta";
 import { PerfilPublicoToggle } from "@/components/perfil-publico-toggle";
 import { AvisoSteamToggle } from "@/components/aviso-steam-toggle";
+import { PartidasRevogar } from "@/components/partidas-revogar";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function SegurancaPage() {
     session
       ? prisma.user.findUnique({
           where: { id: session.userId },
-          select: { personaName: true, avatarUrl: true, lastSyncedAt: true, perfilPublico: true, avisoSteam: true, steamId: true },
+          select: { personaName: true, avatarUrl: true, lastSyncedAt: true, perfilPublico: true, avisoSteam: true, steamId: true, partidasAtivadasEm: true },
         })
       : null,
     session ? seloDe(session.userId) : null,
@@ -83,6 +84,12 @@ export default async function SegurancaPage() {
             e as leituras são suas: outra pessoa só vê se você aceitar o pedido dela, e você revoga
             quando quiser.
           </Bloco>
+          <Bloco titulo="Partidas oficiais">
+            Opcional. Para ver cada partida com placar, a Steam exige um código de autenticação de
+            histórico que só você gera, mais um share code. Esse código lê exclusivamente a lista de
+            partidas — não abre inventário, chat, amigos nem senha — e fica cifrado aqui. Você revoga
+            abaixo, ou gerando outro na Steam.
+          </Bloco>
           <Bloco titulo="O analista">
             As análises são geradas por um modelo de linguagem (OpenAI) através do nosso serviço.
             Enviamos os números agregados da sua série e o seu nome de jogador — nunca o SteamID,
@@ -100,6 +107,7 @@ export default async function SegurancaPage() {
             <h2 className="hud">Os seus dados</h2>
             <PerfilPublicoToggle publico={user.perfilPublico} steamId={user.steamId} />
             <AvisoSteamToggle ligado={user.avisoSteam} amigo={amigo} />
+            <PartidasRevogar ativo={Boolean(user.partidasAtivadasEm)} desde={user.partidasAtivadasEm} />
             <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Baixar tudo</p>

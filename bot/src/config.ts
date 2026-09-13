@@ -40,6 +40,10 @@ export const config = {
   outboxUrl:
     ler("FRAGIQ_OUTBOX_URL") ??
     obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/outbox"),
+  /** A fila de share codes para perguntar ao Game Coordinator. */
+  partidasUrl:
+    ler("FRAGIQ_PARTIDAS_URL") ??
+    obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/partidas"),
   /** Intervalo entre buscas na fila de mensagens. */
   outboxPollMs: Number(process.env.BOT_OUTBOX_POLL_MS ?? 20_000),
 

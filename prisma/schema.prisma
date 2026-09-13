@@ -32,10 +32,25 @@ model User {
   /// para quem adicionou o bot; desligar aqui silencia mesmo sendo amigo.
   avisoSteam Boolean @default(true)
 
+  /// Código de autenticação do histórico de partidas (a Steam chama de
+  /// "match history authentication code"). Só serve para pedir o próximo
+  /// share code à Web API — não abre inventário, chat nem nada da conta.
+  /// Guardado cifrado; a pessoa revoga na página de segurança ou gerando
+  /// outro na Steam.
+  steamAuthCode      String?
+  /// O share code mais recente que conhecemos: é de onde a próxima busca
+  /// continua. A Steam só responde "qual é o seguinte a este".
+  shareCodeAtual     String?
+  /// Último erro ao falar com a Steam sobre partidas, para a página dizer
+  /// o que fazer (código inválido, share code expirado...).
+  partidasErro       String?
+  partidasAtivadasEm DateTime?
+
   lastSyncedAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  partidas    MatchPlayer[]
   games       UserGame[]
   syncRuns    SyncRun[]
   feedback    Feedback[]
@@ -362,4 +377,84 @@ enum SteamMessageStatus {
   PENDING
   SENT
   FAILED
+}
+
+/// Uma partida oficial de matchmaking, como o Game Coordinator do CS2 a
+/// descreve para quem tem o share code: placar final, duração, e a linha de
+/// scoreboard de cada um dos dez jogadores. É o que a Web API não dá —
+/// por partida, não por total — e o que o csstats tem.
+model Match {
+  /// O matchid do GC (uint64), como string.
+  id        String @id
+  shareCode String @unique
+
+  status     MatchStatus @default(PENDING)
+  /// Quantas vezes o bot já pediu ao GC. Depois de algumas, desiste.
+  tentativas Int         @default(0)
+  error      String?
+
+  jogadaEm DateTime?
+  duracaoS Int?
+  rounds   Int?
+  /// Mapa quando dá para saber: pelo bot de presença (rich presence de
+  /// quem estava na partida) ou pelo game_type do GC.
+  mapa     String?
+  gameType Int?
+  placarA  Int?
+  placarB  Int?
+  demoUrl  String?
+
+  /// Quem tinha a corrente de share codes que revelou esta partida. Os
+  /// outros nove jogadores a ganham de graça.
+  descobertaPorId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jogadores MatchPlayer[]
+
+  @@index([status, createdAt])
+  @@index([jogadaEm])
+  @@map("matches")
+}
+
+enum MatchStatus {
+  /// Conhecemos o share code; o bot ainda não pediu ao GC.
+  PENDING
+  /// Scoreboard gravado.
+  DONE
+  /// O GC não tem mais a partida (guarda ~30 dias).
+  EXPIRED
+  /// Desistimos depois de várias tentativas.
+  FAILED
+}
+
+/// A linha de um jogador no scoreboard de uma partida. Existe para os dez,
+/// tenham conta aqui ou não: é o que permite comparar, ver amigos na mesma
+/// partida e mostrar a página pública.
+model MatchPlayer {
+  id String @id @default(cuid())
+
+  matchId String
+  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  steamId String
+  userId  String?
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// 0 = os cinco primeiros da reserva (placarA), 1 = os cinco últimos (placarB).
+  time    Int
+  kills   Int
+  assists Int
+  deaths  Int
+  mvps    Int
+  score   Int
+  hs      Int
+  /// null em empate.
+  venceu  Boolean?
+
+  @@unique([matchId, steamId])
+  @@index([steamId])
+  @@index([userId])
+  @@map("match_players")
 }

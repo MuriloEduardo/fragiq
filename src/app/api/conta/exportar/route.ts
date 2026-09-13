@@ -19,10 +19,17 @@ export async function GET() {
       seguindo: { select: { seguidoId: true, status: true, createdAt: true } },
       seguidores: { select: { seguidorId: true, status: true, createdAt: true } },
       syncRuns: { orderBy: { startedAt: "asc" } },
+      partidas: { include: { match: true } },
     },
   });
 
-  return new NextResponse(JSON.stringify({ exportadoEm: new Date().toISOString(), ...user }, null, 2), {
+  // O código de autenticação sai cifrado do banco e nem assim vai no
+  // export: não é dado sobre a pessoa, é uma credencial — e a Steam gera
+  // outro em um clique.
+  const { steamAuthCode: _credencial, ...dados } = user ?? {};
+  void _credencial;
+
+  return new NextResponse(JSON.stringify({ exportadoEm: new Date().toISOString(), ...dados }, null, 2), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Content-Disposition": `attachment; filename="fragiq-${session.steamId}.json"`,

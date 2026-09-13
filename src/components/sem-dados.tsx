@@ -16,7 +16,7 @@ export function SemDados({ botAmigo }: { botAmigo: boolean | null }) {
         pode ser que a conta ainda não tenha partidas registradas de CS2.
       </p>
       <div className="mt-6">
-        <PrimeirosPassos statsVisiveis={false} botAmigo={botAmigo} coletas={0} />
+        <PrimeirosPassos statsVisiveis={false} botAmigo={botAmigo} coletas={0} partidasAtivas={false} />
       </div>
     </main>
   );

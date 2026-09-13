@@ -3,6 +3,7 @@ import { createInterface } from "node:readline/promises";
 import SteamUser from "steam-user";
 import { CS2_APPID, config } from "./config.js";
 import { gravarRefreshToken, secretId } from "./segredos.js";
+import { ligarPartidas } from "./partidas.js";
 
 /**
  * Bot de presença.
@@ -99,6 +100,12 @@ client.on("steamGuard", async (domain, callback, lastCodeWrong) => {
 client.on("loggedOn", () => {
   console.log(`Conectado como ${client.steamID?.getSteamID64()}`);
   client.setPersona(SteamUser.EPersonaState.Online);
+});
+
+// Conta limitada (nunca gastou US$5) não manda chat nem posta: vale saber
+// no log antes de caçar o erro em outro lugar.
+client.on("accountLimitations", (limited, communityBanned, locked) => {
+  console.log(`Limitações da conta: limitada=${limited} banida=${communityBanned} travada=${locked}`);
 });
 
 client.on("error", (err) => {
@@ -314,6 +321,7 @@ async function entregar(m: Mensagem) {
 }
 
 const filaTimer = setInterval(() => void entregarFila(), config.outboxPollMs);
+const partidasTimer = ligarPartidas(client);
 
 /* ------------------------------- encerramento ------------------------------ */
 
@@ -322,6 +330,7 @@ for (const sinal of ["SIGINT", "SIGTERM"] as const) {
     console.log("Encerrando…");
     for (const t of pendentes.values()) clearTimeout(t);
     clearInterval(filaTimer);
+    clearInterval(partidasTimer);
     client.logOff();
     process.exit(0);
   });

@@ -16,6 +16,7 @@ const ABAS = [
   { seg: "", rotulo: "Resumo" },
   { seg: "estatisticas", rotulo: "Estatísticas" },
   { seg: "sessoes", rotulo: "Sessões" },
+  { seg: "partidas", rotulo: "Partidas" },
   { seg: "metricas", rotulo: "Métricas" },
   { seg: "analista", rotulo: "Analista" },
 ] as const;

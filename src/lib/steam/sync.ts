@@ -1,5 +1,6 @@
 import type { SyncTrigger } from "@/generated/prisma/enums";
 import { garantirAnaliseDaSessao } from "@/lib/analises";
+import { descobrirPartidas } from "@/lib/partidas";
 import { prisma } from "../prisma";
 import {
   getGameStatSchema,
@@ -37,6 +38,8 @@ export type SyncResult = {
   gamesSeen: number;
   gamesStored: number;
   snapshotsCreated: number;
+  /** Partidas novas encontradas na corrente de share codes. */
+  partidasNovas: number;
   statCallsSpent: number;
   /**
    * appIds cujas stats foram buscadas e vieram iguais ao último ponto. Para
@@ -173,6 +176,15 @@ async function runSync(
   let statCallsSpent = 0;
   const unchanged: number[] = [];
 
+  // A corrente de share codes anda junto com a coleta: é o momento em que
+  // a Steam já tem a partida nova. Só custa chamadas para quem ligou. Vem
+  // antes do ponto de propósito: se achou partida, a análise da sessão
+  // espera o scoreboard chegar do GC (o bot avisa) em vez de nascer cega.
+  const partidasNovas = await descobrirPartidas(userId).catch((e) => {
+    console.error("[sync] corrente de partidas falhou:", e instanceof Error ? e.message : e);
+    return 0;
+  });
+
   for (const game of dirty) {
     if (statCallsSpent >= MAX_GAMES_WITH_STATS) break;
 
@@ -190,7 +202,7 @@ async function runSync(
     // Ponto novo de CS2 é uma sessão que acabou: a análise dela nasce aqui,
     // sem ninguém pedir. Falha nisso não é falha da coleta — o ponto já está
     // gravado, e a página pede a análise de novo ao abrir.
-    if (outcome === "created" && game.appid === 730) {
+    if (outcome === "created" && game.appid === 730 && partidasNovas === 0) {
       await garantirAnaliseDaSessao(userId, 730).catch((e) =>
         console.error("[sync] análise da sessão não disparou:", e instanceof Error ? e.message : e),
       );
@@ -200,6 +212,7 @@ async function runSync(
   return {
     gamesSeen: played.length,
     gamesStored: played.length,
+    partidasNovas,
     snapshotsCreated,
     statCallsSpent,
     unchanged,

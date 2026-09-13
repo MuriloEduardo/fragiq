@@ -43,6 +43,23 @@ export type Fonte = {
   playtimeForeverMin: number;
   rows: SnapshotRow[];
   catalog: MetricInfo[];
+  /** Partidas oficiais com scoreboard (via share code + GC), mais recente primeiro. Vazio para quem não ligou. */
+  partidasOficiais: PartidaOficial[];
+};
+
+export type PartidaOficial = {
+  jogadaEm: string;
+  mapa: string | null;
+  placar: string;
+  resultado: "vitória" | "derrota" | "empate";
+  duracaoMin: number;
+  kills: number;
+  assists: number;
+  deaths: number;
+  kd: number;
+  hsPct: number;
+  mvps: number;
+  score: number;
 };
 
 type Params = Record<string, unknown>;
@@ -154,6 +171,11 @@ function resumo(fonte: Fonte, params: Params) {
     ultimaColeta: ultimo ? iso(ultimo.capturedAt) : null,
     filtro: f ?? null,
     periodo,
+    // As partidas oficiais que caem dentro do período: são o detalhe por
+    // partida do que o período soma. Fora do período, a view `partidas`.
+    partidasOficiaisNoPeriodo: periodo
+      ? fonte.partidasOficiais.filter((p) => p.jogadaEm >= periodo.de && p.jogadaEm <= periodo.ate)
+      : [],
     painel,
     leituras: lerSerie(rows, f).map((l) => ({
       numero: l.numero,
@@ -283,6 +305,10 @@ function partidas(fonte: Fonte, params: Params) {
 
   return {
     total: pares.length,
+    // Cada item abaixo é o intervalo entre duas coletas (pode somar mais de
+    // uma partida). `oficiais` são partidas de verdade, uma a uma, com o
+    // scoreboard do Game Coordinator — quando a pessoa ligou a corrente.
+    oficiais: fonte.partidasOficiais.slice(0, limite),
     partidas: pares
       .slice(-limite)
       .reverse()

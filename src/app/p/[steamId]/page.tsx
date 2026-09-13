@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, Lock } from "lucide-react";
 import { getSession } from "@/lib/session";
+import { listarPartidas } from "@/lib/partidas";
+import { PartidasTabela } from "@/components/partidas-tabela";
 import { carregarPerfilPublico, pareceSteamId, resolverEntrada } from "@/lib/perfil-publico";
 import { SteamMark } from "@/components/steam-mark";
 import { Selo } from "@/components/selo";
@@ -53,6 +55,9 @@ export default async function PerfilPublicoPage({
   const estado: EstadoSeguir | null =
     session && alvo && !souEu ? await estadoDeSeguir(session.userId, alvo.id) : null;
   const curva = estado === "seguindo" && alvo ? await carregarFonte(alvo.id, 730) : null;
+  // O scoreboard de partida é público na Steam ("Suas partidas" de cada um
+  // dos dez); mostramos o que já temos gravado deste SteamID.
+  const partidas = perfil.estado === "ok" ? await listarPartidas(entrada, 10) : [];
 
   return (
     <div className="min-h-dvh">
@@ -213,6 +218,15 @@ export default async function PerfilPublicoPage({
                 </p>
               </section>
             </div>
+
+            {partidas.length > 0 && (
+              <section className="mt-10">
+                <h2 className="hud">Últimas partidas oficiais</h2>
+                <div className="mt-3">
+                  <PartidasTabela partidas={partidas} publica />
+                </div>
+              </section>
+            )}
 
             {!perfil.usuarioDoFragiq && !session && (
               <section className="mt-12 rounded-2xl bg-surface p-6 ring-1 ring-line">

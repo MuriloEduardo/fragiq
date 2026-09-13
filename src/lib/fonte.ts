@@ -1,7 +1,9 @@
 import { prisma } from "./prisma";
 import { parseStatSchema } from "./stats";
 import { metricCatalog, type SnapshotRow } from "./series";
-import type { Fonte } from "./analista";
+import type { Fonte, PartidaOficial } from "./analista";
+import { listarPartidas } from "./partidas";
+import { rotularMapa } from "./cs2-labels";
 
 /**
  * O mesmo balde que a página do jogo carrega, para quem não é a página.
@@ -38,6 +40,8 @@ export async function carregarFonte(userId: string, appId: number): Promise<Font
   });
   if (!userGame) return null;
 
+  const partidasOficiais = appId === 730 ? await partidasOficiaisDe(userId) : [];
+
   const rows: SnapshotRow[] = userGame.snapshots.map((s) => ({
     id: s.id,
     capturedAt: s.capturedAt,
@@ -54,7 +58,28 @@ export async function carregarFonte(userId: string, appId: number): Promise<Font
     playtimeForeverMin: userGame.playtimeForeverMin,
     rows,
     catalog: metricCatalog(rows, parseStatSchema(userGame.game.statSchema)),
+    partidasOficiais,
   };
+}
+
+async function partidasOficiaisDe(userId: string): Promise<PartidaOficial[]> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { steamId: true } });
+  if (!user) return [];
+  const linhas = await listarPartidas(user.steamId, 30);
+  return linhas.map((p) => ({
+    jogadaEm: p.jogadaEm.toISOString(),
+    mapa: p.mapa ? rotularMapa(p.mapa) : null,
+    placar: `${p.placar[0]}-${p.placar[1]}`,
+    resultado: p.eu.venceu === null ? "empate" : p.eu.venceu ? "vitória" : "derrota",
+    duracaoMin: Math.round(p.duracaoS / 60),
+    kills: p.eu.kills,
+    assists: p.eu.assists,
+    deaths: p.eu.deaths,
+    kd: Number((p.eu.deaths ? p.eu.kills / p.eu.deaths : p.eu.kills).toFixed(2)),
+    hsPct: Number((p.eu.kills ? (p.eu.hs / p.eu.kills) * 100 : 0).toFixed(0)),
+    mvps: p.eu.mvps,
+    score: p.eu.score,
+  }));
 }
 
 export function coerce(value: unknown): Record<string, number> {

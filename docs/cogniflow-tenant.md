@@ -155,10 +155,10 @@ registrou.
 
 | view | params | devolve |
 |---|---|---|
-| `resumo` | — | período, painel (12 estatísticas: período × vitalício), leituras, contextos observados, grupos |
+| `resumo` | — | período, `partidasOficiaisNoPeriodo` (scoreboard de cada partida oficial dentro do período), painel (12 estatísticas: período × vitalício), leituras, contextos observados, grupos |
 | `metricas` | `grupo`, `limite` (≤200), `incluirParadas` | todas as métricas por round, período × vitalício, ordenadas por impacto |
 | `serie` | `metrica`*, `denominador`, `calculo` (delta/perHour/ratio/cumulative), `bucket` (raw/day/week/month), `pontos` (≤120) | pontos `{t, valor}` + vitalício |
-| `partidas` | `limite` (≤60) | intervalos com jogo, do mais recente: mapa, modo, placar, rounds, kills, deaths, kd, dano/round |
+| `partidas` | `limite` (≤60) | `oficiais` (partidas de matchmaking uma a uma, via share code + Game Coordinator: jogadaEm, mapa, placar, resultado, K/A/D, kd, hsPct, mvps, score) e `partidas` (intervalos entre coletas: mapa, modo, placar, rounds, kills, deaths, kd, dano/round) |
 | `mapas` | — | rounds e vitórias por mapa, período × vitalício (só pool antigo) |
 | `armas` | `minimoTiros` | kills, tiros, acertos, precisão por arma, período × vitalício |
 
@@ -225,11 +225,18 @@ não filtre por um que não está lá.
   cumulative; padrão ratio se houver denominador, senão delta), bucket
   (raw | day | week | month; padrão day), pontos (padrão 30, máx 120).
   Devolve pontos {t, valor} do mais antigo ao mais recente e vitalicio.
-- partidas: limite (padrão 15, máx 60). Cada intervalo com jogo, do mais
-  recente ao mais antigo: de, ate, mapa, modo, placar (quando o bot
-  observou), minutosJogados, rounds, partidas, vitorias, kills, deaths,
-  headshots, dano, mvps, kd, danoPorRound. Sem bot, uma linha é uma
-  sessão entre duas coletas, não uma partida.
+- partidas: limite (padrão 15, máx 60). Devolve dois blocos. `oficiais`:
+  partidas de matchmaking de verdade, uma a uma, com o scoreboard do Game
+  Coordinator (jogadaEm, mapa, placar, resultado vitória/derrota/empate,
+  duracaoMin, kills, assists, deaths, kd, hsPct, mvps, score) — só existe
+  para quem ligou o histórico de partidas; vazio caso contrário. `partidas`:
+  cada intervalo com jogo entre duas coletas, do mais recente ao mais
+  antigo: de, ate, mapa, modo, placar (quando o bot observou),
+  minutosJogados, rounds, partidas, vitorias, kills, deaths, headshots,
+  dano, mvps, kd, danoPorRound. Um intervalo pode somar mais de uma
+  partida oficial. O resumo já traz as oficiais do período em
+  partidasOficiaisNoPeriodo; prefira-as para falar de uma partida
+  específica.
 - mapas: rounds, roundsGanhos e taxaDeVitoria por mapa, periodo e
   vitalicio. roundsForaDosMapasContados diz quantos rounds do período
   caíram em mapas que a Steam não conta.

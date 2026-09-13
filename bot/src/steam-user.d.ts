@@ -56,6 +56,10 @@ declare module "steam-user" {
     logOn(details: LogOnDetails): void;
     logOff(): void;
     setPersona(state: number): void;
+    /** Diz à Steam que estamos "jogando" estes apps — é o que abre a sessão com o GC do CS2. */
+    gamesPlayed(apps: number[]): void;
+    /** Adiciona apps gratuitos à biblioteca da conta. Sem a licença, a Steam ignora o gamesPlayed. */
+    requestFreeLicense(apps: number[], callback: (err: Error | null, grantedPackages: unknown[], grantedApps: number[]) => void): void;
     addFriend(steamID: SteamID | string): void;
     getPersonas(
       steamIDs: (SteamID | string)[],
@@ -82,5 +86,7 @@ declare module "steam-user" {
     ): this;
     on(event: "friendRelationship", cb: (steamID: SteamID, relationship: number) => void): this;
     on(event: "user", cb: (steamID: SteamID, user: PersonaUser) => void): this;
+    on(event: "appOwnershipCached", cb: () => void): this;
+    on(event: "accountLimitations", cb: (limited: boolean, communityBanned: boolean, locked: boolean, canInviteFriends: boolean) => void): this;
   }
 }

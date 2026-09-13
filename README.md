@@ -181,6 +181,13 @@ O que ela **não** entrega, e que csstats.gg / csrep.gg / Leetify mostram:
 ADR, KAST, HLTV rating, clutches, entry duels e dados por round. Nada disso
 existe na Web API.
 
+O primeiro passo já está dado: **partidas oficiais, uma a uma**. Com o código
+de autenticação de histórico (que só a pessoa gera, numa página da Steam) e
+um share code, a Web API entrega a corrente de share codes; o bot pergunta ao
+Game Coordinator por cada um e recebe o scoreboard dos dez jogadores sem
+baixar demo (`src/lib/partidas.ts`, `bot/src/partidas.ts`). É o que a aba
+Partidas mostra. ADR, KAST e rating continuam pedindo a demo.
+
 Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:
 
 - [docs/dados-profundos.md](docs/dados-profundos.md) — o que cada caminho

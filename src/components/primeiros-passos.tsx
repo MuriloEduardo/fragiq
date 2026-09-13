@@ -1,28 +1,33 @@
-import { Check, Circle, ExternalLink, HelpCircle } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Check, Circle, ExternalLink, HelpCircle } from "lucide-react";
 import { BOT_STEAM_ID, perfilDoBot } from "@/lib/bot";
 import { SyncButton } from "./sync-button";
 import { cn } from "@/lib/utils";
 
 /**
- * Os três passos entre entrar e ter uma curva — com o estado de cada um.
+ * Os passos entre entrar e ter uma curva — com o estado de cada um.
  *
  * Quem acabou de logar vê uma tela quase vazia e não sabe se o site quebrou
  * ou se falta algo dele. Falta algo dele, quase sempre: "Detalhes do jogo"
  * privado na Steam (a API não lê nada), o bot ainda não é amigo (mapa e
  * modo não chegam) e só existe uma coleta (não há curva). Cada passo diz o
  * que fazer e conferimos sozinhos quando foi feito — a lista some quando
- * os três estão verdes.
+ * todos estão verdes. O quarto (partidas oficiais) é o que transforma
+ * "totais entre coletas" em "cada partida, com placar".
  */
 export async function PrimeirosPassos({
   statsVisiveis,
   botAmigo,
   coletas,
+  partidasAtivas,
 }: {
   /** A Steam devolveu estatísticas de CS2 (perfil e detalhes do jogo públicos). */
   statsVisiveis: boolean;
   /** null quando a lista de amigos é privada e não dá para conferir. */
   botAmigo: boolean | null;
   coletas: number;
+  /** A corrente de share codes está ligada (partidas oficiais, uma a uma). */
+  partidasAtivas: boolean;
 }) {
   const bot = await perfilDoBot();
   const passos = [
@@ -87,6 +92,21 @@ export async function PrimeirosPassos({
             : "Depois do passo 1, a primeira coleta entra na hora e a curva começa na partida seguinte.",
       acao: null,
     },
+    {
+      feito: partidasAtivas,
+      titulo: "Ligue as partidas oficiais",
+      texto: partidasAtivas
+        ? "Cada partida de matchmaking chega com o placar dos dez jogadores."
+        : "Dois códigos de uma página da Steam, colados uma vez, e cada partida chega com K/D, HS, MVPs e placar — não só o total. Só lê o histórico de partidas; nada da conta.",
+      acao: partidasAtivas ? null : (
+        <Link
+          href="/games/730/partidas"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-canvas transition hover:brightness-110"
+        >
+          Ativar partidas <ArrowRight className="size-3.5" />
+        </Link>
+      ),
+    },
   ];
 
   const pendentes = passos.filter((p) => !p.feito).length;
@@ -95,7 +115,7 @@ export async function PrimeirosPassos({
     <section className="rounded-2xl bg-surface p-5 ring-1 ring-line sm:p-6">
       <div className="flex items-baseline gap-3">
         <h2 className="hud">Primeiros passos</h2>
-        <span className="num text-xs text-ink-faint">{3 - pendentes} de 3</span>
+        <span className="num text-xs text-ink-faint">{passos.length - pendentes} de {passos.length}</span>
       </div>
       <ol className="mt-4 space-y-4">
         {passos.map((p, i) => (
