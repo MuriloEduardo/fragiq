@@ -105,6 +105,9 @@ async function runSync(
   context?: MatchContext,
 ): Promise<SyncResult> {
   const summary = await getPlayerSummary(steamId);
+  // 3 = público. Abaixo disso a Steam responde vazio para biblioteca e
+  // stats, e vazio não pode ser lido como "o jogo não tem stats".
+  const perfilPublico = summary?.communityvisibilitystate === 3;
   if (summary) {
     await prisma.user.update({
       where: { id: userId },
@@ -180,7 +183,7 @@ async function runSync(
     if (record && !record.supportsStats) continue; // já sabemos que não expõe stats.
 
     statCallsSpent++;
-    const outcome = await captureSnapshot(userId, steamId, game, context);
+    const outcome = await captureSnapshot(userId, steamId, game, perfilPublico, context);
     if (outcome === "created") snapshotsCreated++;
     if (outcome === "unchanged") unchanged.push(game.appid);
 
@@ -274,16 +277,25 @@ async function captureSnapshot(
   userId: string,
   steamId: string,
   game: OwnedGame,
+  perfilPublico: boolean,
   context?: MatchContext,
 ): Promise<"created" | "unchanged" | "skipped"> {
   const stats = await getUserStatsForGame(steamId, game.appid);
 
   if (!stats) {
-    // Marca para não tentarmos de novo em todo sync futuro, de nenhum usuário.
-    await prisma.game.update({
-      where: { appId: game.appid },
-      data: { supportsStats: false },
-    });
+    // Stats vazias têm duas causas que a Steam não distingue: o jogo não
+    // expõe stats, ou ESTE perfil está com "Detalhes do jogo" privado. A
+    // marca é global (vale para todo usuário), então só pode nascer da
+    // primeira. Medido em 13/09: o segundo usuário do site entrou com o
+    // perfil privado, o CS2 foi marcado como "sem stats" para todo mundo e
+    // nenhuma coleta de ninguém entrou por uma hora. O CS2 nunca é marcado —
+    // é o jogo do produto — e os demais só quando o perfil é público.
+    if (game.appid !== CS2_APPID && perfilPublico) {
+      await prisma.game.update({
+        where: { appId: game.appid },
+        data: { supportsStats: false },
+      });
+    }
     return "skipped";
   }
 
