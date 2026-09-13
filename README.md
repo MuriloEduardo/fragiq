@@ -222,6 +222,9 @@ src/app/
   api/cron/sync/              coleta agendada
   admin/                      painel de operação (ADMIN_STEAM_IDS)
   comunidade/                 quem participa, selo, feedback público
+  p/[steamId]/                perfil público (só o que a Steam já mostra)
+  p/[steamId]/vs/[outro]/     dois perfis lado a lado
+  amigos/                     amigos da Steam no FragIQ, pedidos, quem segue quem
   api/analises/               perguntas ao analista
   api/cogniflow/              callback e dados, assinados pelo cogniflow
 ```

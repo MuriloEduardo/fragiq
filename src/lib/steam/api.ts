@@ -187,3 +187,25 @@ export async function resolveVanityUrl(vanity: string): Promise<string | null> {
   );
   return data.response.success === 1 ? (data.response.steamid ?? null) : null;
 }
+
+/* --------------------------------- amigos ---------------------------------- */
+
+/**
+ * SteamIDs dos amigos. Lista vazia quando a lista de amigos é privada — a
+ * Steam responde 401 nesse caso, e "sem amigos visíveis" não é erro.
+ */
+export async function getFriendIds(steamId: string): Promise<string[]> {
+  try {
+    const data = await call(
+      "/ISteamUser/GetFriendList/v1/",
+      { steamid: steamId, relationship: "friend" },
+      z.object({
+        friendslist: z.object({ friends: z.array(z.object({ steamid: z.string() })) }).optional(),
+      }),
+    );
+    return (data.friendslist?.friends ?? []).map((f) => f.steamid);
+  } catch (err) {
+    if (err instanceof SteamApiError && err.status !== 403) return [];
+    throw err;
+  }
+}

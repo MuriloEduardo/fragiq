@@ -37,6 +37,8 @@ model User {
   feedback    Feedback[]
   analyses    Analysis[]
   participant Participant?
+  seguindo    Follow[]     @relation("seguidor")
+  seguidores  Follow[]     @relation("seguido")
 
   @@map("users")
 }
@@ -294,4 +296,34 @@ model Participant {
 
   @@index([createdAt])
   @@map("participants")
+}
+
+/// Ver a curva de outra pessoa exige que ela deixe.
+///
+/// Os números vitalícios são públicos na Steam; a série de coletas, as
+/// sessões e as leituras não são públicas em lugar nenhum. Então "seguir" é
+/// um pedido: fica PENDING até quem é seguido aceitar, e só a partir daí a
+/// página pública dessa pessoa mostra a curva para quem pediu.
+model Follow {
+  id String @id @default(cuid())
+
+  seguidorId String
+  seguidor   User   @relation("seguidor", fields: [seguidorId], references: [id], onDelete: Cascade)
+
+  seguidoId String
+  seguido   User   @relation("seguido", fields: [seguidoId], references: [id], onDelete: Cascade)
+
+  status FollowStatus @default(PENDING)
+
+  createdAt  DateTime  @default(now())
+  decididoEm DateTime?
+
+  @@unique([seguidorId, seguidoId])
+  @@index([seguidoId, status])
+  @@map("follows")
+}
+
+enum FollowStatus {
+  PENDING
+  ACCEPTED
 }
