@@ -71,6 +71,8 @@ export type ContextFilter = {
 };
 
 export type SnapshotRow = {
+  /** Presente quando a linha veio do banco; ausente em séries derivadas. */
+  id?: string;
   capturedAt: Date;
   playtimeForeverMin: number;
   metrics: Record<string, number>;

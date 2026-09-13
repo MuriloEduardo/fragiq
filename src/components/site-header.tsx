@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Gauge, LogOut, Megaphone, Users } from "lucide-react";
+import { Gauge, LogOut, Megaphone, ShieldCheck, Users } from "lucide-react";
 import { Selo } from "./selo";
 import { SyncButton } from "./sync-button";
 import { FeedbackButton } from "./feedback-button";
@@ -91,6 +91,15 @@ export function SiteHeader({ personaName, avatarUrl, lastSyncedAt, admin, selo }
             className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
           >
             <Megaphone className="size-4" />
+          </Link>
+
+          <Link
+            href="/seguranca"
+            aria-label="Segurança e dados"
+            title="Segurança e dados"
+            className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
+          >
+            <ShieldCheck className="size-4" />
           </Link>
 
           <FeedbackButton />

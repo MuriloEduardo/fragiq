@@ -225,6 +225,7 @@ src/app/
   p/[steamId]/                perfil público (só o que a Steam já mostra)
   p/[steamId]/vs/[outro]/     dois perfis lado a lado
   amigos/                     amigos da Steam no FragIQ, pedidos, quem segue quem
+  seguranca/                  o que lemos, guardamos e nunca tocamos; exportar e apagar
   api/analises/               perguntas ao analista
   api/cogniflow/              callback e dados, assinados pelo cogniflow
 ```

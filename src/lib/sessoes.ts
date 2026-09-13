@@ -10,6 +10,8 @@ import { rotularMapa, rotularModo } from "./cs2-labels";
  * nunca discordem.
  */
 export type Sessao = {
+  /** A coleta que fechou a sessão; é nela que mapa e modo vivem. */
+  snapshotId: string | null;
   de: Date;
   ate: Date;
   minutos: number;
@@ -38,6 +40,7 @@ export function listarSessoes(rows: SnapshotRow[], filter?: ContextFilter): Sess
     const headshots = d("total_kills_headshot");
     const dano = d("total_damage_done");
     return {
+      snapshotId: par.curr.id ?? null,
       de: par.prev.capturedAt,
       ate: par.curr.capturedAt,
       minutos: par.curr.playtimeForeverMin - par.prev.playtimeForeverMin,

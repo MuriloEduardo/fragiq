@@ -1,5 +1,6 @@
 import type { Sessao } from "@/lib/sessoes";
 import { formatarQuando } from "@/lib/sessoes";
+import { MarcarModo } from "./marcar-modo";
 import { cn } from "@/lib/utils";
 
 /**
@@ -73,6 +74,8 @@ export function SessaoHero({
             );
           })}
         </div>
+
+        {!sessao.modo && sessao.snapshotId && <MarcarModo snapshotId={sessao.snapshotId} />}
       </div>
     </section>
   );

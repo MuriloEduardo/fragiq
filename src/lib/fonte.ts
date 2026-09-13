@@ -25,6 +25,7 @@ export async function carregarFonte(userId: string, appId: number): Promise<Font
         orderBy: { capturedAt: "asc" },
         take: MAX_SNAPSHOTS,
         select: {
+          id: true,
           capturedAt: true,
           playtimeForeverMin: true,
           metrics: true,
@@ -38,6 +39,7 @@ export async function carregarFonte(userId: string, appId: number): Promise<Font
   if (!userGame) return null;
 
   const rows: SnapshotRow[] = userGame.snapshots.map((s) => ({
+    id: s.id,
     capturedAt: s.capturedAt,
     playtimeForeverMin: s.playtimeForeverMin,
     metrics: coerce(s.metrics),

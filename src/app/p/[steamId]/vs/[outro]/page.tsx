@@ -63,19 +63,55 @@ function Jogador({ nome, avatar, href, horas, lado }: { nome: string; avatar?: s
   );
 }
 
+/**
+ * Cada linha é um cabo de guerra: duas barras saem do centro, uma para cada
+ * lado, com comprimento proporcional à parte de cada um na soma. Quem está
+ * na frente fica em laranja. Não há eixo nem legenda porque o rótulo está
+ * no meio e o número na ponta — o gráfico só torna a diferença visível de
+ * longe, que é o que uma tabela de números não faz.
+ */
 function Bloco({ titulo, linhas }: { titulo: string; linhas: Linha[] }) {
   return (
     <section className="mt-8">
       <h2 className="hud">{titulo}</h2>
       <ol className="mt-3 divide-y divide-line-soft rounded-2xl bg-surface ring-1 ring-line">
-        {linhas.map((l) => (
-          <li key={l.rotulo} className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 py-3">
-            <span className={cn("num text-lg font-semibold", l.vencedor === 1 ? "text-accent" : l.vencedor === -1 ? "text-ink-muted" : "")}>{l.a}</span>
-            <span className="text-center text-xs text-ink-faint">{l.rotulo}</span>
-            <span className={cn("num text-right text-lg font-semibold", l.vencedor === -1 ? "text-accent" : l.vencedor === 1 ? "text-ink-muted" : "")}>{l.b}</span>
-          </li>
-        ))}
+        {linhas.map((l) => {
+          const [pa, pb] = proporcao(l.a, l.b);
+          return (
+            <li key={l.rotulo} className="px-5 py-3">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                <span className={cn("num text-lg font-semibold", l.vencedor === 1 ? "text-accent" : l.vencedor === -1 ? "text-ink-muted" : "")}>{l.a}</span>
+                <span className="text-center text-xs text-ink-faint">{l.rotulo}</span>
+                <span className={cn("num text-right text-lg font-semibold", l.vencedor === -1 ? "text-accent" : l.vencedor === 1 ? "text-ink-muted" : "")}>{l.b}</span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-1" aria-hidden>
+                <div className="flex justify-end">
+                  <div
+                    className={cn("h-1.5 rounded-l-full transition-[width]", l.vencedor === 1 ? "bg-accent" : "bg-line")}
+                    style={{ width: `${pa}%` }}
+                  />
+                </div>
+                <div>
+                  <div
+                    className={cn("h-1.5 rounded-r-full transition-[width]", l.vencedor === -1 ? "bg-accent" : "bg-line")}
+                    style={{ width: `${pb}%` }}
+                  />
+                </div>
+              </div>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );
+}
+
+/** Parte de cada lado na soma, em % da metade; empate é 50/50 e "—" é zero. */
+function proporcao(a: string, b: string): [number, number] {
+  const n = (v: string) => Number(v.replace(/\./g, "").replace(",", ".").replace("%", ""));
+  const na = n(a);
+  const nb = n(b);
+  if (!Number.isFinite(na) || !Number.isFinite(nb) || na + nb <= 0) return [0, 0];
+  const total = na + nb;
+  return [Math.max(4, (na / total) * 100), Math.max(4, (nb / total) * 100)];
 }

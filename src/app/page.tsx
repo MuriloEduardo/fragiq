@@ -60,6 +60,7 @@ function TopBar() {
           <a href="#tese" className="transition hover:text-ink">A tese</a>
           <a href="#comparacao" className="transition hover:text-ink">Comparação</a>
           <Link href="/comunidade" className="transition hover:text-ink">Comunidade</Link>
+          <Link href="/seguranca" className="transition hover:text-ink">Segurança</Link>
         </nav>
         <a
           href="/api/auth/steam"
@@ -290,7 +291,9 @@ function Footer() {
       <span className="font-mono font-bold text-ink-muted">
         Frag<span className="text-accent">IQ</span>
       </span>
-      <span>Só leitura do que já é público no seu perfil. Nada na sua conta é alterado.</span>
+      <Link href="/seguranca" className="transition hover:text-ink">
+        Só leitura do que já é público no seu perfil. Nada na sua conta é alterado. Como →
+      </Link>
       <span className="ml-auto">beta · gratuito</span>
     </footer>
   );
