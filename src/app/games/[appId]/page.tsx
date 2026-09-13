@@ -1,201 +1,73 @@
-import Image from "next/image";
-import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
-import { gameHeaderUrl } from "@/lib/steam/api";
-import { formatPlaytime, parseStatSchema } from "@/lib/stats";
-import { gaugesLookStale, metricCatalog, type SnapshotRow } from "@/lib/series";
-import { SiteHeader } from "@/components/site-header";
-import { GameAnalysis } from "@/components/game-analysis";
-import { CollectionStatus } from "@/components/collection-status";
-import { CounterScope } from "@/components/counter-scope";
-import { Analista } from "@/components/analista";
+import { notFound } from "next/navigation";
+import { requireSession } from "@/lib/session";
+import { carregarFonte } from "@/lib/fonte";
 import { cogniflow } from "@/lib/env";
 import { listarAnalises, sessaoSemAnalise } from "@/lib/analises";
-import { isAdmin } from "@/lib/admin";
+import { lerSerie } from "@/lib/leituras";
+import { ultimaSessao, vitaliciosDoHero } from "@/lib/sessoes";
+import { CS2_PANEL } from "@/lib/cs2-panel";
+import { SessaoHero } from "@/components/sessao-hero";
+import { Analista } from "@/components/analista";
+import { Leituras } from "@/components/leituras";
+import { StatPanel } from "@/components/stat-panel";
+import { CollectionStatus } from "@/components/collection-status";
+import { Secao } from "@/components/secao";
+import { SemDados } from "@/components/sem-dados";
 
 export const dynamic = "force-dynamic";
 
-// Teto de pontos carregados para o cliente. A análise recalcula tudo no
-// browser; mandar 5 anos de coletas de uma vez inflaria o payload sem ganho.
-const MAX_SNAPSHOTS = 500;
-
-export default async function GamePage({
-  params,
-}: {
-  params: Promise<{ appId: string }>;
-}) {
-  const session = await getSession();
-  if (!session) redirect("/");
-
+/**
+ * Resumo: "como foi?" em uma tela.
+ *
+ * A última sessão em três números, a análise que chegou sozinha, as quatro
+ * leituras que mais pesam e os seis tiles principais. Tudo o mais tem aba
+ * própria — e cada tile leva ao seu gráfico.
+ */
+export default async function ResumoPage({ params }: { params: Promise<{ appId: string }> }) {
+  const session = await requireSession();
   const appId = Number((await params).appId);
-  if (!Number.isInteger(appId)) notFound();
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { personaName: true, avatarUrl: true, lastSyncedAt: true },
-  });
-  if (!user) redirect("/");
-
-  const userGame = await prisma.userGame.findUnique({
-    where: { userId_gameAppId: { userId: session.userId, gameAppId: appId } },
-    select: {
-      playtimeForeverMin: true,
-      playtimeTwoWeeksMin: true,
-      lastPlayedAt: true,
-      game: { select: { name: true, statSchema: true } },
-      snapshots: {
-        orderBy: { capturedAt: "asc" },
-        take: MAX_SNAPSHOTS,
-        select: {
-          capturedAt: true,
-          playtimeForeverMin: true,
-          metrics: true,
-          matchMap: true,
-          matchMode: true,
-        },
-      },
-    },
-  });
-  // Um usuário novo cujo perfil está restrito, ou que ainda não jogou CS2,
-  // cairia num 404 — o que parece defeito do site em vez de estado do dado.
-  if (!userGame) {
+  const fonte = await carregarFonte(session.userId, appId);
+  if (!fonte) {
     if (appId !== 730) notFound();
-    return (
-      <SemDados
-        personaName={user.personaName}
-        avatarUrl={user.avatarUrl}
-        lastSyncedAt={user.lastSyncedAt}
-      />
-    );
+    return <SemDados />;
   }
+  const { rows } = fonte;
 
-  const schema = parseStatSchema(userGame.game.statSchema);
-
-  const rows: SnapshotRow[] = userGame.snapshots.map((s) => ({
-    capturedAt: s.capturedAt,
-    playtimeForeverMin: s.playtimeForeverMin,
-    metrics: coerce(s.metrics),
-    matchMap: s.matchMap,
-    matchMode: s.matchMode,
-  }));
-
-  const catalog = metricCatalog(rows, schema);
-
-  // O analista só aparece com o cogniflow configurado e com série para ler:
-  // perguntar sobre uma coleta única é pedir uma resposta que não existe.
+  const sessao = ultimaSessao(rows);
+  const leituras = lerSerie(rows).filter((l) => l.id !== "modo" && l.id !== "mapas");
   const analista =
     cogniflow() && rows.length >= 2
-      ? await Promise.all([
-          listarAnalises(session.userId, appId),
-          sessaoSemAnalise(session.userId, appId),
-        ])
+      ? await Promise.all([listarAnalises(session.userId, appId), sessaoSemAnalise(session.userId, appId)])
       : null;
 
-  // Datas viram string na fronteira Server -> Client Component.
-
   return (
     <>
-      <SiteHeader {...user} admin={isAdmin(session.steamId)} />
-
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-
-        <header className="mt-4 flex flex-wrap items-end gap-4 border-b border-line pb-6 sm:gap-5">
-          <Image
-            src={gameHeaderUrl(appId)}
-            alt=""
-            width={184}
-            height={86}
-            className="rounded-lg border border-line"
-            unoptimized
-          />
-
-          {/* w-full no celular força a imagem para a linha de cima, em vez de
-              espremer o título numa coluna de ~150px ao lado dela. */}
-          <div className="w-full min-w-0 sm:w-auto sm:flex-1">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              {userGame.game.name}
-            </h1>
-            <p className="tnum mt-1 text-sm text-ink-muted">
-              {formatPlaytime(userGame.playtimeForeverMin)} no total
-              {userGame.playtimeTwoWeeksMin > 0 && (
-                <> · {formatPlaytime(userGame.playtimeTwoWeeksMin)} nas últimas 2 semanas</>
-              )}
-              {" · "}
-              {rows.length} coleta{rows.length === 1 ? "" : "s"}
-              {" · "}
-              {catalog.length} métricas disponíveis
-            </p>
-          </div>
-        </header>
-
-        <div className="mt-6 space-y-3">
+      {rows.length < 2 && (
+        <div className="mb-6">
           <CollectionStatus snapshotCount={rows.length} />
-          <CounterScope appId={appId} gaugesStale={gaugesLookStale(rows)} />
         </div>
+      )}
 
-        {analista && (
-          <div className="mt-10">
-            <Analista appId={appId} iniciais={analista[0]} sessaoSemAnalise={analista[1]} />
-          </div>
-        )}
+      {sessao && <SessaoHero sessao={sessao} vitalicio={vitaliciosDoHero(rows)} />}
 
-        <div className="mt-10">
-          <GameAnalysis
-            appId={appId}
-            parsed={rows}
-            catalog={catalog}
-          />
-        </div>
-      </main>
-    </>
-  );
-}
+      {analista && (
+        <Secao titulo="Análise" href={`/games/${appId}/analista`} acao="conversar">
+          <Analista appId={appId} iniciais={analista[0]} sessaoSemAnalise={analista[1]} modo="resumo" />
+        </Secao>
+      )}
 
-function coerce(value: unknown): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (value && typeof value === "object") {
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
-    }
-  }
-  return out;
-}
+      {leituras.length > 0 && (
+        <Secao titulo="Leituras">
+          <Leituras leituras={leituras} limite={4} />
+        </Secao>
+      )}
 
-function SemDados({
-  personaName,
-  avatarUrl,
-  lastSyncedAt,
-}: {
-  personaName: string;
-  avatarUrl: string | null;
-  lastSyncedAt: Date | null;
-}) {
-  return (
-    <>
-      <SiteHeader
-        personaName={personaName}
-        avatarUrl={avatarUrl}
-        lastSyncedAt={lastSyncedAt}
-      />
-      <main className="mx-auto max-w-5xl px-6 py-16">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Ainda não encontramos seu Counter-Strike 2
-        </h1>
-        <p className="mt-4 max-w-xl leading-relaxed text-ink-muted">
-          Isso acontece quando o perfil da Steam está restrito. Em{" "}
-          <strong className="font-medium text-ink">
-            Perfil → Editar perfil → Privacidade
-          </strong>
-          , deixe <strong className="font-medium text-ink">Detalhes do jogo</strong>{" "}
-          como público — é o que permite ler suas estatísticas. Depois clique em
-          Sincronizar aqui em cima.
-        </p>
-        <p className="mt-4 max-w-xl text-sm text-ink-faint">
-          Se o perfil já estiver público e a mensagem continuar, pode ser que a
-          conta ainda não tenha partidas registradas de CS2.
-        </p>
-      </main>
+      {appId === 730 && (
+        <Secao titulo="Estatísticas" href={`/games/${appId}/estatisticas`} acao="todas">
+          <StatPanel stats={CS2_PANEL} snapshots={rows} appId={appId} limite={6} />
+        </Secao>
+      )}
     </>
   );
 }

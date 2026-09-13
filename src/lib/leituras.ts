@@ -148,7 +148,7 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
     const melhor = kdVar > 0;
     leituras.push({
       id: "kd",
-      numero: num(kd),
+      numero: kd.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       texto:
         `K/D no período contra ${num(kdVida)} de vitalício — ${pct(kdVar)}. ` +
         (Math.abs(kdVar) < 0.1

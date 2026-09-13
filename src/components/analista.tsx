@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MessageSquarePlus, Send, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { MessageSquarePlus, Send } from "lucide-react";
 import type { AnaliseDTO } from "@/lib/analises";
 import { cn } from "@/lib/utils";
 
@@ -28,11 +29,14 @@ export function Analista({
   appId,
   iniciais,
   sessaoSemAnalise,
+  modo = "completo",
 }: {
   appId: number;
   iniciais: AnaliseDTO[];
   /** A sessão mais recente ainda não tem análise: pedir ao montar. */
   sessaoSemAnalise: boolean;
+  /** "resumo" mostra só a análise da sessão, com um atalho para perguntar. */
+  modo?: "resumo" | "completo";
 }) {
   const [analises, setAnalises] = useState<AnaliseDTO[]>(iniciais);
   const [pergunta, setPergunta] = useState("");
@@ -112,16 +116,8 @@ export function Analista({
   const aguardandoSessao = !sessao && sessaoSemAnalise;
 
   return (
-    <section>
-      <h2 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-ink-muted uppercase">
-        <Sparkles className="size-4 text-accent" aria-hidden />
-        Análise da última sessão
-      </h2>
-      <p className="mt-1 text-sm text-ink-faint">
-        Chega sozinha a cada sessão nova, lendo a mesma série desta página.
-      </p>
-
-      <div className="mt-4 rounded-xl border border-line bg-surface p-4">
+    <div>
+      <div className="rounded-2xl bg-surface p-5 ring-1 ring-line">
         {sessao ? (
           <Corpo analise={sessao} />
         ) : aguardandoSessao ? (
@@ -134,61 +130,73 @@ export function Analista({
         )}
       </div>
 
-      {perguntas.length > 0 && (
-        <ol className="mt-3 space-y-3">
-          {perguntas.map((a) => (
-            <li key={a.id} className="rounded-xl border border-line bg-surface p-4">
-              <p className="text-sm font-medium">{a.question}</p>
-              <div className="mt-3 border-t border-line-soft pt-3">
-                <Corpo analise={a} />
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {perguntando ? (
-        <form onSubmit={enviar} className="mt-3 rounded-xl border border-line bg-surface p-3">
-          <textarea
-            ref={campo}
-            value={pergunta}
-            onChange={(e) => setPergunta(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) enviar();
-            }}
-            rows={2}
-            maxLength={1000}
-            autoFocus
-            placeholder="Ex.: e se eu olhar só o competitivo? A AWP está melhorando?"
-            className="w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none transition focus:border-accent/50"
-          />
-          <div className="mt-2 flex items-center gap-3">
-            {erro && <p className="text-sm text-danger">{erro}</p>}
-            <button
-              type="submit"
-              disabled={estado === "enviando" || emAberto || pergunta.trim().length < 4}
-              className={cn(
-                "ml-auto inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-canvas transition",
-                "disabled:cursor-not-allowed disabled:opacity-40",
-                estado !== "enviando" && "hover:brightness-110",
-              )}
-            >
-              <Send className="size-3.5" aria-hidden />
-              {estado === "enviando" ? "Enviando…" : emAberto ? "Aguardando…" : "Perguntar"}
-            </button>
-          </div>
-        </form>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setPerguntando(true)}
+      {modo === "resumo" ? (
+        <Link
+          href={`/games/${appId}/analista`}
           className="mt-3 inline-flex items-center gap-2 text-sm text-ink-faint transition hover:text-ink"
         >
           <MessageSquarePlus className="size-4" aria-hidden />
           Perguntar algo sobre esta sessão
-        </button>
+        </Link>
+      ) : (
+        <>
+          {perguntando ? (
+            <form onSubmit={enviar} className="mt-3 rounded-2xl bg-surface p-3 ring-1 ring-line">
+              <textarea
+                ref={campo}
+                value={pergunta}
+                onChange={(e) => setPergunta(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) enviar();
+                }}
+                rows={2}
+                maxLength={1000}
+                autoFocus
+                placeholder="Ex.: e se eu olhar só o competitivo? A AWP está melhorando?"
+                className="w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none transition focus:border-accent/50"
+              />
+              <div className="mt-2 flex items-center gap-3">
+                {erro && <p className="text-sm text-danger">{erro}</p>}
+                <button
+                  type="submit"
+                  disabled={estado === "enviando" || emAberto || pergunta.trim().length < 4}
+                  className={cn(
+                    "ml-auto inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-canvas transition",
+                    "disabled:cursor-not-allowed disabled:opacity-40",
+                    estado !== "enviando" && "hover:brightness-110",
+                  )}
+                >
+                  <Send className="size-3.5" aria-hidden />
+                  {estado === "enviando" ? "Enviando…" : emAberto ? "Aguardando…" : "Perguntar"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPerguntando(true)}
+              className="mt-3 inline-flex items-center gap-2 text-sm text-ink-faint transition hover:text-ink"
+            >
+              <MessageSquarePlus className="size-4" aria-hidden />
+              Perguntar algo sobre esta sessão
+            </button>
+          )}
+
+          {perguntas.length > 0 && (
+            <ol className="mt-4 space-y-3">
+              {perguntas.map((a) => (
+                <li key={a.id} className="rounded-2xl bg-surface p-5 ring-1 ring-line">
+                  <p className="text-sm font-medium">{a.question}</p>
+                  <div className="mt-3 border-t border-line-soft pt-3">
+                    <Corpo analise={a} />
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
       )}
-    </section>
+    </div>
   );
 }
 

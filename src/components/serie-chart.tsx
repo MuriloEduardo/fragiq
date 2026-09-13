@@ -108,9 +108,9 @@ export function SerieChart({ points, baseline, formatar, cor = "var(--accent)" }
             strokeDasharray="4 4"
           />
           <text
-            x={W - M.right}
+            x={M.left + 4}
             y={y(baseline) - 6}
-            textAnchor="end"
+            textAnchor="start"
             fontSize="11"
             fill="var(--ink-faint)"
           >
@@ -119,7 +119,15 @@ export function SerieChart({ points, baseline, formatar, cor = "var(--accent)" }
         </>
       )}
 
-      <path d={d} fill="none" stroke={cor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={d}
+        fill="none"
+        stroke={cor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="tracar"
+      />
 
       {points.map((p, i) => (
         <g key={p.t}>

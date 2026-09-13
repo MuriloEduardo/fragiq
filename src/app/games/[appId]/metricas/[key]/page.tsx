@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireSession } from "@/lib/session";
 import { parseStatSchema } from "@/lib/stats";
 import {
   buildSeries,
@@ -15,7 +15,6 @@ import {
   type SeriesSpec,
   type SnapshotRow,
 } from "@/lib/series";
-import { SiteHeader } from "@/components/site-header";
 import { SerieChart } from "@/components/serie-chart";
 
 export const dynamic = "force-dynamic";
@@ -37,19 +36,12 @@ export default async function MetricaPage({
 }: {
   params: Promise<{ appId: string; key: string }>;
 }) {
-  const session = await getSession();
-  if (!session) redirect("/");
+  const session = await requireSession();
 
   const { appId: appIdRaw, key: keyRaw } = await params;
   const appId = Number(appIdRaw);
   const key = decodeURIComponent(keyRaw);
   if (!Number.isInteger(appId)) notFound();
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { personaName: true, avatarUrl: true, lastSyncedAt: true },
-  });
-  if (!user) redirect("/");
 
   const userGame = await prisma.userGame.findUnique({
     where: { userId_gameAppId: { userId: session.userId, gameAppId: appId } },
@@ -110,21 +102,18 @@ export default async function MetricaPage({
 
   return (
     <>
-      <SiteHeader {...user} />
-
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <div className="max-w-4xl">
         <Link
-          href={`/games/${appId}`}
+          href={`/games/${appId}/metricas`}
           className="inline-flex items-center gap-1.5 text-sm text-ink-muted transition hover:text-accent"
         >
           <ArrowLeft className="size-4" />
-          {userGame.game.name}
+          Métricas
         </Link>
 
-        <header className="mt-4 border-b border-line pb-5">
-          <p className="text-xs tracking-wide text-ink-faint uppercase">{groupOf(key)}</p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">{label}</h1>
-          <p className="mt-1 font-mono text-xs text-ink-faint">{key}</p>
+        <header className="mt-4">
+          <p className="hud">{groupOf(key)} · {key}</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">{label}</h2>
         </header>
 
         <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -145,46 +134,26 @@ export default async function MetricaPage({
         </dl>
 
         <section className="mt-8">
-          <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
-            {porRound ? "Taxa por round" : "Por período"}
-          </h2>
-          <p className="mt-1 text-sm text-ink-faint">
-            {porRound
-              ? "Cada ponto é o que aconteceu entre duas coletas, dividido pelos rounds do intervalo. É a forma de comparar um período com o seu vitalício."
-              : "Cada ponto é o que aconteceu entre duas coletas."}
-          </p>
-          <div className="mt-3 rounded-xl border border-line bg-surface p-4">
+          <h3 className="hud">{porRound ? "Taxa por round" : "Por período"}</h3>
+          <div className="mt-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
             <SerieChart points={taxa} baseline={vitalicio} formatar={(v) => fmt(v)} />
           </div>
         </section>
 
         <section className="mt-8">
-          <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
-            Acumulado
-          </h2>
-          <p className="mt-1 text-sm text-ink-faint">
-            O número que a Steam realmente guarda: o total desde sempre. Tudo
-            acima é derivado da diferença entre dois pontos desta linha.
-          </p>
-          <div className="mt-3 rounded-xl border border-line bg-surface p-4">
+          <h3 className="hud">Acumulado</h3>
+          <div className="mt-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
             <SerieChart
               points={acumulado}
               formatar={(v) => fmt(v, 0)}
-              cor="var(--ct)"
+              cor="var(--side-ct)"
             />
           </div>
         </section>
 
         <section className="mt-8">
-          <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">
-            Coleta a coleta
-          </h2>
-          <p className="mt-1 text-sm text-ink-faint">
-            A conta aberta. Coletas sem linha de delta são as descartadas por
-            leitura atrasada da Steam — contador vitalício que veio menor que o
-            anterior.
-          </p>
-          <div className="mt-3 overflow-hidden rounded-xl border border-line bg-surface">
+          <h3 className="hud">Coleta a coleta</h3>
+          <div className="mt-3 overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
             {acumulado
               .slice()
               .reverse()
@@ -217,7 +186,7 @@ export default async function MetricaPage({
             <span>· {porRound ? "por round" : "no período"}</span>
           </p>
         </section>
-      </main>
+      </div>
     </>
   );
 }

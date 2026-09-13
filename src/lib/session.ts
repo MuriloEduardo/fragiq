@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "./env";
 
@@ -48,4 +49,14 @@ export async function getSession(): Promise<SessionPayload | null> {
 
 export async function destroySession() {
   (await cookies()).delete(COOKIE);
+}
+
+/**
+ * Sessão ou redirect para a landing. O layout já redireciona, mas layout e
+ * página renderizam em paralelo — a página não pode contar com ele.
+ */
+export async function requireSession(): Promise<SessionPayload> {
+  const session = await getSession();
+  if (!session) redirect("/");
+  return session;
 }

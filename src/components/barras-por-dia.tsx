@@ -69,7 +69,7 @@ export function BarrasPorDia({ pontos, titulo }: { pontos: PontoDia[]; titulo: s
                   {p.valor}
                 </text>
               )}
-              {(i === 0 || i === ultimo || i % 7 === 0) && (
+              {(ultimo - i) % 7 === 0 && (
                 <text
                   x={x + (largura - GAP) / 2}
                   y={H - 6}

@@ -42,18 +42,12 @@ export function MetricTable({ linhas, appId }: { linhas: LinhaMetrica[]; appId: 
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder={`Filtrar ${linhas.length} métricas — arma, mapa, granada…`}
-          className="min-h-11 w-full rounded-xl border border-line bg-surface pr-3 pl-9 text-sm text-ink placeholder:text-ink-faint focus:border-accent/50 focus:outline-none"
+          placeholder={`Buscar entre ${linhas.length} métricas`}
+          className="min-h-11 w-full rounded-xl bg-surface pr-3 pl-9 text-sm text-ink ring-1 ring-line placeholder:text-ink-faint focus:ring-accent/50 focus:outline-none"
         />
       </label>
 
-      <p className="mt-2 text-xs text-ink-faint">
-        Ordenadas pelo que mais pesou: quantos eventos a mais, ou a menos, do
-        que o seu normal previa. Contadores viram taxa por round, que é o que
-        permite comparar um período com uma vida inteira.
-      </p>
-
-      <div className="mt-3 overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="mt-3 overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
         {filtradas.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-ink-faint">
             Nenhuma métrica com esse nome.
@@ -72,7 +66,7 @@ function Linha({ l, appId }: { l: LinhaMetrica; appId: number }) {
   return (
     <Link
       href={`/games/${appId}/metricas/${encodeURIComponent(l.key)}`}
-      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line px-4 py-2.5 transition last:border-b-0 hover:bg-surface-2"
+      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line-soft px-4 py-2.5 transition last:border-b-0 hover:bg-surface-2"
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm">{l.label}</p>

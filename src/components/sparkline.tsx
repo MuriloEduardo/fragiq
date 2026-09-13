@@ -68,7 +68,7 @@ export function Sparkline({ values, baseline, color = "var(--accent)", className
 
       <path d={d} fill="none" stroke={color} strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke" />
+            vectorEffect="non-scaling-stroke" className="tracar" />
       {/*
         O último ponto ancora a leitura no valor atual.
 

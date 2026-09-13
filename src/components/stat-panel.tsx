@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import {
   buildSeries,
   lifetimeValue,
@@ -11,12 +13,11 @@ import { Sparkline } from "./sparkline";
 import { cn } from "@/lib/utils";
 
 /**
- * Um tile fixo por estatística, todos visíveis de uma vez.
+ * Um tile por estatística, e cada tile é a porta para o gráfico inteiro.
  *
- * O explorador sozinho obrigava a escolher uma métrica por vez, e com poucas
- * coletas todo gráfico saía idêntico — o eixo auto-escala em torno de um
- * ponto único. Aqui a leitura é o número, e a linha é contexto: é o que a
- * forma pede quando o dado é "um valor atual mais tendência".
+ * O número é o conteúdo; a linha é contexto; a página própria é onde se
+ * olha de perto. Não há legenda nem explicação dentro do tile — o rótulo,
+ * o valor, o vitalício e a distância dele dizem tudo que cabe num olhar.
  */
 
 export type PanelStat = {
@@ -32,14 +33,14 @@ type Props = {
   stats: PanelStat[];
   snapshots: SnapshotRow[];
   filter?: ContextFilter;
+  appId: number;
+  /** Quantos tiles mostrar; o resto fica para a aba Estatísticas. */
+  limite?: number;
 };
 
-export function StatPanel({ stats, snapshots, filter }: Props) {
+export function StatPanel({ stats, snapshots, filter, appId, limite }: Props) {
   const tiles = stats.map((stat) => {
     const spec: SeriesSpec = { ...stat.spec, id: stat.key, filter };
-    // "raw": cada coleta é um ponto. Agrupar por dia colapsaria justamente a
-    // granularidade por partida que a coleta frequente produz — e um tile
-    // quer mostrar movimento, não uma média diária.
     const points = buildSeries(snapshots, spec, "raw");
     return {
       stat,
@@ -49,21 +50,24 @@ export function StatPanel({ stats, snapshots, filter }: Props) {
     };
   });
 
-  const utilizaveis = tiles.filter((t) => t.current !== null || t.lifetime !== null);
+  const utilizaveis = tiles
+    .filter((t) => t.current !== null || t.lifetime !== null)
+    .slice(0, limite ?? tiles.length);
 
   if (utilizaveis.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-line px-6 py-8 text-center text-sm text-ink-faint">
-        Nenhuma destas estatísticas está disponível para este jogo ainda.
+      <p className="rounded-2xl border border-dashed border-line px-6 py-8 text-center text-sm text-ink-faint">
+        Nenhuma destas estatísticas está disponível ainda.
       </p>
     );
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {utilizaveis.map(({ stat, values, current, lifetime }) => (
         <Tile
           key={stat.key}
+          appId={appId}
           stat={stat}
           values={values}
           current={current}
@@ -75,11 +79,13 @@ export function StatPanel({ stats, snapshots, filter }: Props) {
 }
 
 function Tile({
+  appId,
   stat,
   values,
   current,
   lifetime,
 }: {
+  appId: number;
   stat: PanelStat;
   values: number[];
   current: number | null;
@@ -91,43 +97,38 @@ function Tile({
       maximumFractionDigits: stat.decimals,
     }) + (stat.unit ?? "");
 
-  // Sem valor de período ainda, o vitalício é o que há de real para mostrar.
   const principal = current ?? lifetime;
   const ehVitalicio = current === null && lifetime !== null;
-
   const variacao =
     current !== null && lifetime !== null && lifetime !== 0
       ? (current - lifetime) / Math.abs(lifetime)
       : null;
+  const sobe = variacao !== null && variacao > 0.005;
 
   return (
-    <div className="rounded-xl border border-line bg-surface p-4 text-left">
-      <p className="text-xs leading-snug text-ink-muted">{stat.label}</p>
+    <Link
+      href={`/games/${appId}/painel/${stat.key}`}
+      className="group relative rounded-2xl bg-surface p-5 ring-1 ring-line transition hover:ring-accent/50"
+    >
+      <ArrowUpRight
+        className="absolute top-4 right-4 size-4 text-ink-faint opacity-0 transition group-hover:opacity-100"
+        aria-hidden
+      />
+      <p className="hud">{stat.label}</p>
 
-      <p className="tnum mt-1.5 text-2xl font-semibold">
-        {principal === null ? (
-          <span className="text-base font-normal text-ink-faint">—</span>
-        ) : (
-          fmt(principal)
-        )}
+      <p className="num mt-2 text-3xl font-semibold">
+        {principal === null ? <span className="text-ink-faint">—</span> : fmt(principal)}
       </p>
 
-      <div className="mt-1 flex min-h-4 items-baseline gap-2">
+      <div className="num mt-1 flex min-h-4 items-baseline gap-2 text-xs">
         {ehVitalicio ? (
-          <span className="text-[11px] text-ink-faint">vitalício</span>
+          <span className="text-ink-faint">vitalício</span>
         ) : lifetime !== null ? (
           <>
-            <span className="tnum text-[11px] text-ink-faint">
-              vitalício {fmt(lifetime)}
-            </span>
+            <span className="text-ink-faint">{fmt(lifetime)}</span>
             {variacao !== null && Math.abs(variacao) >= 0.005 && (
-              <span
-                className={cn(
-                  "tnum text-[11px] font-medium",
-                  variacao > 0 ? "text-accent" : "text-ink-muted",
-                )}
-              >
-                {variacao > 0 ? "+" : ""}
+              <span className={cn("font-medium", sobe ? "text-accent" : "text-ink-muted")}>
+                {sobe ? "+" : ""}
                 {(variacao * 100).toFixed(0)}%
               </span>
             )}
@@ -135,17 +136,13 @@ function Tile({
         ) : null}
       </div>
 
-      <div className="mt-3 h-8">
+      <div className="mt-4 h-8">
         {values.length >= 2 ? (
           <Sparkline values={values} baseline={lifetime} className="h-8 w-full" />
         ) : (
-          <div className="flex h-8 items-center text-[11px] text-ink-faint">
-            {values.length === 1
-              ? "1 período — a linha aparece na próxima coleta"
-              : "aguardando a segunda coleta"}
-          </div>
+          <div className="h-8 border-b border-dashed border-line" />
         )}
       </div>
-    </div>
+    </Link>
   );
 }

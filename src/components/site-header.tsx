@@ -25,7 +25,7 @@ type Props = {
  */
 export function SiteHeader({ personaName, avatarUrl, lastSyncedAt, admin }: Props) {
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b border-line bg-canvas/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 sm:flex-nowrap sm:gap-x-4 sm:px-6 sm:py-3">
         <Link
           href="/cs2"

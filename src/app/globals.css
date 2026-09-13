@@ -19,9 +19,12 @@
   --color-danger: var(--danger);
   --color-warn: var(--warn);
   --color-steam: var(--steam);
+  --color-accent-glow: var(--accent-glow);
 
-  --color-ct: var(--ct);
-  --color-t: var(--t);
+  /* Lados do CS2. Não se chamam `ct` e `t` no tema: `border-t` viraria
+     "borda cor do lado terrorista" em vez de "borda em cima" — aconteceu. */
+  --color-side-ct: var(--side-ct);
+  --color-side-t: var(--side-t);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -30,71 +33,37 @@
 /* Claro é o padrão para o HTML servido antes de qualquer JS: se a primeira
    pintura for escura e o sistema pedir claro, o usuário vê um flash. */
 :root {
-  /* A cor da marca é o ambiente, não um detalhe.
-     Antes o fundo era neutro e o laranja aparecia só em números e ícones —
-     um site correto que poderia ser de qualquer coisa. Aqui o âmbar do CS2
-     é o próprio papel: poeira de mapa no claro, âmbar profundo no escuro. */
-  --canvas: #eee0c8;
-  --surface: #fdf7ee;
-  --surface-2: #e5d5b8;
-  --line: #d3bc98;
-  --line-soft: #e5d5b8;
+  /* Um tema só, escuro.
+     O produto fala com quem joga CS2: gente que passa a noite em telas
+     escuras e reconhece um HUD à distância. Dois temas dobravam o trabalho
+     de desenho e diluíam a identidade; o claro foi removido. Grafite frio,
+     não preto — o preto puro faz o laranja vibrar demais e cansa. */
+  --canvas: #0b0d10;
+  --surface: #13161a;
+  --surface-2: #1a1e24;
+  --line: #262b32;
+  --line-soft: #1e2228;
 
-  /* Tinta quente. Cinza azulado sobre areia lê como sujeira, não como texto. */
-  --ink: #221c12;
-  --ink-muted: #5c503c;
-  --ink-faint: #877961;
+  --ink: #eef0f3;
+  --ink-muted: #a3a9b3;
+  --ink-faint: #7d8590;
 
-  /* O acento precisa se destacar de um fundo que já é da mesma família, daí
-     ser bem mais escuro que o âmbar do modo escuro. Medido: 4,92:1 sobre
-     --surface, 4,63:1 sobre --canvas e 4,73:1 sobre accent-soft. */
-  --accent: #9c4809;
-  --accent-soft: #fbeed6;
-  --danger: #9c1d15;
-  /* Ocre escuro: com o ambiente âmbar, um aviso âmbar desaparece dentro do
-     próprio fundo. Este fica 1,4x mais escuro que o acento, que é o que
-     permite distinguir os dois sem depender só do ícone. */
-  --warn: #5e4700;
-  --steam: #0e6ba8;
+  /* A marca é luz, não fundo: aparece onde há informação — o valor que
+     subiu, a linha do gráfico, a aba ativa. Medido: 6,2:1 sobre --surface. */
+  --accent: #ff6b3d;
+  --accent-soft: #33200f;
+  --accent-glow: rgba(255, 107, 61, 0.22);
+  --danger: #ff7b6e;
+  --warn: #e8c25a;
+  --steam: #5db1f0;
 
-  --ct: #265f9e;
-  --t: #6f5322;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Âmbar profundo, não preto nem ardósia.
-       Três tentativas anteriores ficam no histórico porque o erro se repetiu:
-       #0a0d12, #12171f, #131a23 e #222d3c — as primeiras eram preto demais e
-       a última, neutra demais. O problema não era só luminância, era ausência
-       de cor: o fundo não pertencia a nada. Agora ele é a marca. */
-    --canvas: #241b10;
-    --surface: #372a16;
-    --surface-2: #463620;
-    --line: #5c482d;
-    --line-soft: #463620;
-
-    --ink: #f6efe4;
-    --ink-muted: #c6b69e;
-    --ink-faint: #9d8e79;
-
-    /* Medido: 8,31:1 sobre --surface, 9,70:1 sobre --canvas, 6,14:1 sobre
-       accent-soft. */
-    --accent: #f5b969;
-    --accent-soft: #503a17;
-    --danger: #f79c93;
-    --warn: #f2d98a;
-    --steam: #66c0f4;
-
-    --ct: #8bbce8;
-    --t: #eed9b0;
-  }
+  --side-ct: #7fb4ee;
+  --side-t: #e6c07a;
 }
 
 html {
-  /* Faz o browser pintar scrollbars, seletores e inputs nativos no esquema
-     certo — sem isto, um <select> aparece branco no modo escuro. */
-  color-scheme: light dark;
+  /* Scrollbars, seletores e inputs nativos no esquema certo. */
+  color-scheme: dark;
 }
 
 body {
@@ -117,4 +86,47 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Rótulo de HUD: maiúsculas pequenas em mono, espaçadas. É o que identifica
+   um número como instrumento e não como texto corrido. */
+.hud {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* Números grandes em mono: largura fixa, leitura de painel. */
+.num {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Malha discreta atrás de superfícies de destaque. */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 80%);
+}
+
+/* A linha do gráfico se desenha ao entrar. */
+@keyframes tracar {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.tracar {
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: tracar 1.1s cubic-bezier(0.3, 0, 0.2, 1) forwards;
+}
+
+/* Brilho do acento, para um elemento por tela. */
+.glow {
+  box-shadow: 0 0 0 1px var(--line), 0 0 40px var(--accent-glow);
 }

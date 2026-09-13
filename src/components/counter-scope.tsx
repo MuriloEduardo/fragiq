@@ -17,7 +17,7 @@ export function CounterScope({
   if (appId !== 730) return null;
 
   return (
-    <details className="group rounded-xl border border-line bg-surface">
+    <details className="group rounded-2xl bg-surface ring-1 ring-line">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm text-ink-muted transition hover:text-ink">
         <Info className="size-4 shrink-0 text-ink-faint" />
         O que estes contadores incluem

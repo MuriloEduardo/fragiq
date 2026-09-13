@@ -30,7 +30,7 @@ export function ContextFilterBar({ modes, maps, value, onChange, semContexto }: 
   const ativo = Boolean(value.mode || value.map);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-4 py-3">
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
       <Filter className="size-4 shrink-0 text-ink-faint" />
 
       {modes.length > 0 && (
