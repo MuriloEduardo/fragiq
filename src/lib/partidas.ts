@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { prisma } from "./prisma";
 import { env } from "./env";
 import { decodificarShareCode, normalizarShareCode, shareCodeValido } from "./sharecode";
+import { getPlayerSummaries } from "./steam/api";
 
 /**
  * Partidas detalhadas: o caminho que o csstats usa, com o mínimo de atrito.
@@ -352,4 +353,81 @@ export async function listarPartidas(steamId: string, limite = 30): Promise<Part
     eu: { kills: l.kills, assists: l.assists, deaths: l.deaths, mvps: l.mvps, score: l.score, hs: l.hs, venceu: l.venceu, time: l.time },
     conhecidos: l.match.jogadores.filter((j) => j.steamId !== steamId),
   }));
+}
+
+/* ------------------------------- uma partida ------------------------------ */
+
+export type Scoreboard = {
+  id: string;
+  shareCode: string;
+  jogadaEm: Date;
+  duracaoS: number;
+  mapa: string | null;
+  servidor: string | null;
+  placar: [number, number];
+  demoUrl: string | null;
+  times: {
+    time: number;
+    placar: number;
+    venceu: boolean | null;
+    jogadores: {
+      steamId: string;
+      userId: string | null;
+      nome: string | null;
+      avatar: string | null;
+      kills: number;
+      assists: number;
+      deaths: number;
+      mvps: number;
+      score: number;
+      hs: number;
+    }[];
+  }[];
+};
+
+/**
+ * A partida inteira, os dois times, com nome e avatar de cada um pela
+ * Steam (uma chamada para os dez). É o mesmo placar que o "Suas partidas"
+ * do jogo mostra a qualquer um dos dez — público por natureza.
+ */
+export async function carregarScoreboard(matchId: string): Promise<Scoreboard | null> {
+  const m = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { jogadores: { orderBy: { score: "desc" } } },
+  });
+  if (!m || m.status !== "DONE") return null;
+
+  const perfis = await getPlayerSummaries(m.jogadores.map((j) => j.steamId)).catch(() => new Map());
+  const placar: [number, number] = [m.placarA ?? 0, m.placarB ?? 0];
+  const vencedor = placar[0] === placar[1] ? null : placar[0] > placar[1] ? 0 : 1;
+
+  return {
+    id: m.id,
+    shareCode: m.shareCode,
+    jogadaEm: m.jogadaEm ?? m.createdAt,
+    duracaoS: m.duracaoS ?? 0,
+    mapa: m.mapa,
+    servidor: m.servidor,
+    placar,
+    demoUrl: m.demoUrl,
+    times: [0, 1].map((time) => ({
+      time,
+      placar: placar[time],
+      venceu: vencedor === null ? null : vencedor === time,
+      jogadores: m.jogadores
+        .filter((j) => j.time === time)
+        .map((j) => ({
+          steamId: j.steamId,
+          userId: j.userId,
+          nome: perfis.get(j.steamId)?.personaname ?? null,
+          avatar: perfis.get(j.steamId)?.avatarfull ?? null,
+          kills: j.kills,
+          assists: j.assists,
+          deaths: j.deaths,
+          mvps: j.mvps,
+          score: j.score,
+          hs: j.hs,
+        })),
+    })),
+  };
 }

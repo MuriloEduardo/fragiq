@@ -34,7 +34,11 @@ export function PartidasTabela({ partidas, publica = false }: { partidas: Partid
                 <td className="px-4 py-3 whitespace-nowrap text-ink-muted" suppressHydrationWarning>
                   {formatarQuando(p.jogadaEm)}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap font-sans">{p.mapa ? rotularMapa(p.mapa) : <span className="text-ink-faint">—</span>}</td>
+                <td className="px-4 py-3 whitespace-nowrap font-sans">
+                  <Link href={`/partida/${p.id}`} className="underline decoration-line-soft underline-offset-4 hover:text-accent">
+                    {p.mapa ? rotularMapa(p.mapa) : "Partida"}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span
                     className={cn(
@@ -57,16 +61,10 @@ export function PartidasTabela({ partidas, publica = false }: { partidas: Partid
                 <td className="px-4 py-3 text-right text-ink-muted">{Math.round(p.duracaoS / 60)} min</td>
                 {!publica && (
                   <td className="px-4 py-3 text-right whitespace-nowrap">
-                    {p.conhecidos.length > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs text-ink-muted" title="Outras pessoas do FragIQ nesta partida">
-                        <Users className="size-3.5" />
-                        {p.conhecidos.map((c) => (
-                          <Link key={c.steamId} href={`/p/${c.steamId}`} className="underline decoration-line hover:text-ink">
-                            {c.time === p.eu.time ? "aliado" : "rival"}
-                          </Link>
-                        ))}
-                      </span>
-                    )}
+                    <Link href={`/partida/${p.id}`} className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-ink" title="Os dez jogadores">
+                      <Users className="size-3.5" />
+                      {p.conhecidos.length > 0 ? `+${p.conhecidos.length} do FragIQ` : "os dez"}
+                    </Link>
                   </td>
                 )}
               </tr>

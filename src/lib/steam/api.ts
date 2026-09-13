@@ -50,6 +50,20 @@ export async function getPlayerSummary(steamId: string): Promise<SteamPlayer | n
   return data.response.players[0] ?? null;
 }
 
+/** Até 100 por chamada; a Steam devolve só os que existem, em qualquer ordem. */
+export async function getPlayerSummaries(steamIds: string[]): Promise<Map<string, SteamPlayer>> {
+  const saida = new Map<string, SteamPlayer>();
+  for (let i = 0; i < steamIds.length; i += 100) {
+    const data = await call(
+      "/ISteamUser/GetPlayerSummaries/v2/",
+      { steamids: steamIds.slice(i, i + 100).join(",") },
+      z.object({ response: z.object({ players: z.array(playerSummary) }) }),
+    );
+    for (const p of data.response.players) saida.set(p.steamid, p);
+  }
+  return saida;
+}
+
 /* -------------------------------- biblioteca ------------------------------- */
 
 const ownedGame = z.object({

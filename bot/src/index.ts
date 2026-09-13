@@ -257,6 +257,7 @@ async function avisar(steamId: string, tentativa = 0) {
         map: ctx?.map,
         mode: ctx?.mode,
         score: ctx?.score,
+        tentativa,
       }),
     });
     status = res.status;

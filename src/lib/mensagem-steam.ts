@@ -98,3 +98,33 @@ function desvios(s: Sessao, normal: { kd: number | null; danoPorRound: number | 
     .slice(0, 2);
   return candidatos.map((c) => `${c.rotulo} ${c.fmt(c.atual)} (seu normal ${c.fmt(c.base)})`).join(" · ");
 }
+
+/**
+ * "Vi que você jogou, mas a Steam não me deixa ler." Só para quem nunca
+ * teve um ponto de CS2 — quem já teve e parou de ter recebe o aviso no
+ * site — e só uma vez por conta.
+ */
+export async function avisarPrivacidadeSePreciso(userId: string, steamId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      avisoSteam: true,
+      avisoPrivacidadeEm: true,
+      games: { where: { gameAppId: 730 }, select: { _count: { select: { snapshots: true } } } },
+    },
+  });
+  if (!user || !user.avisoSteam || user.avisoPrivacidadeEm) return false;
+  if ((user.games[0]?._count.snapshots ?? 0) > 0) return false;
+
+  const texto = [
+    "FragIQ · Vi que você jogou CS2, mas a Steam não deixa o site ler as suas estatísticas: os \"Detalhes do jogo\" do seu perfil estão privados.",
+    "É um clique: https://steamcommunity.com/my/edit/settings → Detalhes do jogo → Público. Depois disso, cada partida entra sozinha.",
+    `Passo a passo: ${appUrl()}/cs2 · para não receber mais: ${appUrl()}/seguranca`,
+  ].join("\n");
+
+  await prisma.$transaction([
+    prisma.steamMessage.create({ data: { userId, steamId, texto } }),
+    prisma.user.update({ where: { id: userId }, data: { avisoPrivacidadeEm: new Date() } }),
+  ]);
+  return true;
+}

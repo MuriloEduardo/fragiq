@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { syncUser } from "@/lib/steam/sync";
+import { avisarPrivacidadeSePreciso } from "@/lib/mensagem-steam";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,6 +22,8 @@ const schema = z.object({
   map: z.string().max(64).optional(),
   mode: z.string().max(64).optional(),
   score: z.string().max(32).optional(),
+  /** Quantas vezes o bot já tentou por esta partida (0 na primeira). */
+  tentativa: z.number().int().min(0).max(10).optional(),
 });
 
 // Um bot com defeito reconectando em loop não pode virar rajada contra a
@@ -83,6 +86,15 @@ export async function POST(request: NextRequest) {
     if (result.snapshotsCreated === 0) {
       if (await anexarContexto(user.id, contexto)) {
         return NextResponse.json({ attached: "contexto gravado no ponto anterior", ...result });
+      }
+      // Na terceira tentativa (~14 min depois) sem nunca ter havido um
+      // ponto de CS2, não é a Steam atrasada: são os "Detalhes do jogo"
+      // privados. O bot viu a pessoa jogar; ela merece saber que o site
+      // não vai ver — e o que é preciso mudar. Uma vez só.
+      if ((parsed.data.tentativa ?? 0) >= 3) {
+        await avisarPrivacidadeSePreciso(user.id, user.steamId).catch((e) =>
+          console.error("[steam-event] aviso de privacidade falhou:", e instanceof Error ? e.message : e),
+        );
       }
       return NextResponse.json(
         { pending: "stats ainda não publicadas pela Steam", ...result },

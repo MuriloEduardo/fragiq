@@ -31,6 +31,9 @@ model User {
   /// Receber a análise de cada sessão no chat da Steam, pelo bot. Só chega
   /// para quem adicionou o bot; desligar aqui silencia mesmo sendo amigo.
   avisoSteam Boolean @default(true)
+  /// Quando o bot avisou, no chat, que a Steam não deixa ler as estatísticas
+  /// ("Detalhes do jogo" privado). Uma vez só.
+  avisoPrivacidadeEm DateTime?
 
   /// Código de autenticação do histórico de partidas (a Steam chama de
   /// "match history authentication code"). Só serve para pedir o próximo
