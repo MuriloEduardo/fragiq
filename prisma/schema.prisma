@@ -111,6 +111,8 @@ model StatSnapshot {
   matchMode  String?
   matchScore String?
 
+  analyses Analysis[]
+
   @@unique([userGameId, capturedAt])
   @@index([userGameId, capturedAt])
   @@index([userGameId, matchMode])
@@ -219,6 +221,16 @@ model Analysis {
   question String
   answer   String?
 
+  /// Uma análise chega sozinha a cada sessão nova (SESSION) ou porque a
+  /// pessoa perguntou (QUESTION). A primeira é o produto; a segunda, o
+  /// acompanhamento.
+  kind AnalysisKind @default(QUESTION)
+
+  /// A coleta que fechou a sessão analisada. Única: uma sessão, uma análise —
+  /// é o que impede o cron, o bot e a página de pedirem a mesma três vezes.
+  snapshotId String?       @unique
+  snapshot   StatSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
   status AnalysisStatus @default(PENDING)
   error  String?
 
@@ -232,6 +244,11 @@ model Analysis {
 
   @@index([userId, gameAppId, createdAt])
   @@map("analyses")
+}
+
+enum AnalysisKind {
+  SESSION
+  QUESTION
 }
 
 enum AnalysisStatus {

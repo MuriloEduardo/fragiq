@@ -1,38 +1,46 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Sparkles } from "lucide-react";
+import { MessageSquarePlus, Send, Sparkles } from "lucide-react";
 import type { AnaliseDTO } from "@/lib/analises";
 import { cn } from "@/lib/utils";
 
 /**
- * Pergunte ao analista.
+ * A análise da sessão, sem ninguém pedir.
  *
- * As leituras dizem o que os números dizem; aqui a pessoa pergunta o que
- * quiser, e o agente do cogniflow responde consultando a mesma série. A
- * conversa é assíncrona — a resposta vem por callback — então a tela
- * consulta a lista enquanto há pergunta em aberto e para quando não há.
+ * Toda coleta que fecha uma sessão dispara uma leitura do analista — no
+ * sync, no cron, no bot. Esta tela mostra a da sessão mais recente em
+ * primeiro plano e, se ela ainda não existe (sessão anterior à feature, ou
+ * sync que não conseguiu), pede ao abrir. Ninguém digita "como fui?".
  *
- * Uma pergunta por vez: é o contrato do callback (a resposta chega sem
- * dizer a qual pergunta pertence) e também o ritmo certo para uma conversa.
+ * Perguntar continua possível, como acompanhamento: "e no Mirage?", "e a
+ * AWP?". Fica dobrado atrás de um link porque é a exceção, não o caminho.
+ *
+ * A conversa é assíncrona (a resposta vem por callback), então a lista é
+ * consultada enquanto há algo em aberto e para quando não há. Uma por vez.
  */
 
 const INTERVALO_MS = 2500;
 
-const SUGESTOES = [
-  "Como fui esta semana comparado ao meu normal?",
-  "Em que mapa eu mais caio, e por quê?",
-  "Minha precisão com AK-47 está melhorando?",
-];
-
 type Estado = "parado" | "enviando";
 
-export function Analista({ appId, iniciais }: { appId: number; iniciais: AnaliseDTO[] }) {
+export function Analista({
+  appId,
+  iniciais,
+  sessaoSemAnalise,
+}: {
+  appId: number;
+  iniciais: AnaliseDTO[];
+  /** A sessão mais recente ainda não tem análise: pedir ao montar. */
+  sessaoSemAnalise: boolean;
+}) {
   const [analises, setAnalises] = useState<AnaliseDTO[]>(iniciais);
   const [pergunta, setPergunta] = useState("");
+  const [perguntando, setPerguntando] = useState(false);
   const [estado, setEstado] = useState<Estado>("parado");
   const [erro, setErro] = useState<string | null>(null);
   const campo = useRef<HTMLTextAreaElement>(null);
+  const pediuSessao = useRef(false);
 
   const emAberto = analises.some((a) => a.status === "PENDING" || a.status === "ACKNOWLEDGED");
 
@@ -42,6 +50,18 @@ export function Analista({ appId, iniciais }: { appId: number; iniciais: Analise
     const data = (await res.json()) as { analyses: AnaliseDTO[] };
     setAnalises(data.analyses);
   }, [appId]);
+
+  useEffect(() => {
+    if (!sessaoSemAnalise || pediuSessao.current) return;
+    pediuSessao.current = true;
+    fetch("/api/analises", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "SESSION", appId }),
+    })
+      .then(() => recarregar())
+      .catch(() => {});
+  }, [sessaoSemAnalise, appId, recarregar]);
 
   useEffect(() => {
     if (!emAberto) return;
@@ -71,6 +91,7 @@ export function Analista({ appId, iniciais }: { appId: number; iniciais: Analise
       setAnalises((atual) => [
         {
           id: data.id,
+          kind: "QUESTION",
           question: texto,
           answer: null,
           status: "PENDING",
@@ -86,67 +107,36 @@ export function Analista({ appId, iniciais }: { appId: number; iniciais: Analise
     }
   }
 
-  function sugerir(texto: string) {
-    setPergunta(texto);
-    campo.current?.focus();
-  }
+  const sessao = analises.find((a) => a.kind === "SESSION");
+  const perguntas = analises.filter((a) => a.kind === "QUESTION");
+  const aguardandoSessao = !sessao && sessaoSemAnalise;
 
   return (
     <section>
       <h2 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-ink-muted uppercase">
         <Sparkles className="size-4 text-accent" aria-hidden />
-        Pergunte ao analista
+        Análise da última sessão
       </h2>
       <p className="mt-1 text-sm text-ink-faint">
-        Ele lê a mesma série que está nesta página e responde em segundos.
+        Chega sozinha a cada sessão nova, lendo a mesma série desta página.
       </p>
 
-      <form onSubmit={enviar} className="mt-4 rounded-xl border border-line bg-surface p-3">
-        <textarea
-          ref={campo}
-          value={pergunta}
-          onChange={(e) => setPergunta(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) enviar();
-          }}
-          rows={2}
-          maxLength={1000}
-          placeholder="Ex.: por que meu K/D caiu nas últimas partidas?"
-          className="w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none transition focus:border-accent/50"
-        />
+      <div className="mt-4 rounded-xl border border-line bg-surface p-4">
+        {sessao ? (
+          <Corpo analise={sessao} />
+        ) : aguardandoSessao ? (
+          <Aguardando texto="Pedindo a análise da sessão…" />
+        ) : (
+          <p className="text-sm text-ink-faint">
+            Ainda não há sessão para analisar: é preciso uma coleta com partidas
+            entre ela e a anterior.
+          </p>
+        )}
+      </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {SUGESTOES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => sugerir(s)}
-              className="rounded-full border border-line px-3 py-1 text-xs text-ink-muted transition hover:border-ink-faint hover:text-ink"
-            >
-              {s}
-            </button>
-          ))}
-
-          <button
-            type="submit"
-            disabled={estado === "enviando" || emAberto || pergunta.trim().length < 4}
-            className={cn(
-              "ml-auto inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-canvas transition",
-              "disabled:cursor-not-allowed disabled:opacity-40",
-              estado !== "enviando" && "hover:brightness-110",
-            )}
-          >
-            <Send className="size-3.5" aria-hidden />
-            {estado === "enviando" ? "Enviando…" : emAberto ? "Aguardando…" : "Perguntar"}
-          </button>
-        </div>
-
-        {erro && <p className="mt-2 text-sm text-danger">{erro}</p>}
-      </form>
-
-      {analises.length > 0 && (
-        <ol className="mt-4 space-y-3">
-          {analises.map((a) => (
+      {perguntas.length > 0 && (
+        <ol className="mt-3 space-y-3">
+          {perguntas.map((a) => (
             <li key={a.id} className="rounded-xl border border-line bg-surface p-4">
               <p className="text-sm font-medium">{a.question}</p>
               <div className="mt-3 border-t border-line-soft pt-3">
@@ -155,6 +145,48 @@ export function Analista({ appId, iniciais }: { appId: number; iniciais: Analise
             </li>
           ))}
         </ol>
+      )}
+
+      {perguntando ? (
+        <form onSubmit={enviar} className="mt-3 rounded-xl border border-line bg-surface p-3">
+          <textarea
+            ref={campo}
+            value={pergunta}
+            onChange={(e) => setPergunta(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) enviar();
+            }}
+            rows={2}
+            maxLength={1000}
+            autoFocus
+            placeholder="Ex.: e se eu olhar só o competitivo? A AWP está melhorando?"
+            className="w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none transition focus:border-accent/50"
+          />
+          <div className="mt-2 flex items-center gap-3">
+            {erro && <p className="text-sm text-danger">{erro}</p>}
+            <button
+              type="submit"
+              disabled={estado === "enviando" || emAberto || pergunta.trim().length < 4}
+              className={cn(
+                "ml-auto inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-canvas transition",
+                "disabled:cursor-not-allowed disabled:opacity-40",
+                estado !== "enviando" && "hover:brightness-110",
+              )}
+            >
+              <Send className="size-3.5" aria-hidden />
+              {estado === "enviando" ? "Enviando…" : emAberto ? "Aguardando…" : "Perguntar"}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPerguntando(true)}
+          className="mt-3 inline-flex items-center gap-2 text-sm text-ink-faint transition hover:text-ink"
+        >
+          <MessageSquarePlus className="size-4" aria-hidden />
+          Perguntar algo sobre esta sessão
+        </button>
       )}
     </section>
   );
@@ -169,7 +201,7 @@ function Corpo({ analise }: { analise: AnaliseDTO }) {
     case "FAILED":
       return (
         <p className="text-sm text-danger">
-          O analista não respondeu. Tente perguntar de novo.
+          O analista não respondeu. Recarregue a página para pedir de novo.
         </p>
       );
     case "ANSWERED":

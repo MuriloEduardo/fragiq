@@ -1,4 +1,5 @@
 import type { SyncTrigger } from "@/generated/prisma/enums";
+import { garantirAnaliseDaSessao } from "@/lib/analises";
 import { prisma } from "../prisma";
 import {
   getGameStatSchema,
@@ -170,6 +171,15 @@ async function runSync(
     const outcome = await captureSnapshot(userId, steamId, game, context);
     if (outcome === "created") snapshotsCreated++;
     if (outcome === "unchanged") unchanged.push(game.appid);
+
+    // Ponto novo de CS2 é uma sessão que acabou: a análise dela nasce aqui,
+    // sem ninguém pedir. Falha nisso não é falha da coleta — o ponto já está
+    // gravado, e a página pede a análise de novo ao abrir.
+    if (outcome === "created" && game.appid === 730) {
+      await garantirAnaliseDaSessao(userId, 730).catch((e) =>
+        console.error("[sync] análise da sessão não disparou:", e instanceof Error ? e.message : e),
+      );
+    }
   }
 
   return {

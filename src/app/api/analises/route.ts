@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { cogniflow } from "@/lib/env";
 import { enviarPergunta } from "@/lib/cogniflow";
-import { listarAnalises, TIMEOUT_MS } from "@/lib/analises";
+import { garantirAnaliseDaSessao, listarAnalises, TIMEOUT_MS } from "@/lib/analises";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +16,19 @@ export const dynamic = "force-dynamic";
  * e é o que a tela consulta enquanto espera.
  */
 
-const schema = z.object({
-  appId: z.number().int().positive(),
-  question: z.string().trim().min(4, "Escreva um pouco mais.").max(1000),
-});
+const schema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("QUESTION").default("QUESTION"),
+    appId: z.number().int().positive(),
+    question: z.string().trim().min(4, "Escreva um pouco mais.").max(1000),
+  }),
+  // A página pede a análise da última sessão ao abrir, caso o sync não
+  // tenha conseguido — ou caso a sessão seja anterior a existir análise.
+  z.object({
+    kind: z.literal("SESSION"),
+    appId: z.number().int().positive(),
+  }),
+]);
 
 /** Uma resposta custa tokens; vinte perguntas por hora é uso, não abuso. */
 const MAX_POR_HORA = 20;
@@ -36,7 +45,9 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
-  const parsed = schema.safeParse(body);
+  const parsed = schema.safeParse(
+    body && typeof body === "object" && !("kind" in body) ? { ...body, kind: "QUESTION" } : body,
+  );
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const nossa = issue?.message && !/^(Invalid|Expected|Too )/.test(issue.message);
@@ -45,6 +56,15 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
+
+  if (parsed.data.kind === "SESSION") {
+    const sessao = await garantirAnaliseDaSessao(session.userId, parsed.data.appId);
+    if (!sessao) {
+      return NextResponse.json({ error: "Nenhuma sessão para analisar ainda." }, { status: 404 });
+    }
+    return NextResponse.json({ id: sessao.id }, { status: sessao.criada ? 202 : 200 });
+  }
+
   const { appId, question } = parsed.data;
 
   const [user, recentes, pendente] = await Promise.all([

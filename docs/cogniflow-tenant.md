@@ -25,6 +25,14 @@ POST /api/analises
   └─ Analysis ANSWERED
 ```
 
+A análise chega sozinha: toda coleta que fecha uma sessão (rounds subiram
+desde o ponto anterior) cria uma `Analysis` de tipo `SESSION` amarrada à
+coleta (`snapshotId` único) e manda ao agente "Nova sessão registrada em …:
+N rounds em M partidas. Analise esta sessão contra o meu normal…". O gatilho
+está no sync (cron, bot, manual, login) e a página repete o pedido ao abrir
+se a sessão mais recente ainda não tem análise. Perguntar continua possível,
+como acompanhamento.
+
 Um único segredo (HMAC-SHA256 do corpo, header `X-Signature-256`) assina os
 três caminhos. A conversa no cogniflow é `${userId}:${appId}`, então o agente
 tem memória por jogador e jogo: "e no Mirage?" depois de "como fui esta

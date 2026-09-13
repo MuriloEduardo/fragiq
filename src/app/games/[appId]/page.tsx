@@ -11,7 +11,7 @@ import { CollectionStatus } from "@/components/collection-status";
 import { CounterScope } from "@/components/counter-scope";
 import { Analista } from "@/components/analista";
 import { cogniflow } from "@/lib/env";
-import { listarAnalises } from "@/lib/analises";
+import { listarAnalises, sessaoSemAnalise } from "@/lib/analises";
 
 export const dynamic = "force-dynamic";
 
@@ -83,8 +83,13 @@ export default async function GamePage({
 
   // O analista só aparece com o cogniflow configurado e com série para ler:
   // perguntar sobre uma coleta única é pedir uma resposta que não existe.
-  const analises =
-    cogniflow() && rows.length >= 2 ? await listarAnalises(session.userId, appId) : null;
+  const analista =
+    cogniflow() && rows.length >= 2
+      ? await Promise.all([
+          listarAnalises(session.userId, appId),
+          sessaoSemAnalise(session.userId, appId),
+        ])
+      : null;
 
   // Datas viram string na fronteira Server -> Client Component.
 
@@ -128,9 +133,9 @@ export default async function GamePage({
           <CounterScope appId={appId} gaugesStale={gaugesLookStale(rows)} />
         </div>
 
-        {analises && (
+        {analista && (
           <div className="mt-10">
-            <Analista appId={appId} iniciais={analises} />
+            <Analista appId={appId} iniciais={analista[0]} sessaoSemAnalise={analista[1]} />
           </div>
         )}
 
