@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
 import { processarCapturasDevidas } from "@/lib/capturas";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +14,34 @@ export const maxDuration = 60;
  * fila nem precisa: qualquer coisa que chame este endpoint serve de
  * relógio — outro bot, o cron, um curl.
  */
-export async function GET(request: NextRequest) {
+function autorizado(request: NextRequest) {
   const secret = process.env.BOT_WEBHOOK_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
+}
+
+export async function GET(request: NextRequest) {
+  if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  return NextResponse.json(await processarCapturasDevidas());
+}
+
+/** Como o bot está — para o painel ver que ele vive sem ninguém abrir log. */
+const estado = z.object({
+  amigos: z.number().int().nonnegative(),
+  gc: z.boolean(),
+  iniciadoEm: z.string().datetime().optional(),
+});
+
+export async function POST(request: NextRequest) {
+  if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  const parsed = estado.safeParse(await request.json().catch(() => null));
+  if (parsed.success) {
+    const dados = {
+      ultimoTickEm: new Date(),
+      amigos: parsed.data.amigos,
+      gcConectado: parsed.data.gc,
+      iniciadoEm: parsed.data.iniciadoEm ? new Date(parsed.data.iniciadoEm) : undefined,
+    };
+    await prisma.botStatus.upsert({ where: { id: "bot" }, create: { id: "bot", ...dados }, update: dados });
   }
   return NextResponse.json(await processarCapturasDevidas());
 }

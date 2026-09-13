@@ -135,6 +135,35 @@ client.on("friendRelationship", (steamID, relationship) => {
   }
 });
 
+/**
+ * A lista de amigos, como está, para o site — na carga e a cada mudança.
+ * É o que diz ao funil "adicionou o bot" sem depender de a lista da pessoa
+ * ser pública.
+ */
+let amigosTimer: NodeJS.Timeout | null = null;
+function reportarAmigos() {
+  if (amigosTimer) clearTimeout(amigosTimer);
+  amigosTimer = setTimeout(async () => {
+    amigosTimer = null;
+    const steamIds = Object.entries(client.myFriends)
+      .filter(([, rel]) => rel === SteamUser.EFriendRelationship.Friend)
+      .map(([id]) => id);
+    try {
+      const res = await fetch(config.amigosUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${config.webhookSecret}` },
+        body: JSON.stringify({ steamIds }),
+      });
+      const r = (await res.json().catch(() => ({}))) as { entraram?: number; sairam?: number };
+      console.log(`Amigos reportados: ${steamIds.length}${r.entraram ? ` (+${r.entraram})` : ""}${r.sairam ? ` (-${r.sairam})` : ""}`);
+    } catch (err) {
+      console.error("Amigos: não reportou:", err);
+    }
+  }, 3000);
+}
+client.on("friendsList", reportarAmigos);
+client.on("friendRelationship", reportarAmigos);
+
 /* ----------------------------- estado de jogo ----------------------------- */
 
 /**
@@ -215,7 +244,12 @@ async function avisar(steamId: string, motivo: string) {
 async function tick() {
   if (!client.steamID) return;
   try {
-    const res = await fetch(config.tickUrl, { headers: { authorization: `Bearer ${config.webhookSecret}` } });
+    const amigos = Object.values(client.myFriends).filter((rel) => rel === SteamUser.EFriendRelationship.Friend).length;
+    const res = await fetch(config.tickUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", authorization: `Bearer ${config.webhookSecret}` },
+      body: JSON.stringify({ amigos, gc: partidas.gcConectado(), iniciadoEm }),
+    });
     if (!res.ok) {
       console.warn(`Tick: ${res.status}`);
       return;
@@ -226,6 +260,7 @@ async function tick() {
     console.error("Tick falhou:", err);
   }
 }
+const iniciadoEm = new Date().toISOString();
 const tickTimer = setInterval(() => void tick(), config.tickMs);
 
 /* ------------------------------ chat da Steam ------------------------------ */
@@ -292,7 +327,7 @@ async function entregar(m: Mensagem) {
 }
 
 const filaTimer = setInterval(() => void entregarFila(), config.outboxPollMs);
-const partidasTimer = ligarPartidas(client);
+const partidas = ligarPartidas(client);
 
 /* ------------------------------- encerramento ------------------------------ */
 
@@ -301,7 +336,7 @@ for (const sinal of ["SIGINT", "SIGTERM"] as const) {
     console.log("Encerrando…");
     clearInterval(tickTimer);
     clearInterval(filaTimer);
-    clearInterval(partidasTimer);
+    clearInterval(partidas.timer);
     client.logOff();
     process.exit(0);
   });

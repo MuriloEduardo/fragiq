@@ -29,7 +29,30 @@ export type Usuario = {
 
 export type PontoDia = { dia: string; valor: number };
 
+export type EtapaFunil = {
+  id: string;
+  rotulo: string;
+  /** Quantos chegaram até aqui. */
+  chegaram: number;
+  /** Quem passou pela anterior e parou aqui (nomes, até 6). */
+  presos: string[];
+};
+
+export type Saude = {
+  bot: { ultimoTickEm: Date; amigos: number; gcConectado: boolean; iniciadoEm: Date | null } | null;
+  capturasPendentes: { total: number; maisAntigaEm: Date | null; maxTentativa: number };
+  partidasNaFila: number;
+  partidasExpiradas: number;
+  chat24h: { enviadas: number; falhas: number; pendentes: number };
+  erros24h: number;
+};
+
+export type EventoLinha = { id: string; nome: string; persona: string | null; dados: unknown; createdAt: Date };
+
 export type Painel = {
+  funil: EtapaFunil[];
+  saude: Saude;
+  eventos: EventoLinha[];
   totais: {
     usuarios: number;
     novos7d: number;
@@ -84,6 +107,7 @@ export type Painel = {
 
 export async function carregarPainel(): Promise<Painel> {
   const semanaAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const [funil, saude, eventos] = await Promise.all([carregarFunil(), carregarSaude(), carregarEventos()]);
 
   const [
     usuarios,
@@ -169,6 +193,9 @@ export async function carregarPainel(): Promise<Painel> {
   ]);
 
   return {
+    funil,
+    saude,
+    eventos,
     totais: {
       usuarios,
       novos7d,
@@ -284,4 +311,75 @@ async function contagensPorDia() {
     syncs: preencher(syncs),
     analises: preencher(analises),
   };
+}
+
+/* ---------------------------------- funil --------------------------------- */
+
+/**
+ * O funil de ativação, derivado do estado — não de eventos de clique.
+ *
+ * Cada etapa é um fato do banco: tem ponto de CS2, o bot é amigo, a
+ * corrente está ligada, tem partida oficial, recebeu mensagem. Quem parou
+ * numa etapa aparece pelo nome: com três testadores, o painel precisa
+ * dizer "o AVELLARTS está preso na privacidade", não "33%".
+ */
+async function carregarFunil(): Promise<EtapaFunil[]> {
+  const users = await prisma.user.findMany({
+    select: {
+      personaName: true,
+      botAmigoDesde: true,
+      partidasAtivadasEm: true,
+      games: { where: { gameAppId: 730 }, select: { _count: { select: { snapshots: true } } } },
+      _count: { select: { partidas: true, mensagens: { where: { status: "SENT" } } } },
+    },
+  });
+  const etapas: { id: string; rotulo: string; passa: (u: (typeof users)[number]) => boolean }[] = [
+    { id: "entrou", rotulo: "Entrou com a Steam", passa: () => true },
+    { id: "stats", rotulo: "Steam deixa ler (1ª coleta de CS2)", passa: (u) => (u.games[0]?._count.snapshots ?? 0) > 0 },
+    { id: "bot", rotulo: "Adicionou o bot", passa: (u) => u.botAmigoDesde !== null },
+    { id: "corrente", rotulo: "Ligou as partidas oficiais", passa: (u) => u.partidasAtivadasEm !== null },
+    { id: "partida", rotulo: "Tem partida com placar", passa: (u) => u._count.partidas > 0 },
+    { id: "chat", rotulo: "Recebeu mensagem no chat", passa: (u) => u._count.mensagens > 0 },
+  ];
+  // Funil de verdade: só conta na etapa N quem passou por todas até N.
+  let restantes = users;
+  return etapas.map((e, i) => {
+    const passaram = restantes.filter(e.passa);
+    const presos = i === 0 ? [] : restantes.filter((u) => !e.passa(u)).map((u) => u.personaName).slice(0, 6);
+    restantes = passaram;
+    return { id: e.id, rotulo: e.rotulo, chegaram: passaram.length, presos };
+  });
+}
+
+/* ---------------------------------- saúde --------------------------------- */
+
+async function carregarSaude(): Promise<Saude> {
+  const diaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [bot, capturas, maisAntiga, partidasNaFila, partidasExpiradas, enviadas, falhas, pendentes, erros24h] = await Promise.all([
+    prisma.botStatus.findUnique({ where: { id: "bot" } }),
+    prisma.pendingCapture.aggregate({ _count: true, _max: { tentativa: true } }),
+    prisma.pendingCapture.findFirst({ orderBy: { createdAt: "asc" }, select: { createdAt: true } }),
+    prisma.match.count({ where: { status: "PENDING" } }),
+    prisma.match.count({ where: { status: { in: ["EXPIRED", "FAILED"] } } }),
+    prisma.steamMessage.count({ where: { status: "SENT", sentAt: { gt: diaAtras } } }),
+    prisma.steamMessage.count({ where: { status: "FAILED", createdAt: { gt: diaAtras } } }),
+    prisma.steamMessage.count({ where: { status: "PENDING" } }),
+    prisma.evento.count({ where: { nome: "erro", createdAt: { gt: diaAtras } } }),
+  ]);
+  return {
+    bot,
+    capturasPendentes: { total: capturas._count, maisAntigaEm: maisAntiga?.createdAt ?? null, maxTentativa: capturas._max.tentativa ?? 0 },
+    partidasNaFila,
+    partidasExpiradas,
+    chat24h: { enviadas, falhas, pendentes },
+    erros24h,
+  };
+}
+
+async function carregarEventos(): Promise<EventoLinha[]> {
+  const linhas = await prisma.evento.findMany({ orderBy: { createdAt: "desc" }, take: 30 });
+  const ids = [...new Set(linhas.map((l) => l.userId).filter((v): v is string => Boolean(v)))];
+  const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, personaName: true } }) : [];
+  const nome = new Map(users.map((u) => [u.id, u.personaName]));
+  return linhas.map((l) => ({ id: l.id, nome: l.nome, persona: l.userId ? (nome.get(l.userId) ?? null) : null, dados: l.dados, createdAt: l.createdAt }));
 }

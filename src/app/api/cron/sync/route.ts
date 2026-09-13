@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncUser } from "@/lib/steam/sync";
 import { processarCapturasDevidas } from "@/lib/capturas";
+import { reportarErro } from "@/lib/eventos";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
       snapshots += result.snapshotsCreated;
       synced++;
     } catch (err) {
-      console.error(`[cron] sync falhou para ${user.steamId}`, err);
+      await reportarErro("cron.sync", err, user.id);
       failed++;
     }
   }

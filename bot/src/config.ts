@@ -49,6 +49,10 @@ export const config = {
     ler("FRAGIQ_TICK_URL") ??
     obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/tick"),
   tickMs: Number(process.env.BOT_TICK_MS ?? 30_000),
+  /** Para onde vai a lista de amigos do bot. */
+  amigosUrl:
+    ler("FRAGIQ_AMIGOS_URL") ??
+    obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/amigos"),
   /** Intervalo entre buscas na fila de mensagens. */
   outboxPollMs: Number(process.env.BOT_OUTBOX_POLL_MS ?? 20_000),
 

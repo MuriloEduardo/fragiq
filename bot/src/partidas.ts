@@ -172,5 +172,6 @@ export function ligarPartidas(client: SteamUser) {
     };
   }
 
-  return setInterval(() => void processarFila(), config.outboxPollMs);
+  const timer = setInterval(() => void processarFila(), config.outboxPollMs);
+  return { timer, gcConectado: () => csgo.haveGCSession };
 }

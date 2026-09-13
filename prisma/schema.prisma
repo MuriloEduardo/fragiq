@@ -34,6 +34,9 @@ model User {
   /// Quando o bot avisou, no chat, que a Steam não deixa ler as estatísticas
   /// ("Detalhes do jogo" privado). Uma vez só.
   avisoPrivacidadeEm DateTime?
+  /// Desde quando o bot de presença é amigo (o bot reporta a lista). null =
+  /// não é. É o que o funil de ativação lê sem perguntar à Steam.
+  botAmigoDesde      DateTime?
 
   /// Código de autenticação do histórico de partidas (a Steam chama de
   /// "match history authentication code"). Só serve para pedir o próximo
@@ -492,4 +495,34 @@ model PendingCapture {
 
   @@index([proximaEm])
   @@map("pending_captures")
+}
+
+/// O bot conta como está a cada tick. Uma linha só.
+model BotStatus {
+  id           String    @id @default("bot")
+  ultimoTickEm DateTime
+  amigos       Int       @default(0)
+  gcConectado  Boolean   @default(false)
+  iniciadoEm   DateTime?
+
+  @@map("bot_status")
+}
+
+/// O que aconteceu de notável — erros e transições que o painel lista.
+///
+/// Não é analytics de clique: é o diário de operação. Um `catch` que só
+/// escrevia no log da Vercel passa a deixar uma linha aqui, com quem e o
+/// quê, para o painel mostrar sem ninguém abrir log.
+model Evento {
+  id String @id @default(cuid())
+
+  nome   String
+  userId String?
+  dados  Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([nome, createdAt])
+  @@map("eventos")
 }

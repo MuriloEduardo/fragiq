@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { env } from "./env";
 import { decodificarShareCode, normalizarShareCode, shareCodeValido } from "./sharecode";
 import { getPlayerSummaries } from "./steam/api";
+import { registrar, reportarErro } from "./eventos";
 
 /**
  * Partidas detalhadas: o caminho que o csstats usa, com o mínimo de atrito.
@@ -101,6 +102,7 @@ export async function proximoShareCode(steamId: string, authCode: string, conhec
  * clara na hora, não uma fila que nunca anda.
  */
 export async function ativarPartidas(userId: string, steamId: string, authCode: string, shareCode: string) {
+  await registrar("corrente.ativada", { userId });
   const share = normalizarShareCode(shareCode);
   if (!authCodeValido(authCode)) throw new CodigoInvalido("auth", "O código de autenticação tem o formato XXXX-XXXXX-XXXX.");
   if (!shareCodeValido(share)) throw new CodigoInvalido("share", "O share code tem o formato CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx (pode colar o link inteiro).");
@@ -166,8 +168,9 @@ export async function descobrirPartidas(userId: string): Promise<number> {
   } catch (err) {
     if (err instanceof CodigoInvalido && err.campo !== "steam") {
       await prisma.user.update({ where: { id: userId }, data: { partidasErro: err.message } });
+      await registrar("corrente.parou", { userId, dados: { campo: err.campo } });
     } else {
-      console.error("[partidas] corrente parou:", err instanceof Error ? err.message : err);
+      await reportarErro("partidas.corrente", err, userId);
     }
   }
   return novas;

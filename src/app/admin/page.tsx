@@ -30,7 +30,9 @@ export default async function AdminPage() {
   ]);
   if (!user) redirect("/");
 
-  const { totais, usuarios, porDia } = painel;
+  const { totais, usuarios, porDia, funil, saude, eventos } = painel;
+  const tickHa = saude.bot ? Date.now() - saude.bot.ultimoTickEm.getTime() : null;
+  const botVivo = tickHa !== null && tickHa < 2 * 60_000;
 
   return (
     <>
@@ -55,6 +57,69 @@ export default async function AdminPage() {
             nota={`${totais.analisesRespondidas} respondidas · ${totais.feedbacks} feedback${totais.feedbacks === 1 ? "" : "s"}`}
           />
         </section>
+
+        <Secao titulo="Saúde" sub="O bot conta como está a cada 30 s; o resto são as filas que ele e o site compartilham.">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Tile
+              rotulo="Bot"
+              valor={botVivo ? "vivo" : saude.bot ? "parado" : "nunca"}
+              nota={
+                saude.bot
+                  ? `tick há ${Math.round((tickHa ?? 0) / 1000)} s · ${saude.bot.amigos} amigos · GC ${saude.bot.gcConectado ? "ok" : "fora"}`
+                  : "nenhum tick recebido"
+              }
+              alerta={!botVivo}
+            />
+            <Tile
+              rotulo="Capturas pendentes"
+              valor={saude.capturasPendentes.total}
+              nota={
+                saude.capturasPendentes.maisAntigaEm
+                  ? `mais antiga há ${Math.round((Date.now() - saude.capturasPendentes.maisAntigaEm.getTime()) / 60_000)} min · tentativa ${saude.capturasPendentes.maxTentativa}`
+                  : "nada esperando a Steam"
+              }
+              alerta={saude.capturasPendentes.maxTentativa >= 3}
+            />
+            <Tile
+              rotulo="Partidas na fila"
+              valor={saude.partidasNaFila}
+              nota={`${saude.partidasExpiradas} expiradas/falhas no total`}
+              alerta={saude.partidasNaFila > 5}
+            />
+            <Tile
+              rotulo="Chat 24 h"
+              valor={saude.chat24h.enviadas}
+              nota={`${saude.chat24h.falhas} falha${saude.chat24h.falhas === 1 ? "" : "s"} · ${saude.chat24h.pendentes} pendente${saude.chat24h.pendentes === 1 ? "" : "s"} · ${saude.erros24h} erro${saude.erros24h === 1 ? "" : "s"} no diário`}
+              alerta={saude.chat24h.falhas > 0 || saude.erros24h > 0}
+            />
+          </div>
+        </Secao>
+
+        <Secao titulo="Funil de ativação" sub="Derivado do estado de cada conta, não de cliques. Quem parou numa etapa aparece pelo nome.">
+          <ol className="grid gap-2">
+            {funil.map((e, i) => {
+              const base = funil[0].chegaram || 1;
+              return (
+                <li key={e.id} className="rounded-xl border border-line bg-surface px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="num w-6 text-xs text-ink-faint">{i + 1}</span>
+                    <span className="flex-1 text-sm">{e.rotulo}</span>
+                    <span className="num text-sm font-medium">{e.chegaram}</span>
+                    <span className="num w-12 text-right text-xs text-ink-faint">{Math.round((e.chegaram / base) * 100)}%</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${(e.chegaram / base) * 100}%` }} />
+                  </div>
+                  {e.presos.length > 0 && (
+                    <p className="mt-2 text-xs text-ink-faint">
+                      Presos aqui: <span className="text-ink-muted">{e.presos.join(", ")}</span>
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </Secao>
 
         <section className="mt-8 grid gap-3 lg:grid-cols-2">
           <BarrasPorDia titulo="Cadastros por dia" pontos={porDia.cadastros} />
@@ -146,6 +211,19 @@ export default async function AdminPage() {
           />
         </Secao>
 
+        <Secao titulo="Diário" sub="Erros e transições que antes só existiam no log: quem, o quê, quando.">
+          <Tabela
+            cabecalho={["Quando", "Evento", "Quem", "Detalhe"]}
+            vazio="Nada registrado ainda."
+            linhas={eventos.map((e) => [
+              <span key="q" className="whitespace-nowrap text-ink-muted" suppressHydrationWarning>{dataHora(e.createdAt)}</span>,
+              <span key="n" className={cn("font-mono text-xs", e.nome === "erro" && "text-danger")}>{e.nome}</span>,
+              e.persona ?? <span key="p" className="text-ink-faint">—</span>,
+              <span key="d" className="font-mono text-xs text-ink-muted">{e.dados ? JSON.stringify(e.dados).slice(0, 140) : ""}</span>,
+            ])}
+          />
+        </Secao>
+
         <Secao titulo="Feedback" sub="O que as pessoas escreveram, e de onde.">
           {painel.feedbacks.length === 0 ? (
             <Vazio texto="Nenhum feedback ainda." />
@@ -171,11 +249,13 @@ export default async function AdminPage() {
 
 /* ------------------------------ peças ----------------------------------- */
 
-function Tile({ rotulo, valor, nota }: { rotulo: string; valor: number; nota: string }) {
+function Tile({ rotulo, valor, nota, alerta = false }: { rotulo: string; valor: number | string; nota: string; alerta?: boolean }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-4">
+    <div className={cn("rounded-xl border bg-surface p-4", alerta ? "border-danger/50" : "border-line")}>
       <p className="text-xs text-ink-muted">{rotulo}</p>
-      <p className="tnum mt-1.5 text-2xl font-semibold">{valor.toLocaleString("pt-BR")}</p>
+      <p className={cn("tnum mt-1.5 text-2xl font-semibold", alerta && "text-danger")}>
+        {typeof valor === "number" ? valor.toLocaleString("pt-BR") : valor}
+      </p>
       <p className="mt-1 text-[11px] text-ink-faint">{nota}</p>
     </div>
   );

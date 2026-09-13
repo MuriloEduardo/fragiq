@@ -85,6 +85,7 @@ declare module "steam-user" {
       ) => void | Promise<void>,
     ): this;
     on(event: "friendRelationship", cb: (steamID: SteamID, relationship: number) => void): this;
+    on(event: "friendsList", cb: () => void): this;
     on(event: "user", cb: (steamID: SteamID, user: PersonaUser) => void): this;
     on(event: "appOwnershipCached", cb: () => void): this;
     on(event: "webSession", cb: (sessionID: string, cookies: string[]) => void): this;

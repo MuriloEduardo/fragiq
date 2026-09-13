@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { syncUser, type MatchContext } from "./steam/sync";
 import { avisarPrivacidadeSePreciso } from "./mensagem-steam";
+import { registrar, reportarErro } from "./eventos";
 
 /**
  * Coleta reativa com memória.
@@ -71,7 +72,7 @@ export async function processarCapturasDevidas(limite = 5): Promise<ResultadoDoT
       const result = await syncUser(c.userId, c.steamId, "EVENT", contexto);
       gravou = result.snapshotsCreated > 0 || (await anexarContexto(c.userId, contexto));
     } catch (err) {
-      console.error(`[capturas] sync falhou para ${c.steamId}:`, err instanceof Error ? err.message : err);
+      await reportarErro("capturas.sync", err, c.userId);
     }
 
     if (gravou) {
@@ -86,9 +87,11 @@ export async function processarCapturasDevidas(limite = 5): Promise<ResultadoDoT
       // mostrar ("Detalhes do jogo" privado — e a pessoa fica sabendo) ou
       // o cron das 02:00 pega. Guardar mais não ajuda.
       await prisma.pendingCapture.deleteMany({ where: { id: c.id } });
-      await avisarPrivacidadeSePreciso(c.userId, c.steamId).catch((e) =>
-        console.error("[capturas] aviso de privacidade falhou:", e instanceof Error ? e.message : e),
-      );
+      const avisou = await avisarPrivacidadeSePreciso(c.userId, c.steamId).catch((e) => {
+        void reportarErro("capturas.avisoPrivacidade", e, c.userId);
+        return false;
+      });
+      await registrar("captura.desistida", { userId: c.userId, dados: { mapa: c.matchMap, avisouPrivacidade: avisou } });
       r.desistidas++;
       continue;
     }
