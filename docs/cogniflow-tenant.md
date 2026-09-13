@@ -1,6 +1,6 @@
 # O analista: FragIQ como tenant do cogniflow
 
-A seção "Pergunte ao analista" na página do jogo não chama um modelo daqui.
+A análise de sessão na página do jogo não chama um modelo daqui.
 O FragIQ é um **tenant do cogniflow** — o runtime de agentes da SistemasGlobal
 que já atende WhatsApp e e-mail — conectado pelo canal `webhook`, que existe
 justamente para a aplicação do próprio cliente ser um canal como outro

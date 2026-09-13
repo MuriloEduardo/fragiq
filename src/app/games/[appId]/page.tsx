@@ -60,7 +60,7 @@ export default async function ResumoPage({ params }: { params: Promise<{ appId: 
       {sessao && <SessaoHero sessao={sessao} vitalicio={vitaliciosDoHero(rows)} />}
 
       {analista && (
-        <Secao titulo="Análise" href={`/games/${appId}/analista`} acao="conversar">
+        <Secao titulo="Análise" href={`/games/${appId}/analista`} acao="histórico">
           <Analista appId={appId} iniciais={analista[0]} sessaoSemAnalise={analista[1]} modo="resumo" />
         </Secao>
       )}

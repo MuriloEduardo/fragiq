@@ -7,7 +7,7 @@ import { Analista } from "@/components/analista";
 
 export const dynamic = "force-dynamic";
 
-/** A conversa inteira com o analista: a sessão e o que foi perguntado. */
+/** Todas as análises de sessão, da mais recente à mais antiga. Nada a digitar. */
 export default async function AnalistaPage({ params }: { params: Promise<{ appId: string }> }) {
   const session = await requireSession();
   const appId = Number((await params).appId);

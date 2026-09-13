@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
  * Uma página só com tudo empilhado era uma rolagem de 12 mil pixels em que
  * o painel, as leituras e a tabela de 178 métricas disputavam a mesma
  * atenção. Separar por pergunta — "como foi?", "como estou?", "o que
- * joguei?", "o contador X", "pergunte" — é o que deixa cada tela curta.
+ * joguei?", "o contador X", "o que o analista disse" — é o que deixa cada
+ * tela curta.
  */
 const ABAS = [
   { seg: "", rotulo: "Resumo" },
@@ -18,7 +19,7 @@ const ABAS = [
   { seg: "sessoes", rotulo: "Sessões" },
   { seg: "partidas", rotulo: "Partidas" },
   { seg: "metricas", rotulo: "Métricas" },
-  { seg: "analista", rotulo: "Analista" },
+  { seg: "analista", rotulo: "Análises" },
 ] as const;
 
 export function NavJogo({ appId }: { appId: number }) {

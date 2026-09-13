@@ -19,9 +19,11 @@ export type AnaliseDTO = {
   status: "PENDING" | "ACKNOWLEDGED" | "ANSWERED" | "FAILED";
   createdAt: string;
   answeredAt: string | null;
+  /** Quando a sessão analisada foi coletada (SESSION). */
+  sessaoEm: string | null;
 };
 
-/** As últimas perguntas do jogador para o jogo, da mais recente à mais antiga. */
+/** As últimas análises do jogador para o jogo, da mais recente à mais antiga. */
 export async function listarAnalises(userId: string, appId: number): Promise<AnaliseDTO[]> {
   const rows = await prisma.analysis.findMany({
     where: { userId, gameAppId: appId },
@@ -35,11 +37,13 @@ export async function listarAnalises(userId: string, appId: number): Promise<Ana
       status: true,
       createdAt: true,
       answeredAt: true,
+      snapshot: { select: { capturedAt: true } },
     },
   });
   const limite = Date.now() - TIMEOUT_MS;
-  return rows.map((r) => ({
+  return rows.map(({ snapshot, ...r }) => ({
     ...r,
+    sessaoEm: snapshot?.capturedAt.toISOString() ?? null,
     // Uma pendente velha demais é apresentada como perdida, sem escrever no
     // banco: se a resposta chegar atrasada, o callback ainda a encontra.
     status:

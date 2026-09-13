@@ -197,8 +197,9 @@ Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:
 
 ## O analista
 
-"Pergunte ao analista", na página do jogo, é um agente que lê a mesma série e
-responde em texto. Ele não roda aqui: o FragIQ é um tenant do **cogniflow**,
+A análise de cada sessão, na página do jogo, vem de um agente que lê a mesma
+série e responde em texto — disparado por nós a cada sessão fechada (sync,
+cron, bot, scoreboard do GC), nunca por uma pergunta digitada. Ele não roda aqui: o FragIQ é um tenant do **cogniflow**,
 conectado pelo canal webhook — a pergunta sai assinada, a resposta volta por
 callback, e durante o turno o agente consulta `/api/cogniflow/data`, que
 expõe as mesmas derivações de `series.ts` como views. Provisionamento,
@@ -216,7 +217,7 @@ src/lib/
   series.ts                   motor de consulta do explorador
   stats.ts                    formatação e métricas derivadas de CS2
   analista.ts                 views que o analista consulta (data.read)
-  cogniflow.ts                assinatura e envio de perguntas ao cogniflow
+  cogniflow.ts                assinatura e envio de pedidos de análise ao cogniflow
   steam/openid.ts             OpenID 2.0
   steam/api.ts                cliente da Web API
   steam/sync.ts               ingestão com gate de playtime
@@ -233,6 +234,6 @@ src/app/
   p/[steamId]/vs/[outro]/     dois perfis lado a lado
   amigos/                     amigos da Steam no FragIQ, pedidos, quem segue quem
   seguranca/                  o que lemos, guardamos e nunca tocamos; exportar e apagar
-  api/analises/               perguntas ao analista
+  api/analises/               análises de sessão (listar; pedir a que falta)
   api/cogniflow/              callback e dados, assinados pelo cogniflow
 ```
