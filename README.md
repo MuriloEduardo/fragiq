@@ -270,26 +270,15 @@ leitura dentro de uma requisição (`src/lib/segredos.ts`; não no boot — o
 token OIDC é um header da requisição). O que precisa ficar na
 Vercel, e o passo a passo da AWS, estão em [docs/segredos.md](docs/segredos.md).
 
-## Limpeza pendente (depois da fase 2 do cogniflow)
+## O bot é nosso, a Web API é do cogniflow
 
-Quando o canal `steam:chat` e o `steam-worker` existirem no cogniflow
-(`cogniflow/orchestration-service/docs/STEAM.md`), isto deixa de ter razão
-de existir aqui e pode ser apagado:
-
-- `bot/` inteiro (presença, chat, GC) e o EC2 `fragiq-bot`;
-- `src/app/api/bot/*` (amigos, outbox, partidas, tick) e `src/lib/bot.ts`;
-- `SteamMessage` e a outbox em `src/lib/mensagem-steam.ts` — as mensagens
-  proativas viram `messaging.send` pela API de capabilities;
-- `src/app/api/sync/steam-event` — vira um handler do evento
-  `steam.match.ended` no callback já assinado do cogniflow;
-- `BOT_WEBHOOK_SECRET`, `BOT_STEAM_ID`, `BotStatus`;
-- `bot/src/partidas.ts` — o scoreboard passa a chegar por
-  `steam.match.read`.
-
-Fica: `PendingCapture` e as retentativas (é conhecimento sobre quando a
-Steam publica, não sobre como falar com ela), o gate de playtime, o
-snapshot, as sessões, a corrente de share codes (a chamada já passa pelo
-cogniflow).
+Decisão de 14/09/2026: o cogniflow não fala o protocolo do cliente Steam
+(chat, presença, amizades, Game Coordinator) — uma conta bot é um ativo do
+tenant, e a única biblioteca mantida para esse protocolo é Node. Então
+`bot/` continua aqui, com a outbox, `/api/bot/*` e `/api/sync/steam-event`,
+e o que mudou de mão foi só a Web API: perfil, biblioteca, estatísticas,
+amigos e a corrente de share codes vêm das capabilities `steam.*` do
+cogniflow. A `STEAM_API_KEY` não existe mais neste projeto.
 
 ## Estrutura
 

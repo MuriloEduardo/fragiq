@@ -224,10 +224,10 @@ Uma recusa da Steam volta como 502 com `provider_status` — 403 é a chave,
 antes; 503 é indisponibilidade e vale repetir no próximo cron.
 
 O que continua daqui: o gate de playtime, o snapshot, `classifyMetric`, as
-retentativas de captura (`PendingCapture`) e a decisão de quem sincronizar
-quando. O bot de presença (`bot/`) ainda é nosso; migrá-lo para um canal
-`steam:chat` do cogniflow é a fase 2, descrita em
-`cogniflow/orchestration-service/docs/STEAM.md`.
+retentativas de captura (`PendingCapture`), a decisão de quem sincronizar
+quando — e o bot de presença (`bot/`), por decisão de 14/09/2026: o
+cogniflow não fala o protocolo do cliente Steam; uma conta bot é do tenant
+(`cogniflow/orchestration-service/docs/STEAM.md`).
 
 ## Contrato do `data.read` (o que o agente pode perguntar)
 
