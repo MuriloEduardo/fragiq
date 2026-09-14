@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/session";
 import { carregarFonte } from "@/lib/fonte";
 import { todasAsMetricas } from "@/lib/leituras";
 import { MetricTable } from "@/components/metric-table";
+import { gaugesLookStale } from "@/lib/series";
 import { filtroDoModo } from "@/lib/modo";
 import { abasDoUsuario, modoDaRequisicao, type SearchParams } from "@/lib/modo-servidor";
 
@@ -17,5 +18,5 @@ export default async function MetricasPage({ params, searchParams }: { params: P
   const modo = await modoDaRequisicao(searchParams, await abasDoUsuario(session.userId, appId));
 
   const linhas = todasAsMetricas(fonte.rows, fonte.catalog.map((c) => c.key), filtroDoModo(modo));
-  return <MetricTable linhas={linhas} appId={appId} />;
+  return <MetricTable linhas={linhas} appId={appId} congeladas={gaugesLookStale(fonte.rows)} />;
 }

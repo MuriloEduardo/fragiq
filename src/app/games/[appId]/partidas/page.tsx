@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { listarPartidas } from "@/lib/partidas";
 import { AtivarPartidas, PAGINA_STEAM } from "@/components/ativar-partidas";
 import { PartidasTabela } from "@/components/partidas-tabela";
+import { Estado } from "@/components/estado";
 import { filtroDoModo, rotuloDoModo, TUDO } from "@/lib/modo";
 import { abasDoUsuario, modoDaRequisicao, type SearchParams } from "@/lib/modo-servidor";
 
@@ -39,17 +40,12 @@ export default async function PartidasPage({ params, searchParams }: { params: P
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
         <section className="rounded-2xl bg-surface p-6 ring-1 ring-line">
           <p className="hud">Partidas oficiais</p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight">Cada partida, com o placar dos dez.</h2>
-          <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-            A Steam guarda o scoreboard de cada partida de matchmaking (Premier, Competitivo, Wingman), mas
-            só entrega para quem tiver um código gerado por você. Com ele, cada partida nova chega aqui
-            sozinha: K/D, HS, MVPs, score, placar — e quem do FragIQ estava do seu lado ou contra.
-          </p>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight">Cada partida com placar e os dez jogadores.</h2>
+          <p className="mt-3 text-sm leading-relaxed text-ink-muted">Um código da Steam, colado uma vez.</p>
           <ul className="mt-4 space-y-1.5 text-sm text-ink-muted">
-            <li>· Uma vez só. Depois, nunca mais pede nada.</li>
-            <li>· O código só lê o histórico de partidas. Não vê inventário, chat, amigos nem senha.</li>
-            <li>· Guardado cifrado. Revogue aqui ou gerando outro na Steam — o antigo morre na hora.</li>
-            <li>· Cobre partidas oficiais da Valve. FACEIT e Gamers Club não entram (ainda).</li>
+            <li>· Só histórico de partidas</li>
+            <li>· Cifrado; revogável aqui</li>
+            <li>· FACEIT e Gamers Club não entram</li>
           </ul>
         </section>
         <section className="rounded-2xl bg-surface p-6 ring-1 ring-line">
@@ -88,24 +84,21 @@ export default async function PartidasPage({ params, searchParams }: { params: P
         </p>
       )}
       {partidas.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line px-6 py-10 text-center text-sm text-ink-faint">
-          {pendentes > 0
-            ? "Buscando o scoreboard…"
-            : modo === TUDO
-              ? "Nenhuma partida ainda. A próxima que você jogar aparece aqui depois da coleta."
-              : `Nenhuma partida de ${rotuloDoModo(modo)} com scoreboard ainda. Partidas sem modo conhecido ficam em "Tudo".`}
-        </p>
+        <Estado
+          titulo={pendentes > 0 ? "Buscando o scoreboard" : modo === TUDO ? "Nenhuma partida ainda" : `Nenhuma partida em ${rotuloDoModo(modo)}`}
+          texto={pendentes > 0 ? "O bot pergunta ao Game Coordinator em até um minuto." : modo === TUDO ? "A próxima que você jogar entra depois da coleta." : "Partidas sem modo conhecido ficam em Tudo."}
+          acao={modo === TUDO ? undefined : { rotulo: "Ver todas", href: `/games/${appId}/partidas` }}
+        />
       ) : (
         <PartidasTabela partidas={partidas} />
       )}
       {ativo && (
         <p className="text-xs text-ink-faint">
-          Corrente ligada{user?.shareCodeAtual ? ` · última conhecida ${user.shareCodeAtual}` : ""}. A cada coleta pedimos à Steam a
-          próxima. Se a Steam parar de aceitar o código, gere outro na{" "}
+          Corrente ligada · <Link href="/seguranca" className="underline decoration-line hover:text-ink">Revogar</Link>
+          {" · "}
           <a href={PAGINA_STEAM} target="_blank" rel="noreferrer" className="underline decoration-line hover:text-ink">
-            página da Steam
-          </a>{" "}
-          e cole de novo. Para revogar: <Link href="/seguranca" className="underline decoration-line hover:text-ink">Segurança e dados</Link>.
+            gerar outro código
+          </a>
         </p>
       )}
     </div>

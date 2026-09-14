@@ -5,7 +5,10 @@ import Link from "next/link";
 import { ChevronRight, Search } from "lucide-react";
 import type { LinhaMetrica } from "@/lib/leituras";
 import { Sparkline } from "./sparkline";
-import { pontosSimples } from "@/lib/series";
+import { DeltaChip } from "./delta-chip";
+import { GROUP_ORDER, pontosSimples } from "@/lib/series";
+import { formatarNumeroAte } from "@/lib/formato";
+import type { Delta } from "@/lib/delta";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,7 +17,9 @@ import { cn } from "@/lib/utils";
  * Cobertura total sem consulta para montar: cada contador aparece como taxa
  * por round no período contra a taxa de vitalício, que é a única comparação
  * honesta entre um recorte e uma vida inteira. A ordem é por distância do
- * normal, então o topo já é a resposta para "o que mudou".
+ * normal, então o topo já é a resposta para "o que mudou". Chips de grupo
+ * recortam a lista; o grupo "Última partida" (contadores que a Valve
+ * congelou) fica colapsado por padrão.
  */
 
 function fmt(v: number | null, casas = 2) {
@@ -22,22 +27,52 @@ function fmt(v: number | null, casas = 2) {
   // Taxas por round de contador raro ficam na terceira casa. Arredondar para
   // duas mostra "0" ao lado de uma variação de +400%, o que parece defeito.
   const precisao = v !== 0 && Math.abs(v) < 0.1 ? 4 : casas;
-  return v.toLocaleString("pt-BR", { maximumFractionDigits: precisao });
+  return formatarNumeroAte(v, precisao);
 }
 
-export function MetricTable({ linhas, appId }: { linhas: LinhaMetrica[]; appId: number }) {
-  const [busca, setBusca] = useState("");
+const GRUPO_CONGELADO = "Última partida";
 
+function deltaDe(l: LinhaMetrica): Delta {
+  if (l.variacao === null) return { estado: "sem-base", motivo: "sem-normal" };
+  const pct = l.variacao * 100;
+  const direcao = Math.abs(pct) < 3 ? "igual" : pct > 0 ? "sobe" : "desce";
+  return { estado: "ok", valor: pct, unidade: "%", direcao, valencia: "neutral", fraco: !l.relevante };
+}
+
+export function MetricTable({ linhas, appId, congeladas = false }: { linhas: LinhaMetrica[]; appId: number; congeladas?: boolean }) {
+  const [busca, setBusca] = useState("");
+  const [grupo, setGrupo] = useState<string | null>(null);
+  const [mostrarCongeladas, setMostrarCongeladas] = useState(false);
+
+  const grupos = useMemo(() => GROUP_ORDER.filter((g) => linhas.some((l) => l.grupo === g)), [linhas]);
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    if (!q) return linhas;
     return linhas.filter(
-      (l) => l.label.toLowerCase().includes(q) || l.key.toLowerCase().includes(q),
+      (l) =>
+        (!q || l.label.toLowerCase().includes(q) || l.key.toLowerCase().includes(q)) &&
+        (grupo === null || l.grupo === grupo) &&
+        (mostrarCongeladas || grupo === GRUPO_CONGELADO || !congeladas || l.grupo !== GRUPO_CONGELADO),
     );
-  }, [busca, linhas]);
+  }, [busca, grupo, linhas, congeladas, mostrarCongeladas]);
+  const escondidas = congeladas && !mostrarCongeladas && grupo === null ? linhas.filter((l) => l.grupo === GRUPO_CONGELADO).length : 0;
 
   return (
     <div>
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {[null, ...grupos].map((g) => (
+          <button
+            key={g ?? "todas"}
+            type="button"
+            onClick={() => setGrupo(g)}
+            className={cn(
+              "rounded-full px-3 py-1 text-xs ring-1 transition",
+              grupo === g ? "bg-accent-soft text-accent ring-accent/40" : "text-ink-muted ring-line hover:text-ink",
+            )}
+          >
+            {g ?? "Todas"}
+          </button>
+        ))}
+      </div>
       <label className="relative flex items-center">
         <Search className="pointer-events-none absolute left-3 size-4 text-ink-faint" />
         <input
@@ -56,13 +91,21 @@ export function MetricTable({ linhas, appId }: { linhas: LinhaMetrica[]; appId: 
         ) : (
           filtradas.map((l) => <Linha key={l.key} l={l} appId={appId} />)
         )}
+        {escondidas > 0 && (
+          <button
+            type="button"
+            onClick={() => setMostrarCongeladas(true)}
+            className="w-full px-4 py-3 text-left text-xs text-ink-faint transition hover:text-ink"
+          >
+            ▸ {escondidas} contadores de última partida congelados pela Valve
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 function Linha({ l, appId }: { l: LinhaMetrica; appId: number }) {
-  const sobe = l.variacao !== null && l.variacao > 0;
 
   return (
     <Link
@@ -96,31 +139,12 @@ function Linha({ l, appId }: { l: LinhaMetrica; appId: number }) {
         </div>
 
         <div className="min-w-14 text-right">
-          {l.variacao === null ? (
-            <p className="text-ink-faint">—</p>
-          ) : (
-            <p
-              className={cn(
-                "font-medium",
-                !l.relevante ? "text-ink-faint" : sobe ? "text-accent" : "text-ink-muted",
-              )}
-              title={
-                l.relevante
-                  ? undefined
-                  : "Pouco material no período: a variação é ruído de divisão por número pequeno."
-              }
-            >
-              {sobe ? "+" : ""}
-              {(l.variacao * 100).toFixed(0)}%
-            </p>
-          )}
+          {l.variacao === null ? <p className="text-ink-faint">—</p> : <DeltaChip delta={deltaDe(l)} />}
         </div>
       </div>
 
       <div className="hidden h-7 w-24 sm:block">
-        {l.valores.length >= 2 && (
-          <Sparkline pontos={pontosSimples(l.valores)} normal={l.vitalicio} className="h-7 w-full" />
-        )}
+        {l.valores.length >= 2 && <Sparkline pontos={pontosSimples(l.valores)} normal={l.vitalicio} className="h-7 w-full" />}
       </div>
 
       <ChevronRight className="size-4 shrink-0 text-ink-faint" aria-hidden />

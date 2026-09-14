@@ -38,7 +38,7 @@ export function PartidasTabela({ partidas, publica = false }: { partidas: Partid
                   <Link href={`/partida/${p.id}`} className="underline decoration-line-soft underline-offset-4 hover:text-accent">
                     {p.mapa ? rotularMapa(p.mapa) : "Partida"}
                   </Link>
-                  {p.modo && <span className="ml-2 text-xs text-ink-faint">{rotularModo(p.modo)}</span>}
+                  {p.modo && <span className="ml-2 rounded-full px-2 py-0.5 text-xs text-ink-muted ring-1 ring-line">● {rotularModo(p.modo)}</span>}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span

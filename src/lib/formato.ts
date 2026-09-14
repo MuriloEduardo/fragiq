@@ -22,6 +22,11 @@ export function formatarNumero(v: number, casas = 0, l = getLocale()): string {
   return v.toLocaleString(l.locale, { minimumFractionDigits: casas, maximumFractionDigits: casas });
 }
 
+/** Até `casas` decimais, sem zeros à direita: para valores de escala variável. */
+export function formatarNumeroAte(v: number, casas: number, l = getLocale()): string {
+  return v.toLocaleString(l.locale, { maximumFractionDigits: casas });
+}
+
 /** Porcentagem já em 0–100. */
 export function formatarPct(v: number, casas = 0, l = getLocale()): string {
   return `${formatarNumero(v, casas, l)}%`;
