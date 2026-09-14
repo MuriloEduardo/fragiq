@@ -4,6 +4,7 @@ import { carregarFonte } from "./fonte";
 import { listarSessoes, vitaliciosDoHero, type Sessao } from "./sessoes";
 import { listarPartidas, type PartidaLinha } from "./partidas";
 import { rotularMapa } from "./cs2-labels";
+import { LEMBRETES_PRIVACIDADE } from "./pendencias";
 
 /**
  * A sessão no chat da Steam, em três linhas.
@@ -109,22 +110,17 @@ export async function avisarPrivacidadeSePreciso(userId: string, steamId: string
     where: { id: userId },
     select: {
       avisoSteam: true,
-      avisoPrivacidadeEm: true,
+      avisosPrivacidade: true,
       games: { where: { gameAppId: 730 }, select: { _count: { select: { snapshots: true } } } },
     },
   });
-  if (!user || !user.avisoSteam || user.avisoPrivacidadeEm) return false;
+  if (!user || !user.avisoSteam || user.avisosPrivacidade > 0) return false;
   if ((user.games[0]?._count.snapshots ?? 0) > 0) return false;
 
-  const texto = [
-    "FragIQ · Vi que você jogou CS2, mas a Steam não deixa o site ler as suas estatísticas: os \"Detalhes do jogo\" do seu perfil estão privados.",
-    "É um clique: https://steamcommunity.com/my/edit/settings → Detalhes do jogo → Público. Depois disso, cada partida entra sozinha.",
-    `Passo a passo: ${appUrl()}/cs2 · para não receber mais: ${appUrl()}/seguranca`,
-  ].join("\n");
-
+  const texto = LEMBRETES_PRIVACIDADE(appUrl())[0];
   await prisma.$transaction([
     prisma.steamMessage.create({ data: { userId, steamId, texto } }),
-    prisma.user.update({ where: { id: userId }, data: { avisoPrivacidadeEm: new Date() } }),
+    prisma.user.update({ where: { id: userId }, data: { avisoPrivacidadeEm: new Date(), avisosPrivacidade: 1 } }),
   ]);
   return true;
 }

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncUser } from "@/lib/steam/sync";
 import { processarCapturasDevidas } from "@/lib/capturas";
+import { lembrarPendenciasNoSteam } from "@/lib/pendencias";
 import { reportarErro } from "@/lib/eventos";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +73,13 @@ export async function GET(request: NextRequest) {
   // O que o bot deixou pendente e o tick não alcançou (bot fora do ar, por
   // exemplo) entra antes da varredura geral, com o contexto que ele viu.
   await processarCapturasDevidas(20).catch((e) => console.error("[cron] capturas pendentes:", e));
+  // Os lembretes do bot (privacidade, corrente de partidas) têm cadência de
+  // dias; o cron diário é o relógio deles.
+  const lembretes = await lembrarPendenciasNoSteam().catch((e) => {
+    console.error("[cron] lembretes:", e);
+    return null;
+  });
+  if (lembretes && (lembretes.stats || lembretes.partidas)) console.log("[cron] lembretes enfileirados:", lembretes);
 
   const run = await prisma.cronRun.create({
     data: { status: "RUNNING", candidates: users.length },

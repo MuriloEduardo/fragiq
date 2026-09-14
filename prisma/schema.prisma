@@ -31,14 +31,16 @@ model User {
   /// Receber a análise de cada sessão no chat da Steam, pelo bot. Só chega
   /// para quem adicionou o bot; desligar aqui silencia mesmo sendo amigo.
   avisoSteam         Boolean   @default(true)
-  /// Quando o bot avisou, no chat, que a Steam não deixa ler as estatísticas
-  /// ("Detalhes do jogo" privado). Uma vez só.
+  /// O último lembrete, no chat, de que a Steam não deixa ler as
+  /// estatísticas ("Detalhes do jogo" privado), e quantos já foram. O bot
+  /// insiste de tempos em tempos (`lembrarPendenciasNoSteam`), com teto.
   avisoPrivacidadeEm DateTime?
-  /// Quando o bot avisou, no chat, que a corrente de share codes está
-  /// desligada — sem ela não há partida oficial nem modo por partida. Uma
-  /// vez só, e só depois de a pessoa ter sessões suficientes para sentir
-  /// falta.
+  avisosPrivacidade  Int       @default(0)
+  /// O último lembrete de que a corrente de share codes está desligada —
+  /// sem ela não há partida oficial nem modo por partida — e quantos já
+  /// foram. Mesma cadência e mesmo teto.
   avisoPartidasEm    DateTime?
+  avisosPartidas     Int       @default(0)
   /// Desde quando o bot de presença é amigo (o bot reporta a lista). null =
   /// não é. É o que o funil de ativação lê sem perguntar à Steam.
   botAmigoDesde      DateTime?

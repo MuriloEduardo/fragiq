@@ -181,9 +181,15 @@ estatística), bot não é amigo (sessões sem modo nem mapa) e corrente de
 share codes desligada (nenhuma partida oficial). `src/lib/pendencias.ts`
 calcula; `components/pendencias-banner.tsx` mostra em toda aba do jogo
 (no Resumo o onboarding já conta a história), dispensável por uma semana.
-No chat da Steam, para quem o bot alcança, uma mensagem por porta, uma vez
-só: a de privacidade quando uma captura desiste, a das partidas depois da
-terceira sessão sem corrente (`User.avisoPrivacidadeEm`, `avisoPartidasEm`).
+No chat da Steam, para quem o bot alcança, o bot **insiste com teto**
+(`lembrarPendenciasNoSteam`, chamado pelo cron diário): o primeiro lembrete
+depois de dois dias de amizade — ou, para as partidas, já na terceira
+sessão sem corrente —, os seguintes a cada sete dias, no máximo três por
+porta, com texto diferente a cada vez e sempre dizendo o mesmo no fundo: é
+seguro, é uma vez só, e é o que toda plataforma (Leetify, csstats, Scope)
+pede. Para quando a pessoa liga, desliga os avisos em /seguranca ou já
+ouviu três vezes (`User.avisoPrivacidadeEm/avisosPrivacidade`,
+`avisoPartidasEm/avisosPartidas`).
 
 ## O explorador
 
