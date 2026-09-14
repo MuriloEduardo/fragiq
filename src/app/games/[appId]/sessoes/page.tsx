@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { carregarFonte } from "@/lib/fonte";
 import { listarSessoes, formatarQuando } from "@/lib/sessoes";
+import { filtroDoModo, rotuloDoModo, TUDO } from "@/lib/modo";
+import { abasDoUsuario, modoDaRequisicao, type SearchParams } from "@/lib/modo-servidor";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -13,18 +15,21 @@ export const dynamic = "force-dynamic";
  * sem ele é o que foi jogado entre duas coletas. Os números são os mesmos
  * do hero do Resumo, para a lista e o destaque nunca discordarem.
  */
-export default async function SessoesPage({ params }: { params: Promise<{ appId: string }> }) {
+export default async function SessoesPage({ params, searchParams }: { params: Promise<{ appId: string }>; searchParams: SearchParams }) {
   const session = await requireSession();
   const appId = Number((await params).appId);
   const fonte = await carregarFonte(session.userId, appId);
   if (!fonte) notFound();
+  const modo = await modoDaRequisicao(searchParams, await abasDoUsuario(session.userId, appId));
 
-  const sessoes = listarSessoes(fonte.rows).reverse();
+  const sessoes = listarSessoes(fonte.rows, filtroDoModo(modo)).reverse();
 
   if (sessoes.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-line px-6 py-10 text-center text-sm text-ink-faint">
-        Nenhuma sessão ainda: é preciso duas coletas com partidas entre elas.
+        {modo === TUDO
+          ? "Nenhuma sessão ainda: é preciso duas coletas com partidas entre elas."
+          : `Nenhuma sessão de ${rotuloDoModo(modo)} ainda.`}
       </p>
     );
   }

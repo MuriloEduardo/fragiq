@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { TUDO, comModo } from "@/lib/modo";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,19 +25,21 @@ const ABAS = [
 
 export function NavJogo({ appId }: { appId: number }) {
   const pathname = usePathname();
+  const modo = useSearchParams().get("modo") ?? TUDO;
   const base = `/games/${appId}`;
 
   return (
     <nav aria-label="Áreas" className="-mb-px flex gap-1 overflow-x-auto">
       {ABAS.map(({ seg, rotulo }) => {
         const href = seg ? `${base}/${seg}` : base;
+        const destino = comModo(href, modo);
         const ativa = seg
           ? pathname === href || pathname.startsWith(`${href}/`) || (seg === "estatisticas" && pathname.startsWith(`${base}/painel/`))
           : pathname === base;
         return (
           <Link
             key={seg}
-            href={href}
+            href={destino}
             className={cn(
               "shrink-0 border-b-2 px-3 py-2.5 text-sm transition",
               ativa

@@ -28,10 +28,15 @@ POST /api/analises
 A análise chega sozinha: toda coleta que fecha uma sessão (rounds subiram
 desde o ponto anterior) cria uma `Analysis` de tipo `SESSION` amarrada à
 coleta (`snapshotId` único) e manda ao agente "Nova sessão registrada em …:
-N rounds em M partidas. Analise esta sessão contra o meu normal…". O gatilho
-está no sync (cron, bot, manual, login) e a página repete o pedido ao abrir
-se a sessão mais recente ainda não tem análise. Perguntar continua possível,
-como acompanhamento.
+N rounds em M partidas — modo premier (Premier), mapa de_mirage (Mirage),
+placar 13:9. Analise esta sessão contra o meu normal… Comece pela view
+resumo com modo="premier", e mantenha esse modo em toda consulta". O
+gatilho está no sync (cron, bot, manual, login) e a página repete o pedido
+ao abrir se a sessão mais recente ainda não tem análise.
+
+O modo da sessão vem do rich presence que o bot observou (ou do que a
+pessoa marcou à mão); sem bot a mensagem vai sem modo e o analista compara
+com o vitalício de tudo, que é o único normal que existe nesse caso.
 
 Um único segredo (HMAC-SHA256 do corpo, header `X-Signature-256`) assina os
 três caminhos. A conversa no cogniflow é `${userId}:${appId}`, então o agente
@@ -134,6 +139,53 @@ Versões seguintes do prompt entram pelo painel admin
 (`POST /admin/agents/fragiq/analista/versions` com `publish=true`), que copia
 capabilities e graph da anterior.
 
+### 3b. Grants `steam.*` (a Steam passa pelo cogniflow)
+
+Desde 13/09/2026 o FragIQ não tem chave da Steam: perfil, biblioteca,
+estatísticas, amigos, vanity URL e a corrente de share codes são capabilities
+`steam.*` do cogniflow, chamadas pela API de capabilities (abaixo) com o
+mesmo segredo da conexão. Os grants são os da versão publicada do agente, e
+a rota de versões aceita a lista inteira:
+
+```bash
+curl -X POST https://<dominio-do-admin>/admin/agents/fragiq/analista/versions \
+  -H "Authorization: Bearer <token Cognito>" -H "Content-Type: application/json" \
+  -d '{"notes": "grants steam.*", "capabilities": [
+        "messaging.send", "data.read",
+        "steam.player.read", "steam.library.read", "steam.stats.read",
+        "steam.stats.schema.read", "steam.friends.read", "steam.vanity.resolve",
+        "steam.match.code.next"]}'
+```
+
+Sem sessão no painel, o mesmo pelo CLI, como task avulsa do ECS (é como a
+v2 foi publicada em 14/09/2026, junto com o prompt novo):
+
+```bash
+aws ecs run-task --cluster cogniflow --launch-type FARGATE \
+  --task-definition orchestration-service \
+  --network-configuration "$(aws ecs describe-services --cluster cogniflow \
+      --services orchestration-worker --query 'services[0].networkConfiguration' --output json)" \
+  --overrides '{"containerOverrides":[{"name":"orchestration-service","command":[
+    "python","-m","app.admin.versions","--tenant","fragiq","--agent-slug","analista",
+    "--capability","messaging.send","--capability","data.read",
+    "--capability","steam.player.read","--capability","steam.library.read",
+    "--capability","steam.stats.read","--capability","steam.stats.schema.read",
+    "--capability","steam.friends.read","--capability","steam.vanity.resolve",
+    "--capability","steam.match.code.next",
+    "--prompt","<o prompt da seção abaixo>","--publish","--notes","grants steam.* e formato fixo"]}]}'
+```
+
+A lista substitui a anterior (o que ela omite cai; a config de
+`messaging.send` sobrevive). O prompt e o graph são copiados quando não
+informados. Sem estes grants a API responde 404 para `steam.*` e o cron
+para de coletar — o log do sync mostra `cogniflow steam.library.read
+respondeu 404`.
+
+O agente também ganha as mesmas tools no turno. O prompt de hoje não as
+menciona e o analista continua lendo só `data_read`, que é o certo: a série
+é do FragIQ, a Steam só tem o total de agora. Elas ficam disponíveis para
+quando fizer sentido ("qual é o nome desse amigo?").
+
 ### 4. FragIQ na Vercel
 
 | Variável | Valor |
@@ -141,9 +193,41 @@ capabilities e graph da anterior.
 | `COGNIFLOW_WEBHOOK_URL` | `https://<dominio-do-integration-service>/webhooks/webhook` |
 | `COGNIFLOW_CLIENT_ID` | `fragiq` |
 | `COGNIFLOW_SIGNING_SECRET` | o mesmo `WEBHOOK_SIGNING_SECRET` do passo 1 |
+| `COGNIFLOW_API_URL` | `https://<dominio-do-orchestration-admin>` (o processo do painel serve `/capabilities`) |
+| `COGNIFLOW_TENANT_ID` | `fragiq` |
+| `COGNIFLOW_CONNECTION_ID` | `web` |
 
-Sem as três, a seção não aparece e nenhuma rota `/api/cogniflow/*` aceita
-nada (404). Depois de setar, redeploy.
+Sem as três primeiras, a seção do analista não aparece e nenhuma rota
+`/api/cogniflow/*` aceita nada (404). Sem as três últimas (mais o segredo),
+nenhuma coleta roda: `src/lib/steam/api.ts` lança na primeira chamada. A
+`STEAM_API_KEY` deixou de existir aqui; ela mora em `cogniflow/prod`, no
+topo do JSON, e é a chave da plataforma. Depois de setar, redeploy.
+
+## A API de capabilities (o cron lendo a Steam)
+
+```text
+FragIQ cron / sync                          cogniflow (orchestration-admin)
+──────────────────                          ──────────────────────────────
+POST /capabilities/steam.library.read  ───▶ HMAC do corpo com o segredo da
+  X-Cogniflow-Tenant: fragiq                conexão webhook fragiq/web
+  X-Cogniflow-Connection: web               └─ grants do agente publicado
+  X-Signature-256: sha256=…                 └─ executor → Steam Web API
+  {"input": {"steam_id": "7656…"}}
+                                       ◀─── {"status":"completed","output":{"games":[…]}}
+```
+
+`src/lib/cogniflow-api.ts` faz a chamada; `src/lib/steam/api.ts` traduz os
+nomes estáveis da capability (`name`, `playtime_forever_minutes`) para os
+tipos que o resto do site sempre usou (`personaname`, `playtime_forever`).
+Uma recusa da Steam volta como 502 com `provider_status` — 403 é a chave,
+412 é share code alheio — e vira `SteamApiError`/`CodigoInvalido` como
+antes; 503 é indisponibilidade e vale repetir no próximo cron.
+
+O que continua daqui: o gate de playtime, o snapshot, `classifyMetric`, as
+retentativas de captura (`PendingCapture`) e a decisão de quem sincronizar
+quando. O bot de presença (`bot/`) ainda é nosso; migrá-lo para um canal
+`steam:chat` do cogniflow é a fase 2, descrita em
+`cogniflow/orchestration-service/docs/STEAM.md`.
 
 ## Contrato do `data.read` (o que o agente pode perguntar)
 
@@ -186,8 +270,12 @@ honesto — como um treinador que respeita a inteligência de quem lê.
    uma tendência. Se o período tiver menos de 50 rounds, avise que é
    indício. Se o resumo trouxer leituras com tom "aviso", elas vão na
    resposta.
-4. Compare com o vitalício do próprio jogador, não com o mundo. O produto
-   é "você contra o seu normal".
+4. Compare com o normal do próprio jogador, não com o mundo. O produto
+   é "você contra o seu normal". Quando a mensagem da sessão disser o modo
+   (premier, competitive, casual, scrimcomp2v2…), passe modo="<id>" em TODA
+   consulta: Premier, Competitivo e Casual não se misturam, e com modo o
+   campo vitalicio das views vira o acumulado daquele modo — é contra ele
+   que a sessão se lê. Diga o modo na manchete ou na primeira frase.
 5. O que a Steam não mede, você não inventa: não existe ADR do HLTV, KAST,
    rating, clutch, entry. "Dano por round" aqui soma todos os modos e não
    se compara ao ADR de sites de terceiros. Os contadores por mapa não
@@ -198,10 +286,26 @@ honesto — como um treinador que respeita a inteligência de quem lê.
 
 # Formato da resposta
 
-Texto corrido, no máximo ~150 palavras. Pode usar **negrito** para o número
-central e listas com "- " quando houver 2 a 4 itens paralelos. Sem
-cabeçalhos, sem tabelas, sem emojis. Números no formato brasileiro (1,21 e
-não 1.21). Termine com uma frase acionável quando houver o que fazer.
+A resposta tem uma forma fixa, e a tela depende dela:
+
+Linha 1 — a manchete: UMA frase de até 12 palavras que resume a sessão,
+sem começar por número (ex.: "Sua melhor noite de AWP em duas semanas.").
+
+Linha em branco.
+
+Dois ou três parágrafos curtos (2 a 3 frases cada), separados por linha em
+branco: o que mudou, o que pesou de verdade, e a ressalva de amostra ou de
+modo quando houver. Pode usar **negrito** no número central de cada
+parágrafo e uma lista com "- " quando houver 2 a 4 itens paralelos.
+
+Linha em branco.
+
+Última linha — a ação: começa com "→ " e traz UMA coisa concreta para a
+próxima sessão (ex.: "→ Na próxima, entre pelo B com flash antes do
+contato: 6 das 9 mortes no A foram sem utilitário.").
+
+Sem cabeçalhos, sem tabelas, sem emojis. Números no formato brasileiro
+(1,21 e não 1.21). No máximo ~120 palavras no total.
 
 # data_read: views e parâmetros
 

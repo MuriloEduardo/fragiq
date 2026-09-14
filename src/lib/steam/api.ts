@@ -1,21 +1,15 @@
-import { z } from "zod";
-import { env } from "../env";
+import { CogniflowApiError, invocar } from "../cogniflow-api";
 
-const BASE = "https://api.steampowered.com";
-
-async function call<T>(path: string, params: Record<string, string>, shape: z.ZodType<T>) {
-  const url = new URL(`${BASE}${path}`);
-  url.searchParams.set("key", env().STEAM_API_KEY);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-
-  const res = await fetch(url, { cache: "no-store" });
-
-  // 403 = chave inválida; 400/500 costuma ser "esse appid não tem stats" ou
-  // perfil privado. Quem chama decide se isso é fatal.
-  if (!res.ok) throw new SteamApiError(path, res.status);
-
-  return shape.parse(await res.json());
-}
+/**
+ * A Steam, vista daqui, é um conjunto de capabilities do cogniflow.
+ *
+ * Este módulo já falou com api.steampowered.com diretamente. Hoje quem fala
+ * é o cogniflow — a chave e a cota são da plataforma, e o mesmo `steam.*`
+ * que o cron chama aqui é a tool que o analista tem no turno. O que sobrou
+ * deste lado é o vocabulário que o resto do site usa: os tipos e as funções
+ * mantêm a forma de sempre, e a tradução para os nomes estáveis da
+ * capability (`name` em vez de `personaname`) acontece só aqui.
+ */
 
 export class SteamApiError extends Error {
   constructor(
@@ -27,67 +21,102 @@ export class SteamApiError extends Error {
   }
 }
 
+/**
+ * Uma recusa da Steam vira `SteamApiError` com o status da própria Steam,
+ * como sempre foi (403 = chave; quem chama decide se é fatal). Qualquer
+ * outra falha — cogniflow fora, grant faltando, payload recusado — sobe
+ * como está: não é a Steam dizendo não, é a nossa integração quebrada.
+ */
+async function capability<T>(id: string, input: Record<string, unknown>): Promise<T> {
+  try {
+    return await invocar<T>(id, input);
+  } catch (err) {
+    if (err instanceof CogniflowApiError && err.providerStatus !== null) {
+      throw new SteamApiError(id, err.providerStatus);
+    }
+    throw err;
+  }
+}
+
 /* ---------------------------------- perfil --------------------------------- */
 
-const playerSummary = z.object({
-  steamid: z.string(),
-  personaname: z.string(),
-  avatarfull: z.string().optional(),
-  profileurl: z.string().optional(),
-  loccountrycode: z.string().optional(),
-  // 1 = público. Menos que isso e a biblioteca/stats vêm vazias.
-  communityvisibilitystate: z.number().optional(),
-});
+export type SteamPlayer = {
+  steamid: string;
+  personaname: string;
+  avatarfull?: string;
+  profileurl?: string;
+  loccountrycode?: string;
+  /** 3 = público. Menos que isso e a biblioteca/stats vêm vazias. */
+  communityvisibilitystate?: number;
+};
 
-export type SteamPlayer = z.infer<typeof playerSummary>;
+type Jogador = {
+  steam_id: string;
+  name: string | null;
+  avatar_url: string | null;
+  profile_url: string | null;
+  country: string | null;
+  public: boolean;
+};
+
+function jogador(p: Jogador): SteamPlayer {
+  return {
+    steamid: p.steam_id,
+    personaname: p.name ?? "",
+    avatarfull: p.avatar_url ?? undefined,
+    profileurl: p.profile_url ?? undefined,
+    loccountrycode: p.country ?? undefined,
+    communityvisibilitystate: p.public ? 3 : 1,
+  };
+}
 
 export async function getPlayerSummary(steamId: string): Promise<SteamPlayer | null> {
-  const data = await call(
-    "/ISteamUser/GetPlayerSummaries/v2/",
-    { steamids: steamId },
-    z.object({ response: z.object({ players: z.array(playerSummary) }) }),
-  );
-  return data.response.players[0] ?? null;
+  const { players } = await capability<{ players: Jogador[] }>("steam.player.read", { steam_ids: [steamId] });
+  return players[0] ? jogador(players[0]) : null;
 }
 
 /** Até 100 por chamada; a Steam devolve só os que existem, em qualquer ordem. */
 export async function getPlayerSummaries(steamIds: string[]): Promise<Map<string, SteamPlayer>> {
   const saida = new Map<string, SteamPlayer>();
   for (let i = 0; i < steamIds.length; i += 100) {
-    const data = await call(
-      "/ISteamUser/GetPlayerSummaries/v2/",
-      { steamids: steamIds.slice(i, i + 100).join(",") },
-      z.object({ response: z.object({ players: z.array(playerSummary) }) }),
-    );
-    for (const p of data.response.players) saida.set(p.steamid, p);
+    const { players } = await capability<{ players: Jogador[] }>("steam.player.read", {
+      steam_ids: steamIds.slice(i, i + 100),
+    });
+    for (const p of players) saida.set(p.steam_id, jogador(p));
   }
   return saida;
 }
 
 /* -------------------------------- biblioteca ------------------------------- */
 
-const ownedGame = z.object({
-  appid: z.number(),
-  name: z.string().optional(),
-  playtime_forever: z.number().default(0),
-  playtime_2weeks: z.number().default(0),
-  img_icon_url: z.string().optional(),
-  rtime_last_played: z.number().optional(),
-});
+export type OwnedGame = {
+  appid: number;
+  name?: string;
+  playtime_forever: number;
+  playtime_2weeks: number;
+  img_icon_url?: string;
+  rtime_last_played?: number;
+};
 
-export type OwnedGame = z.infer<typeof ownedGame>;
+type Jogo = {
+  app_id: number;
+  name: string | null;
+  playtime_forever_minutes: number;
+  playtime_2weeks_minutes: number;
+  icon_hash: string | null;
+  last_played_at: number | null;
+};
 
 export async function getOwnedGames(steamId: string): Promise<OwnedGame[]> {
-  const data = await call(
-    "/IPlayerService/GetOwnedGames/v1/",
-    {
-      steamid: steamId,
-      include_appinfo: "1",
-      include_played_free_games: "1", // sem isto CS2 e Dota somem da lista.
-    },
-    z.object({ response: z.object({ games: z.array(ownedGame).optional() }) }),
-  );
-  return data.response.games ?? [];
+  const { games } = await capability<{ games: Jogo[] }>("steam.library.read", { steam_id: steamId });
+  return games.map((g) => ({
+    appid: g.app_id,
+    name: g.name ?? undefined,
+    playtime_forever: g.playtime_forever_minutes ?? 0,
+    playtime_2weeks: g.playtime_2weeks_minutes ?? 0,
+    img_icon_url: g.icon_hash ?? undefined,
+    rtime_last_played: g.last_played_at ?? undefined,
+  }));
 }
 
 /* --------------------------- estatísticas por jogo -------------------------- */
@@ -100,76 +129,28 @@ export type GameStats = {
 
 /**
  * Retorna null (em vez de lançar) quando o jogo simplesmente não expõe stats
- * ou o perfil está privado — nesse caso a Steam responde 400, e um sync de
- * centenas de jogos não pode morrer por causa disso.
+ * ou o perfil está privado — o cogniflow já traduz o 400 da Steam para
+ * `stats: null`, e um sync de centenas de jogos não pode morrer por isso.
  */
-export async function getUserStatsForGame(
-  steamId: string,
-  appId: number,
-): Promise<GameStats | null> {
-  let data;
-  try {
-    data = await call(
-      "/ISteamUserStats/GetUserStatsForGame/v2/",
-      { steamid: steamId, appid: String(appId) },
-      z.object({
-        playerstats: z
-          .object({
-            stats: z.array(z.object({ name: z.string(), value: z.number() })).optional(),
-            achievements: z
-              .array(z.object({ name: z.string(), achieved: z.number() }))
-              .optional(),
-          })
-          .optional(),
-      }),
-    );
-  } catch (err) {
-    if (err instanceof SteamApiError && err.status !== 403) return null;
-    throw err;
-  }
-
-  const stats = data.playerstats?.stats ?? [];
-  const achievements = data.playerstats?.achievements ?? [];
-  if (stats.length === 0 && achievements.length === 0) return null;
-
+export async function getUserStatsForGame(steamId: string, appId: number): Promise<GameStats | null> {
+  const { stats } = await capability<{
+    stats: { metrics: Record<string, number>; achievements_unlocked: number | null; achievements_total: number | null } | null;
+  }>("steam.stats.read", { steam_id: steamId, app_id: appId });
+  if (!stats) return null;
   return {
-    metrics: Object.fromEntries(stats.map((s) => [s.name, s.value])),
-    achievementsUnlocked: achievements.length
-      ? achievements.filter((a) => a.achieved === 1).length
-      : null,
-    achievementsTotal: achievements.length || null,
+    metrics: stats.metrics,
+    achievementsUnlocked: stats.achievements_unlocked,
+    achievementsTotal: stats.achievements_total,
   };
 }
 
 /** Nomes legíveis das stats de um jogo. Igual para todo mundo — cacheamos. */
-export async function getGameStatSchema(
-  appId: number,
-): Promise<Record<string, string> | null> {
+export async function getGameStatSchema(appId: number): Promise<Record<string, string> | null> {
   try {
-    const data = await call(
-      "/ISteamUserStats/GetSchemaForGame/v2/",
-      { appid: String(appId) },
-      z.object({
-        game: z
-          .object({
-            availableGameStats: z
-              .object({
-                stats: z
-                  .array(z.object({ name: z.string(), displayName: z.string().optional() }))
-                  .optional(),
-              })
-              .optional(),
-          })
-          .optional(),
-      }),
-    );
-
-    const stats = data.game?.availableGameStats?.stats ?? [];
-    if (stats.length === 0) return null;
-
-    return Object.fromEntries(
-      stats.map((s) => [s.name, s.displayName?.trim() || s.name]),
-    );
+    const { schema } = await capability<{ schema: Record<string, string> | null }>("steam.stats.schema.read", {
+      app_id: appId,
+    });
+    return schema;
   } catch {
     return null;
   }
@@ -192,34 +173,17 @@ export function gameHeaderUrl(appId: number) {
  * copiam da barra de endereço.
  */
 export async function resolveVanityUrl(vanity: string): Promise<string | null> {
-  const data = await call(
-    "/ISteamUser/ResolveVanityURL/v1/",
-    { vanityurl: vanity },
-    z.object({
-      response: z.object({ success: z.number(), steamid: z.string().optional() }),
-    }),
-  );
-  return data.response.success === 1 ? (data.response.steamid ?? null) : null;
+  const { steam_id } = await capability<{ steam_id: string | null }>("steam.vanity.resolve", { vanity });
+  return steam_id;
 }
 
 /* --------------------------------- amigos ---------------------------------- */
 
 /**
- * SteamIDs dos amigos. Lista vazia quando a lista de amigos é privada — a
- * Steam responde 401 nesse caso, e "sem amigos visíveis" não é erro.
+ * SteamIDs dos amigos. Lista vazia quando a lista de amigos é privada — o
+ * cogniflow já traduz o 401 da Steam, e "sem amigos visíveis" não é erro.
  */
 export async function getFriendIds(steamId: string): Promise<string[]> {
-  try {
-    const data = await call(
-      "/ISteamUser/GetFriendList/v1/",
-      { steamid: steamId, relationship: "friend" },
-      z.object({
-        friendslist: z.object({ friends: z.array(z.object({ steamid: z.string() })) }).optional(),
-      }),
-    );
-    return (data.friendslist?.friends ?? []).map((f) => f.steamid);
-  } catch (err) {
-    if (err instanceof SteamApiError && err.status !== 403) return [];
-    throw err;
-  }
+  const { steam_ids } = await capability<{ steam_ids: string[] }>("steam.friends.read", { steam_id: steamId });
+  return steam_ids;
 }

@@ -15,6 +15,8 @@ import { Secao } from "@/components/secao";
 import { SemDados } from "@/components/sem-dados";
 import { botEhAmigo } from "@/lib/bot";
 import { prisma } from "@/lib/prisma";
+import { filtroDoModo, rotuloDoModo, TUDO } from "@/lib/modo";
+import { abasDoUsuario, modoDaRequisicao, type SearchParams } from "@/lib/modo-servidor";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +26,12 @@ export const dynamic = "force-dynamic";
  * A última sessão em três números, a análise que chegou sozinha, as quatro
  * leituras que mais pesam e os seis tiles principais. Tudo o mais tem aba
  * própria — e cada tile leva ao seu gráfico.
+ *
+ * Tudo aqui respeita o modo do submenu: a última sessão é a última DAQUELE
+ * modo, e o "normal" contra o qual ela é medida é o acumulado do modo, não
+ * o vitalício que mistura tudo.
  */
-export default async function ResumoPage({ params }: { params: Promise<{ appId: string }> }) {
+export default async function ResumoPage({ params, searchParams }: { params: Promise<{ appId: string }>; searchParams: SearchParams }) {
   const session = await requireSession();
   const appId = Number((await params).appId);
 
@@ -35,18 +41,20 @@ export default async function ResumoPage({ params }: { params: Promise<{ appId: 
     return <SemDados botAmigo={await botEhAmigo(session.steamId)} />;
   }
   const { rows } = fonte;
+  const modo = await modoDaRequisicao(searchParams, await abasDoUsuario(session.userId, appId));
+  const filtro = filtroDoModo(modo);
 
-  const sessao = ultimaSessao(rows);
+  const sessao = ultimaSessao(rows, filtro);
   const amigoDoBot = appId === 730 ? await botEhAmigo(session.steamId) : true;
   const partidasAtivas =
     appId === 730
       ? Boolean((await prisma.user.findUnique({ where: { id: session.userId }, select: { partidasAtivadasEm: true } }))?.partidasAtivadasEm)
       : true;
   const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true || !partidasAtivas);
-  const leituras = lerSerie(rows).filter((l) => l.id !== "modo" && l.id !== "mapas");
+  const leituras = lerSerie(rows, filtro).filter((l) => l.id !== "modo" && l.id !== "mapas");
   const analista =
     cogniflow() && rows.length >= 2
-      ? await Promise.all([listarAnalises(session.userId, appId), sessaoSemAnalise(session.userId, appId)])
+      ? await Promise.all([listarAnalises(session.userId, appId, { modo, rows }), sessaoSemAnalise(session.userId, appId)])
       : null;
 
   return (
@@ -57,11 +65,19 @@ export default async function ResumoPage({ params }: { params: Promise<{ appId: 
         </div>
       )}
 
-      {sessao && <SessaoHero sessao={sessao} vitalicio={vitaliciosDoHero(rows)} />}
+      {sessao ? (
+        <SessaoHero sessao={sessao} vitalicio={vitaliciosDoHero(rows, filtro)} referencia={modo === TUDO ? "vitalício" : `no ${rotuloDoModo(modo)}`} />
+      ) : (
+        modo !== TUDO && (
+          <p className="rounded-2xl border border-dashed border-line px-6 py-8 text-center text-sm text-ink-faint">
+            Nenhuma sessão de {rotuloDoModo(modo)} ainda.
+          </p>
+        )
+      )}
 
       {analista && (
         <Secao titulo="Análise" href={`/games/${appId}/analista`} acao="histórico">
-          <Analista appId={appId} iniciais={analista[0]} sessaoSemAnalise={analista[1]} modo="resumo" />
+          <Analista appId={appId} iniciais={analista[0]} sessaoSemAnalise={analista[1] && modo === TUDO} apresentacao="resumo" modo={modo} />
         </Secao>
       )}
 
@@ -73,7 +89,7 @@ export default async function ResumoPage({ params }: { params: Promise<{ appId: 
 
       {appId === 730 && (
         <Secao titulo="Estatísticas" href={`/games/${appId}/estatisticas`} acao="todas">
-          <StatPanel stats={CS2_PANEL} snapshots={rows} appId={appId} limite={6} />
+          <StatPanel stats={CS2_PANEL} snapshots={rows} filter={filtro} appId={appId} limite={6} />
         </Secao>
       )}
     </>

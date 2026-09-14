@@ -22,7 +22,7 @@ O FragIQ hoje usa só o caminho 1.
 
 ## 1. Web API pública — o que já usamos
 
-`api.steampowered.com`, autenticado por `STEAM_API_KEY`. Entrega contadores
+`api.steampowered.com`, autenticado pela chave da plataforma (no cogniflow; o FragIQ chama as capabilities `steam.*`). Entrega contadores
 **vitalícios e cumulativos**: no CS2 são 197, dos quais 178 viram série
 temporal (ver [README](../README.md)).
 
@@ -178,7 +178,7 @@ dashboard vazio, e o caminho 2 existe para resolvê-la.
 ## 2. Bot amigo — o mecanismo menos conhecido
 
 A Web API respeita a privacidade **em relação ao dono da chave**, não em
-relação ao mundo. Se a conta que gerou a `STEAM_API_KEY` for amiga do
+relação ao mundo. Se a conta que gerou a chave da plataforma for amiga do
 jogador, perfis marcados como "Somente amigos" passam a responder
 normalmente. Desfeita a amizade, a API volta a devolver vazio.
 
@@ -230,7 +230,7 @@ Com isso o backend caminha a cadeia:
 
 ```
 GET https://api.steampowered.com/ICSGOPlayers_730/GetNextMatchSharingCode/v1
-      ?key=<STEAM_API_KEY>
+      ?key=<chave da plataforma, no cogniflow>
       &steamid=<SteamID64>
       &steamidkey=<Authentication Code>
       &knowncode=<ultimo share code conhecido>

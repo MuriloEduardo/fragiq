@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { listarPartidas } from "@/lib/partidas";
 import { AtivarPartidas, PAGINA_STEAM } from "@/components/ativar-partidas";
 import { PartidasTabela } from "@/components/partidas-tabela";
+import { filtroDoModo, rotuloDoModo, TUDO } from "@/lib/modo";
+import { abasDoUsuario, modoDaRequisicao, type SearchParams } from "@/lib/modo-servidor";
 
 export const dynamic = "force-dynamic";
 
@@ -16,22 +18,23 @@ export const dynamic = "force-dynamic";
  * estado da fila (o bot pergunta ao GC em até um minuto) e o erro, se a
  * Steam parou de aceitar o código.
  */
-export default async function PartidasPage({ params }: { params: Promise<{ appId: string }> }) {
+export default async function PartidasPage({ params, searchParams }: { params: Promise<{ appId: string }>; searchParams: SearchParams }) {
   const session = await requireSession();
   const appId = Number((await params).appId);
   if (appId !== 730) notFound();
+  const modo = await modoDaRequisicao(searchParams, await abasDoUsuario(session.userId, appId));
 
   const [user, partidas, pendentes] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: { partidasAtivadasEm: true, partidasErro: true, shareCodeAtual: true },
     }),
-    listarPartidas(session.steamId, 50),
+    listarPartidas(session.steamId, 50, filtroDoModo(modo)?.mode),
     prisma.match.count({ where: { status: "PENDING", descobertaPorId: session.userId } }),
   ]);
   const ativo = Boolean(user?.partidasAtivadasEm);
 
-  if (!ativo && partidas.length === 0) {
+  if (!ativo && partidas.length === 0 && modo === TUDO) {
     return (
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
         <section className="rounded-2xl bg-surface p-6 ring-1 ring-line">
@@ -86,7 +89,11 @@ export default async function PartidasPage({ params }: { params: Promise<{ appId
       )}
       {partidas.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line px-6 py-10 text-center text-sm text-ink-faint">
-          {pendentes > 0 ? "Buscando o scoreboard…" : "Nenhuma partida ainda. A próxima que você jogar aparece aqui depois da coleta."}
+          {pendentes > 0
+            ? "Buscando o scoreboard…"
+            : modo === TUDO
+              ? "Nenhuma partida ainda. A próxima que você jogar aparece aqui depois da coleta."
+              : `Nenhuma partida de ${rotuloDoModo(modo)} com scoreboard ainda. Partidas sem modo conhecido ficam em "Tudo".`}
         </p>
       ) : (
         <PartidasTabela partidas={partidas} />

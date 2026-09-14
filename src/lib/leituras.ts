@@ -10,7 +10,7 @@ import {
   type SeriesSpec,
   type SnapshotRow,
 } from "./series";
-import { rotularArma, rotularMapa } from "./cs2-labels";
+import { rotularModo, rotularArma, rotularMapa } from "./cs2-labels";
 
 /**
  * Transformar contador em frase.
@@ -68,6 +68,9 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
 
   const rounds = deltaEntre(par, "total_rounds_played");
   const partidas = deltaEntre(par, "total_matches_played");
+  // Com recorte por modo a referência é o acumulado daquele modo, e o texto
+  // precisa dizer isso: "de vitalício" seria mentira.
+  const ref = filter?.mode ? `do seu ${rotularModo(filter.mode)}` : "de vitalício";
   const base =
     rounds !== null
       ? `${rounds} round${rounds === 1 ? "" : "s"}${partidas ? ` em ${partidas} partida${partidas === 1 ? "" : "s"}` : ""}`
@@ -141,7 +144,7 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
   /* ------------------------------- K/D ------------------------------------ */
 
   const kd = ultimoValor(rows, RATIO("total_kills", "total_deaths"), filter);
-  const kdVida = lifetimeValue(RATIO("total_kills", "total_deaths"), rows);
+  const kdVida = lifetimeValue({ ...RATIO("total_kills", "total_deaths"), filter }, rows);
   const kdVar = variacao(kd, kdVida);
 
   if (kd !== null && kdVida !== null && kdVar !== null) {
@@ -150,7 +153,7 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
       id: "kd",
       numero: kd.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       texto:
-        `K/D no período contra ${num(kdVida)} de vitalício — ${pct(kdVar)}. ` +
+        `K/D no período contra ${num(kdVida)} ${ref} — ${pct(kdVar)}. ` +
         (Math.abs(kdVar) < 0.1
           ? `Praticamente o seu normal.`
           : melhor
@@ -164,7 +167,7 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
   /* ---------------------------- headshot ---------------------------------- */
 
   const hs = ultimoValor(rows, RATIO("total_kills_headshot", "total_kills", 100), filter);
-  const hsVida = lifetimeValue(RATIO("total_kills_headshot", "total_kills", 100), rows);
+  const hsVida = lifetimeValue({ ...RATIO("total_kills_headshot", "total_kills", 100), filter }, rows);
   const hsVar = variacao(hs, hsVida);
 
   if (hs !== null && hsVida !== null && hsVar !== null && Math.abs(hsVar) >= 0.05) {
@@ -173,7 +176,7 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
       numero: `${num(hs, 1)}%`,
       texto:
         `Dos seus abates no período foram na cabeça, contra ${num(hsVida, 1)}% ` +
-        `de vitalício. ${
+        `${ref}. ${
           hsVar > 0
             ? `Mira mais alta que o seu costume.`
             : `Abaixo do seu costume — spray e trocas de perto derrubam essa taxa.`
@@ -195,7 +198,7 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
         arma,
         tiros,
         periodo: ultimoValor(rows, spec, filter),
-        vida: lifetimeValue(spec, rows),
+        vida: lifetimeValue({ ...spec, filter }, rows),
       };
     })
     .filter((a) => a.tiros >= 25 && a.periodo !== null && a.vida !== null)
@@ -209,12 +212,12 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
       numero: `${num(top.periodo!, 1)}%`,
       texto:
         `Precisão com ${rotularArma(top.arma)} no período, contra ${num(top.vida!, 1)}% ` +
-        `de vitalício (${pct(top.var)}). ` +
+        `${ref} (${pct(top.var)}). ` +
         // Quando toda arma caiu, chamar a melhor de "acima do normal" é
         // mentira — ela está acima das outras, não do seu vitalício.
         (top.var > 0
           ? `É a sua arma mais acima do normal no recorte.`
-          : `Nenhuma arma ficou acima do seu vitalício neste período; esta foi a que menos caiu.`),
+          : `Nenhuma arma ficou acima do seu normal neste período; esta foi a que menos caiu.`),
       base: `${top.tiros} tiros`,
       tom: top.var > 0 ? "bom" : "neutro",
     });
@@ -227,8 +230,8 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
         id: "arma-pior",
         numero: `${num(pior.periodo!, 1)}%`,
         texto:
-          `Precisão com ${rotularArma(pior.arma)}, contra ${num(pior.vida!, 1)}% de ` +
-          `vitalício (${pct(pior.var)}). É onde você mais caiu em relação a si mesmo.`,
+          `Precisão com ${rotularArma(pior.arma)}, contra ${num(pior.vida!, 1)}% ` +
+          `${ref} (${pct(pior.var)}). É onde você mais caiu em relação a si mesmo.`,
         base: `${pior.tiros} tiros`,
         tom: "ruim",
       });
@@ -328,7 +331,7 @@ export function todasAsMetricas(
 
     const pts = buildSeries(rows, { ...spec, filter }, "raw");
     const periodo = pts.length ? pts[pts.length - 1].value : null;
-    const vitalicio = porRound ? lifetimeValue(spec, rows) : null;
+    const vitalicio = porRound ? lifetimeValue({ ...spec, filter }, rows) : null;
 
     const total = par ? deltaEntre(par, key) : null;
 

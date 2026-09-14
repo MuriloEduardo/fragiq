@@ -3,7 +3,8 @@
  *
  *   npm run probe -- <SteamID64>
  *
- * Verifica se a chave funciona, se o perfil está com a privacidade correta e
+ * Verifica se o caminho até a Steam funciona (as variáveis COGNIFLOW_* e os
+ * grants steam.* do tenant), se o perfil está com a privacidade correta e
  * quais contadores o jogo expõe — sem gravar nada no banco. É o primeiro
  * lugar a olhar quando um usuário reclama que o dashboard veio vazio.
  */

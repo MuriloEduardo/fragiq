@@ -6,12 +6,13 @@ import { rotularModo } from "@/lib/cs2-labels";
 import { cn } from "@/lib/utils";
 
 /**
- * Recorte por mapa e modo.
+ * Recorte por mapa (e por modo, onde o modo não é navegação).
  *
  * Só existe porque o bot de presença lê o rich presence do CS2 — os
  * contadores da Steam não distinguem modo nem conhecem os mapas modernos.
  * Sem coletas marcadas, o controle não aparece: um filtro que não filtra
- * nada só confunde.
+ * nada só confunde. Nas abas do jogo o modo vem do submenu e a barra
+ * recebe `modes=[]`; o "limpar" então só solta o mapa.
  */
 
 
@@ -27,7 +28,7 @@ type Props = {
 export function ContextFilterBar({ modes, maps, value, onChange, semContexto }: Props) {
   if (modes.length === 0 && maps.length === 0) return null;
 
-  const ativo = Boolean(value.mode || value.map);
+  const ativo = Boolean((modes.length > 0 && value.mode) || value.map);
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
@@ -53,7 +54,7 @@ export function ContextFilterBar({ modes, maps, value, onChange, semContexto }: 
 
       {ativo && (
         <button
-          onClick={() => onChange({})}
+          onClick={() => onChange(modes.length > 0 ? {} : { ...value, map: null })}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-faint transition hover:text-ink"
         >
           <X className="size-3" />

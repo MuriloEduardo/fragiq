@@ -6,19 +6,27 @@ import { contextOptions, type ContextFilter, type SnapshotRow } from "@/lib/seri
 import { StatPanel } from "./stat-panel";
 import { ContextFilterBar } from "./context-filter";
 
-/** Os doze tiles, com o recorte por mapa e modo quando o bot registrou. */
-export function Estatisticas({ appId, rows }: { appId: number; rows: SnapshotRow[] }) {
-  const [filtro, setFiltro] = useState<ContextFilter>({});
+/**
+ * Os doze tiles, no modo do submenu, com o recorte por mapa por cima.
+ *
+ * O modo vem de fora e não é escolhido aqui: ele é a navegação, vale para
+ * todas as abas e já chega resolvido pelo servidor. O que sobra para a
+ * barra é o mapa — um recorte dentro do modo, que faz sentido só nesta
+ * tela e não precisa sobreviver a um clique em outra aba.
+ */
+export function Estatisticas({ appId, rows, modo }: { appId: number; rows: SnapshotRow[]; modo: string | null }) {
+  const [mapa, setMapa] = useState<string | null>(null);
   const opcoes = useMemo(() => contextOptions(rows), [rows]);
+  const filtro: ContextFilter = { mode: modo, map: mapa };
   const semContexto = rows.filter((s) => !s.matchMode && !s.matchMap).length;
 
   return (
     <div className="space-y-4">
       <ContextFilterBar
-        modes={opcoes.modes}
+        modes={[]}
         maps={opcoes.maps}
         value={filtro}
-        onChange={setFiltro}
+        onChange={(f) => setMapa(f.map ?? null)}
         semContexto={semContexto}
       />
       <StatPanel stats={CS2_PANEL} snapshots={rows} filter={filtro} appId={appId} />

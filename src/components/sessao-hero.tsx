@@ -14,9 +14,12 @@ import { cn } from "@/lib/utils";
 export function SessaoHero({
   sessao,
   vitalicio,
+  referencia = "vitalício",
 }: {
   sessao: Sessao;
   vitalicio: { kd: number | null; danoPorRound: number | null; hs: number | null };
+  /** Como chamar a referência: "vitalício", ou "no Premier" quando o modo recorta. */
+  referencia?: string;
 }) {
   const numeros = [
     { rotulo: "K/D", valor: sessao.kd, ref: vitalicio.kd, fmt: (v: number) => v.toFixed(2).replace(".", ",") },
@@ -68,7 +71,7 @@ export function SessaoHero({
                   )}
                 </div>
                 <p className="num mt-1 text-xs text-ink-faint">
-                  {n.ref === null ? "sem vitalício" : `vitalício ${n.fmt(n.ref)}`}
+                  {n.ref === null ? `sem ${referencia}` : `${referencia} ${n.fmt(n.ref)}`}
                 </p>
               </div>
             );

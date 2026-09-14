@@ -493,10 +493,21 @@ export function gaugesLookStale(snapshots: SnapshotRow[]): boolean {
   return gauges.every((k) => ultimo[k] === primeiro[k]);
 }
 
+/**
+ * O "normal" contra o qual um período é comparado.
+ *
+ * Sem recorte é o vitalício da Steam: o último contador, que soma todos os
+ * modos desde sempre. Com recorte por modo ou mapa o vitalício não serve —
+ * comparar uma noite de Premier com um total que mistura casual é o que
+ * o submenu de modos existe para não fazer — então a referência vira o
+ * acumulado das sessões daquele recorte: menor, mas do mesmo jogo.
+ */
 export function lifetimeValue(
   spec: SeriesSpec,
   snapshots: SnapshotRow[],
 ): number | null {
+  if (spec.filter?.mode || spec.filter?.map) return accumulatedValue(spec, snapshots);
+
   const last = snapshots[snapshots.length - 1];
   if (!last) return null;
   if ((spec.kind ?? classifyMetric(spec.metric)) === "gauge") return null;
@@ -518,6 +529,31 @@ export function lifetimeValue(
     return hours > 0 ? value / hours : null;
   }
 
+  return null;
+}
+
+function accumulatedValue(spec: SeriesSpec, snapshots: SnapshotRow[]): number | null {
+  if ((spec.kind ?? classifyMetric(spec.metric)) === "gauge") return null;
+  const scale = spec.scale ?? 1;
+  let valor = 0;
+  let denominador = 0;
+  let minutos = 0;
+  let pares = 0;
+  for (const par of paresDeMovimento(snapshots, spec.metric, spec.filter)) {
+    valor += deltaEntre(par, spec.metric) ?? 0;
+    if (spec.denominator) denominador += deltaEntre(par, spec.denominator) ?? 0;
+    minutos += Math.max(0, par.curr.playtimeForeverMin - par.prev.playtimeForeverMin);
+    pares++;
+  }
+  if (pares === 0) return null;
+
+  if (spec.mode === "ratio") {
+    if (!spec.denominator || denominador === 0) return null;
+    return (valor / denominador) * scale;
+  }
+  if (spec.mode === "perHour") {
+    return minutos > 0 ? valor / (minutos / 60) : null;
+  }
   return null;
 }
 

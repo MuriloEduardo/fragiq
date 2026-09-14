@@ -8,12 +8,12 @@ Steam. A ideia central: a Steam só guarda o **total de hoje**; o FragIQ guarda 
 
 ```bash
 docker compose up -d          # Postgres em localhost:5433
-cp .env.example .env          # preencha STEAM_API_KEY e AUTH_SECRET
+cp .env.example .env          # preencha AUTH_SECRET e as variáveis COGNIFLOW_*
 npm run db:migrate
 npm run dev
 ```
 
-Para avaliar a interface sem chave da Steam:
+Para avaliar a interface sem o cogniflow (e portanto sem Steam):
 
 ```bash
 npm run seed                  # 90 dias de histórico fictício de CS2
@@ -61,10 +61,23 @@ função morre em 60s (daí o `CRON_TIME_BUDGET_MS` padrão de 45s, que dá ~25
 usuários por dia — suficiente para validar, não para escalar). No **Pro** a
 cadência é por minuto e a função vai a 300s.
 
+### Quem fala com a Steam é o cogniflow
+
+O FragIQ não tem chave da Steam. `src/lib/steam/api.ts` mantém as funções
+de sempre (`getOwnedGames`, `getUserStatsForGame`…), mas cada uma é uma
+chamada `POST /capabilities/steam.*` na API de capabilities do cogniflow,
+assinada com o mesmo segredo da conexão webhook (`src/lib/cogniflow-api.ts`).
+A chave, a cota e as semânticas da Web API (400 em stats é "não há stats",
+401 em amigos é "lista privada") moram lá; a regra de *quando* e *o que*
+pedir mora aqui. As mesmas capabilities são as tools que o analista tem no
+turno — o cron e o agente leem a Steam pelo mesmo caminho.
+
 ### O gate que torna o polling barato
 
-A chave da Steam Web API permite ~100k chamadas/dia. Uma varredura ingênua
-(1 chamada por jogo por usuário) estoura isso com poucas centenas de usuários.
+A chave da Steam Web API permite ~100k chamadas/dia — e é uma só, da
+plataforma, dividida entre todos os tenants do cogniflow. Uma varredura
+ingênua (1 chamada por jogo por usuário) estoura isso com poucas centenas de
+usuários.
 
 `GetOwnedGames` devolve o `playtime_forever` de **toda** a biblioteca em uma
 única chamada. Se o playtime de um jogo não mudou desde a última coleta, o
@@ -134,6 +147,44 @@ contra 940.530 de `total_shots_fired`, uma precisão impossível de 0,9%. Os
 pares por arma (`total_hits_ak47` / `total_shots_ak47`) são confiáveis, e é
 por isso que o preset "Precisão por arma" existe.
 
+## Modos: Premier, Competitivo, Casual
+
+A Steam soma todos os modos num contador só, e um K/D de Premier misturado
+com casual não diz nada. Por isso o modo é **navegação**, não filtro: sob
+as abas do jogo há um submenu (Tudo · Premier · Competitivo · Casual ·
+Wingman) que vale para todas elas — Resumo, Estatísticas, Sessões,
+Partidas, Métricas e Análises mostram só aquele modo até a pessoa trocar.
+A escolha vai na URL (`?modo=premier`, compartilhável) e num cookie de 90
+dias (`src/lib/modo.ts`, `src/lib/modo-servidor.ts`, `components/modo-nav.tsx`).
+
+De onde vem o modo de cada coisa:
+
+- **sessão**: o rich presence que o bot observou no fim da partida
+  (`StatSnapshot.matchMode`), ou o que a pessoa marcou à mão no hero;
+- **partida oficial**: `Match.modo`, resolvido na gravação — pelo
+  `gameType` do GC quando o valor é conhecido (8 = competitivo, 264 =
+  Wingman; o Premier ainda depende da presença), senão pelo snapshot de
+  presença de algum dos dez jogadores na janela da partida;
+- **análise**: o modo da sessão analisada; o analista recebe o modo na
+  mensagem e passa `modo=` em toda consulta.
+
+Com modo, o "normal" contra o qual um período é lido deixa de ser o
+vitalício da Steam e vira o acumulado das sessões daquele modo
+(`lifetimeValue` em `series.ts`, `vitaliciosDoHero`, as leituras). Só o
+submenu aparece para quem tem ao menos uma sessão marcada — e quem não tem
+recebe o aviso abaixo.
+
+### Avisos do que falta compartilhar
+
+Três portas e um dado atrás de cada: "Detalhes do jogo" privado (nenhuma
+estatística), bot não é amigo (sessões sem modo nem mapa) e corrente de
+share codes desligada (nenhuma partida oficial). `src/lib/pendencias.ts`
+calcula; `components/pendencias-banner.tsx` mostra em toda aba do jogo
+(no Resumo o onboarding já conta a história), dispensável por uma semana.
+No chat da Steam, para quem o bot alcança, uma mensagem por porta, uma vez
+só: a de privacidade quando uma captura desiste, a das partidas depois da
+terceira sessão sem corrente (`User.avisoPrivacidadeEm`, `avisoPartidasEm`).
+
 ## O explorador
 
 `src/lib/series.ts` deriva tudo em tempo de consulta. Como os contadores são
@@ -199,12 +250,45 @@ Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:
 
 A análise de cada sessão, na página do jogo, vem de um agente que lê a mesma
 série e responde em texto — disparado por nós a cada sessão fechada (sync,
-cron, bot, scoreboard do GC), nunca por uma pergunta digitada. Ele não roda aqui: o FragIQ é um tenant do **cogniflow**,
+cron, bot, scoreboard do GC), nunca por uma pergunta digitada. A resposta
+tem forma fixa (manchete, dois ou três parágrafos, uma linha "→" com a
+ação), que `src/lib/analise-texto.ts` separa e o cartão de
+`components/analista.tsx` mostra com a sessão em cima: modo, mapa, placar
+e os três números contra o normal do modo. Ele não roda aqui: o FragIQ é um tenant do **cogniflow**,
 conectado pelo canal webhook — a pergunta sai assinada, a resposta volta por
 callback, e durante o turno o agente consulta `/api/cogniflow/data`, que
 expõe as mesmas derivações de `series.ts` como views. Provisionamento,
 contrato das views e prompt do agente em
 [docs/cogniflow-tenant.md](docs/cogniflow-tenant.md).
+
+## Segredos
+
+Em produção `AUTH_SECRET`, `COGNIFLOW_SIGNING_SECRET` e
+`BOT_WEBHOOK_SECRET` não são variáveis da Vercel: vêm do segredo
+`cogniflow/tenants/fragiq` no Secrets Manager, lido por OIDC no boot
+(`src/instrumentation.ts` → `src/lib/segredos.ts`). O que precisa ficar na
+Vercel, e o passo a passo da AWS, estão em [docs/segredos.md](docs/segredos.md).
+
+## Limpeza pendente (depois da fase 2 do cogniflow)
+
+Quando o canal `steam:chat` e o `steam-worker` existirem no cogniflow
+(`cogniflow/orchestration-service/docs/STEAM.md`), isto deixa de ter razão
+de existir aqui e pode ser apagado:
+
+- `bot/` inteiro (presença, chat, GC) e o EC2 `fragiq-bot`;
+- `src/app/api/bot/*` (amigos, outbox, partidas, tick) e `src/lib/bot.ts`;
+- `SteamMessage` e a outbox em `src/lib/mensagem-steam.ts` — as mensagens
+  proativas viram `messaging.send` pela API de capabilities;
+- `src/app/api/sync/steam-event` — vira um handler do evento
+  `steam.match.ended` no callback já assinado do cogniflow;
+- `BOT_WEBHOOK_SECRET`, `BOT_STEAM_ID`, `BotStatus`;
+- `bot/src/partidas.ts` — o scoreboard passa a chegar por
+  `steam.match.read`.
+
+Fica: `PendingCapture` e as retentativas (é conhecimento sobre quando a
+Steam publica, não sobre como falar com ela), o gate de playtime, o
+snapshot, as sessões, a corrente de share codes (a chamada já passa pelo
+cogniflow).
 
 ## Estrutura
 
@@ -218,8 +302,13 @@ src/lib/
   stats.ts                    formatação e métricas derivadas de CS2
   analista.ts                 views que o analista consulta (data.read)
   cogniflow.ts                assinatura e envio de pedidos de análise ao cogniflow
+  cogniflow-api.ts            chamada assinada de uma capability (fora do turno)
+  modo.ts / modo-servidor.ts  o modo como navegação: abas, URL, cookie
+  pendencias.ts               o que falta compartilhar, e o aviso no chat
+  analise-texto.ts            manchete / parágrafos / ação da resposta do analista
+  segredos.ts                 segredos do Secrets Manager via OIDC (instrumentation.ts)
   steam/openid.ts             OpenID 2.0
-  steam/api.ts                cliente da Web API
+  steam/api.ts                a Steam como capabilities steam.* do cogniflow
   steam/sync.ts               ingestão com gate de playtime
 src/app/
   page.tsx                    landing + login

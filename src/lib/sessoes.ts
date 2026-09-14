@@ -1,4 +1,4 @@
-import { deltaEntre, paresDeMovimento, type ContextFilter, type SnapshotRow } from "./series";
+import { deltaEntre, lifetimeValue, paresDeMovimento, type ContextFilter, type SnapshotRow } from "./series";
 import { rotularMapa, rotularModo } from "./cs2-labels";
 
 /**
@@ -27,7 +27,9 @@ export type Sessao = {
   danoPorRound: number | null;
   hs: number | null;
   mapa: string | null;
+  /** Rótulo ("Premier"); `modoId` é o id cru ("premier"), que o submenu e o analista usam. */
   modo: string | null;
+  modoId: string | null;
   placar: string | null;
 };
 
@@ -64,6 +66,7 @@ export function listarSessoes(rows: SnapshotRow[], filter?: ContextFilter): Sess
       hs: headshots !== null && kills ? (headshots / kills) * 100 : null,
       mapa: par.curr.matchMap ? rotularMapa(par.curr.matchMap) : null,
       modo: par.curr.matchMode ? rotularModo(par.curr.matchMode) : null,
+      modoId: par.curr.matchMode ?? null,
       placar: par.curr.matchScore ?? null,
     };
   });
@@ -74,12 +77,14 @@ export function ultimaSessao(rows: SnapshotRow[], filter?: ContextFilter): Sessa
   return todas[todas.length - 1] ?? null;
 }
 
-/** Vitalícios dos três números do hero, para o delta. */
-export function vitaliciosDoHero(rows: SnapshotRow[]) {
-  const last = rows[rows.length - 1]?.metrics;
-  if (!last) return { kd: null, danoPorRound: null, hs: null };
+/**
+ * A referência dos três números do hero, para o delta: o vitalício da
+ * Steam, ou, com recorte por modo, o acumulado daquele modo (ver
+ * `lifetimeValue`).
+ */
+export function vitaliciosDoHero(rows: SnapshotRow[], filter?: ContextFilter) {
   const razao = (a: string, b: string, escala = 1) =>
-    last[b] ? ((last[a] ?? 0) / last[b]) * escala : null;
+    lifetimeValue({ id: a, metric: a, denominator: b, mode: "ratio", scale: escala, filter }, rows);
   return {
     kd: razao("total_kills", "total_deaths"),
     danoPorRound: razao("total_damage_done", "total_rounds_played"),

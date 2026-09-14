@@ -34,6 +34,11 @@ model User {
   /// Quando o bot avisou, no chat, que a Steam não deixa ler as estatísticas
   /// ("Detalhes do jogo" privado). Uma vez só.
   avisoPrivacidadeEm DateTime?
+  /// Quando o bot avisou, no chat, que a corrente de share codes está
+  /// desligada — sem ela não há partida oficial nem modo por partida. Uma
+  /// vez só, e só depois de a pessoa ter sessões suficientes para sentir
+  /// falta.
+  avisoPartidasEm    DateTime?
   /// Desde quando o bot de presença é amigo (o bot reporta a lista). null =
   /// não é. É o que o funil de ativação lê sem perguntar à Steam.
   botAmigoDesde      DateTime?
@@ -409,6 +414,10 @@ model Match {
   /// Nome do servidor da Valve, do mesmo cabeçalho ("south_america … gru1").
   servidor String?
   gameType Int?
+  /// O modo da partida (premier, competitive, scrimcomp2v2…), resolvido na
+  /// gravação: pelo `gameType` do GC quando o valor é conhecido, senão pelo
+  /// rich presence de quem estava nela. É o eixo do submenu de modos.
+  modo     String?
   placarA  Int?
   placarB  Int?
   demoUrl  String?
@@ -424,6 +433,7 @@ model Match {
 
   @@index([status, createdAt])
   @@index([jogadaEm])
+  @@index([modo])
   @@map("matches")
 }
 

@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { env } from "./env";
 import { decodificarShareCode, normalizarShareCode, shareCodeValido } from "./sharecode";
 import { getPlayerSummaries } from "./steam/api";
+import { CogniflowApiError, invocar } from "./cogniflow-api";
 import { registrar, reportarErro } from "./eventos";
 
 /**
@@ -20,7 +21,6 @@ import { registrar, reportarErro } from "./eventos";
  * Duas colas, uma vez, e as partidas passam a chegar sozinhas.
  */
 
-const BASE = "https://api.steampowered.com/ICSGOPlayers_730/GetNextMatchSharingCode/v1/";
 const FORMATO_AUTH = /^[A-Z0-9]{4}-[A-Z0-9]{5}-[A-Z0-9]{4}$/i;
 /** Quantos elos da corrente seguimos por coleta. A Steam limita chamadas; quem ficou semanas fora vai em várias. */
 const MAX_POR_RODADA = 8;
@@ -75,21 +75,24 @@ export function authCodeValido(codigo: string) {
  * ou velho demais para a corrente.
  */
 export async function proximoShareCode(steamId: string, authCode: string, conhecido: string): Promise<string | null> {
-  const url = new URL(BASE);
-  url.searchParams.set("key", env().STEAM_API_KEY);
-  url.searchParams.set("steamid", steamId);
-  url.searchParams.set("steamidkey", authCode.trim().toUpperCase());
-  url.searchParams.set("knowncode", conhecido);
-
-  const res = await fetch(url, { cache: "no-store" });
-  if (res.status === 403) throw new CodigoInvalido("auth", "A Steam não aceitou o código de autenticação. Confira se copiou o código inteiro — gerar um novo na Steam invalida o anterior.");
-  if (res.status === 412) throw new CodigoInvalido("share", "A Steam não reconhece esse share code como seu, ou ele é antigo demais. Use o da última partida, que aparece na mesma página do código.");
-  if (res.status === 429) throw new CodigoInvalido("steam", "A Steam pediu para esperar um pouco. Tente de novo em um minuto.");
-  if (!res.ok) throw new CodigoInvalido("steam", `A Steam respondeu ${res.status}. Tente de novo em instantes.`);
-
-  const corpo = (await res.json().catch(() => null)) as { result?: { nextcode?: string } } | null;
-  const proximo = corpo?.result?.nextcode;
-  if (!proximo || proximo === "n/a") return null;
+  let proximo: string | null;
+  try {
+    ({ next_code: proximo } = await invocar<{ next_code: string | null }>("steam.match.code.next", {
+      steam_id: steamId,
+      auth_code: authCode.trim().toUpperCase(),
+      known_code: conhecido,
+    }));
+  } catch (err) {
+    if (!(err instanceof CogniflowApiError)) throw err;
+    // O cogniflow devolve o status da própria Steam quando ela recusa; é o
+    // que separa "seu código está errado" de "tente de novo".
+    if (err.providerStatus === 403) throw new CodigoInvalido("auth", "A Steam não aceitou o código de autenticação. Confira se copiou o código inteiro — gerar um novo na Steam invalida o anterior.");
+    if (err.providerStatus === 412) throw new CodigoInvalido("share", "A Steam não reconhece esse share code como seu, ou ele é antigo demais. Use o da última partida, que aparece na mesma página do código.");
+    if (err.providerStatus === 429 || !err.permanente) throw new CodigoInvalido("steam", "A Steam pediu para esperar um pouco. Tente de novo em um minuto.");
+    if (err.status === 400) throw new CodigoInvalido("share", "Os códigos não têm o formato que a Steam espera. Confira os dois e cole de novo.");
+    throw new CodigoInvalido("steam", `A Steam respondeu ${err.providerStatus ?? err.status}. Tente de novo em instantes.`);
+  }
+  if (!proximo) return null;
   if (!shareCodeValido(proximo)) throw new CodigoInvalido("steam", "A Steam devolveu um código que não entendemos.");
   return proximo;
 }
@@ -253,7 +256,9 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
     };
   });
 
-  const mapa = p.mapa ?? (await mapaPelaPresenca([...userPorSteam.values()], jogadaEm, p.duracaoS));
+  const presenca = await contextoPelaPresenca([...userPorSteam.values()], jogadaEm, p.duracaoS);
+  const mapa = p.mapa ?? presenca.mapa;
+  const modo = modoDoGameType(p.gameType) ?? presenca.modo;
 
   await prisma.$transaction([
     prisma.match.update({
@@ -265,6 +270,7 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
         duracaoS: p.duracaoS,
         rounds: p.rounds,
         gameType: p.gameType,
+        modo,
         demoUrl: p.demoUrl,
         placarA: a,
         placarB: b,
@@ -279,24 +285,49 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
 }
 
 /**
- * Reserva para quando o bot não leu o cabeçalho da demo: o bot de
- * presença grava o mapa no snapshot da coleta que veio logo depois da
- * partida. Se algum dos dez jogadores tem um snapshot assim na janela
- * certa, é este.
+ * O `game_type` que o GC devolve na reserva da partida, traduzido para o
+ * vocabulário do rich presence — o mesmo das sessões, para que o submenu
+ * de modos junte as duas fontes.
+ *
+ * Os valores vêm de partidas observadas, não de documentação da Valve
+ * (não existe): 8 é o competitivo clássico desde o CS:GO e 264 o Wingman.
+ * O Premier do CS2 ainda não foi visto com certeza — enquanto um valor
+ * não estiver aqui, a reserva é a presença de quem jogou, que o bot marca
+ * como "premier" sem ambiguidade. Um valor desconhecido devolve null em
+ * vez de chutar: um modo errado numa aba é pior que uma partida em "tudo".
  */
-async function mapaPelaPresenca(userIds: string[], jogadaEm: Date, duracaoS: number): Promise<string | null> {
-  if (userIds.length === 0) return null;
+const MODO_POR_GAME_TYPE: Record<number, string> = {
+  8: "competitive",
+  264: "scrimcomp2v2",
+};
+
+export function modoDoGameType(gameType: number | null | undefined): string | null {
+  if (gameType === null || gameType === undefined) return null;
+  return MODO_POR_GAME_TYPE[gameType] ?? null;
+}
+
+/**
+ * Reserva para o que o GC não diz: o bot de presença grava mapa e modo no
+ * snapshot da coleta que veio logo depois da partida. Se algum dos dez
+ * jogadores tem um snapshot assim na janela certa, é este.
+ */
+async function contextoPelaPresenca(
+  userIds: string[],
+  jogadaEm: Date,
+  duracaoS: number,
+): Promise<{ mapa: string | null; modo: string | null }> {
+  if (userIds.length === 0) return { mapa: null, modo: null };
   const fim = new Date(jogadaEm.getTime() + duracaoS * 1000);
   const snap = await prisma.statSnapshot.findFirst({
     where: {
       userGame: { userId: { in: userIds }, gameAppId: 730 },
-      matchMap: { not: null },
+      OR: [{ matchMap: { not: null } }, { matchMode: { not: null } }],
       capturedAt: { gte: fim, lte: new Date(fim.getTime() + 40 * 60_000) },
     },
     orderBy: { capturedAt: "asc" },
-    select: { matchMap: true },
+    select: { matchMap: true, matchMode: true },
   });
-  return snap?.matchMap ?? null;
+  return { mapa: snap?.matchMap ?? null, modo: snap?.matchMode ?? null };
 }
 
 /** Só o mapa, lido depois. Sem mapa conta como tentativa, para não ficar pedindo para sempre. */
@@ -327,6 +358,8 @@ export type PartidaLinha = {
   duracaoS: number;
   rounds: number;
   mapa: string | null;
+  /** Vocabulário do rich presence (premier, competitive…); null quando nem o GC nem a presença disseram. */
+  modo: string | null;
   placar: [number, number];
   demoUrl: string | null;
   eu: { kills: number; assists: number; deaths: number; mvps: number; score: number; hs: number; venceu: boolean | null; time: number };
@@ -334,10 +367,10 @@ export type PartidaLinha = {
   conhecidos: { steamId: string; time: number }[];
 };
 
-/** As partidas gravadas de um SteamID, mais recente primeiro. */
-export async function listarPartidas(steamId: string, limite = 30): Promise<PartidaLinha[]> {
+/** As partidas gravadas de um SteamID, mais recente primeiro; `modo` recorta pelo submenu. */
+export async function listarPartidas(steamId: string, limite = 30, modo?: string | null): Promise<PartidaLinha[]> {
   const linhas = await prisma.matchPlayer.findMany({
-    where: { steamId, match: { status: "DONE" } },
+    where: { steamId, match: { status: "DONE", ...(modo ? { modo } : {}) } },
     orderBy: { match: { jogadaEm: "desc" } },
     take: limite,
     include: {
@@ -351,6 +384,7 @@ export async function listarPartidas(steamId: string, limite = 30): Promise<Part
     duracaoS: l.match.duracaoS ?? 0,
     rounds: l.match.rounds ?? 0,
     mapa: l.match.mapa,
+    modo: l.match.modo,
     placar: l.time === 0 ? [l.match.placarA ?? 0, l.match.placarB ?? 0] : [l.match.placarB ?? 0, l.match.placarA ?? 0],
     demoUrl: l.match.demoUrl,
     eu: { kills: l.kills, assists: l.assists, deaths: l.deaths, mvps: l.mvps, score: l.score, hs: l.hs, venceu: l.venceu, time: l.time },

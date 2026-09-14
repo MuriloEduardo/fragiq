@@ -54,6 +54,7 @@ export async function PrimeirosPassos({
     {
       feito: botAmigo === true,
       incerto: botAmigo === null,
+      ancora: "bot",
       titulo: `Adicione ${bot?.personaname ?? "o bot do FragIQ"} como amigo`,
       texto:
         botAmigo === true
@@ -119,7 +120,7 @@ export async function PrimeirosPassos({
       </div>
       <ol className="mt-4 space-y-4">
         {passos.map((p, i) => (
-          <li key={p.titulo} className="flex gap-3">
+          <li key={p.titulo} id={p.ancora} className="flex gap-3 scroll-mt-24">
             <span
               className={cn(
                 "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ring-1",

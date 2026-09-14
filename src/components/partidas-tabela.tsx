@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Users } from "lucide-react";
 import type { PartidaLinha } from "@/lib/partidas";
 import { formatarQuando } from "@/lib/sessoes";
-import { rotularMapa } from "@/lib/cs2-labels";
+import { rotularMapa, rotularModo } from "@/lib/cs2-labels";
 import { cn } from "@/lib/utils";
 
 /**
@@ -38,6 +38,7 @@ export function PartidasTabela({ partidas, publica = false }: { partidas: Partid
                   <Link href={`/partida/${p.id}`} className="underline decoration-line-soft underline-offset-4 hover:text-accent">
                     {p.mapa ? rotularMapa(p.mapa) : "Partida"}
                   </Link>
+                  {p.modo && <span className="ml-2 text-xs text-ink-faint">{rotularModo(p.modo)}</span>}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span

@@ -1,6 +1,7 @@
 import type { SyncTrigger } from "@/generated/prisma/enums";
 import { garantirAnaliseDaSessao } from "@/lib/analises";
 import { descobrirPartidas } from "@/lib/partidas";
+import { avisarPartidasSePreciso } from "@/lib/pendencias";
 import { prisma } from "../prisma";
 import {
   getGameStatSchema,
@@ -205,6 +206,14 @@ async function runSync(
     if (outcome === "created" && game.appid === 730 && partidasNovas === 0) {
       await garantirAnaliseDaSessao(userId, 730).catch((e) =>
         console.error("[sync] análise da sessão não disparou:", e instanceof Error ? e.message : e),
+      );
+    }
+    // Uma sessão a mais sem partida oficial por trás: é a hora de lembrar,
+    // no chat, que a corrente existe — uma vez só, e só para quem o bot
+    // alcança.
+    if (outcome === "created" && game.appid === 730) {
+      await avisarPartidasSePreciso(userId, steamId).catch((e) =>
+        console.error("[sync] aviso das partidas não saiu:", e instanceof Error ? e.message : e),
       );
     }
   }

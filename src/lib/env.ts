@@ -1,10 +1,9 @@
 import { z } from "zod";
 
 // Validado uma vez, no boot do servidor. Falhar aqui é muito melhor do que
-// descobrir um STEAM_API_KEY vazio dentro de um fetch em produção.
+// descobrir uma variável vazia dentro de um fetch em produção.
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
-  STEAM_API_KEY: z.string().min(1, "Pegue a chave em https://steamcommunity.com/dev/apikey"),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET precisa ter ao menos 32 caracteres"),
 });
 
@@ -15,7 +14,6 @@ export function env() {
 
   const parsed = schema.safeParse({
     DATABASE_URL: process.env.DATABASE_URL,
-    STEAM_API_KEY: process.env.STEAM_API_KEY,
     AUTH_SECRET: process.env.AUTH_SECRET,
   });
 
@@ -77,4 +75,39 @@ export function cogniflow(): Cogniflow | null {
   const signingSecret = process.env.COGNIFLOW_SIGNING_SECRET?.trim();
   if (!webhookUrl || !clientId || !signingSecret) return null;
   return { webhookUrl, clientId, signingSecret };
+}
+
+/**
+ * A API de capabilities do cogniflow, por onde lemos a Steam.
+ *
+ * O FragIQ não tem chave da Steam: quem fala com a Web API é o cogniflow,
+ * com a chave da plataforma, e nós chamamos `POST /capabilities/steam.*`
+ * assinando com o mesmo segredo da conexão webhook. Sem estas variáveis
+ * nenhuma coleta funciona — mas o site abre, e o `npm run seed` continua
+ * servindo para mexer nos gráficos sem falar com ninguém. Por isso a
+ * validação é na primeira chamada, não no boot.
+ */
+export type CogniflowApi = {
+  apiUrl: string;
+  tenantId: string;
+  connectionId: string;
+  signingSecret: string;
+};
+
+let apiCached: CogniflowApi | null = null;
+
+export function cogniflowApi(): CogniflowApi {
+  if (apiCached) return apiCached;
+  const apiUrl = process.env.COGNIFLOW_API_URL?.trim().replace(/\/$/, "");
+  const tenantId = process.env.COGNIFLOW_TENANT_ID?.trim();
+  const connectionId = process.env.COGNIFLOW_CONNECTION_ID?.trim();
+  const signingSecret = process.env.COGNIFLOW_SIGNING_SECRET?.trim();
+  if (!apiUrl || !tenantId || !connectionId || !signingSecret) {
+    throw new Error(
+      "A leitura da Steam passa pelo cogniflow: defina COGNIFLOW_API_URL, COGNIFLOW_TENANT_ID, " +
+        "COGNIFLOW_CONNECTION_ID e COGNIFLOW_SIGNING_SECRET (ver docs/cogniflow-tenant.md).",
+    );
+  }
+  apiCached = { apiUrl, tenantId, connectionId, signingSecret };
+  return apiCached;
 }

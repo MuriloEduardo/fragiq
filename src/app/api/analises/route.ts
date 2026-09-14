@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/session";
 import { cogniflow } from "@/lib/env";
 import { garantirAnaliseDaSessao, listarAnalises } from "@/lib/analises";
+import { carregarFonte } from "@/lib/fonte";
 
 export const dynamic = "force-dynamic";
 
@@ -47,5 +48,7 @@ export async function GET(request: NextRequest) {
   if (!Number.isInteger(appId)) {
     return NextResponse.json({ error: "appId inválido." }, { status: 400 });
   }
-  return NextResponse.json({ analyses: await listarAnalises(session.userId, appId) });
+  const modo = request.nextUrl.searchParams.get("modo") ?? undefined;
+  const fonte = await carregarFonte(session.userId, appId);
+  return NextResponse.json({ analyses: await listarAnalises(session.userId, appId, { modo, rows: fonte?.rows }) });
 }
