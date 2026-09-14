@@ -19,7 +19,7 @@ segredo é async por isso: `authSecret()`, `cogniflow()`, `cogniflowApi()`,
 |---|---|---|
 | `AUTH_SECRET` | segredo | assina a sessão; só o runtime precisa |
 | `COGNIFLOW_SIGNING_SECRET` | segredo | é o mesmo valor de `tenants.fragiq.webhook.web` no cogniflow |
-| `BOT_WEBHOOK_SECRET` | segredo | some com o bot na fase 2 |
+| `BOT_WEBHOOK_SECRET` | segredo | autentica o bot de presença (`bot/`), que é nosso |
 | `DATABASE_URL`, `DIRECT_DATABASE_URL` | Vercel | o build roda `prisma migrate deploy` antes de existir runtime |
 | `CRON_SECRET` | Vercel | a Vercel só injeta o Bearer do cron se a variável estiver nela |
 | `COGNIFLOW_*_URL`, `*_ID`, `ADMIN_STEAM_IDS`, `APP_URL` | Vercel | configuração, não segredo |
