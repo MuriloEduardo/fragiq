@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { segredoOpcional } from "@/lib/segredos";
 
 export const dynamic = "force-dynamic";
 
@@ -11,13 +12,13 @@ export const dynamic = "force-dynamic";
  * entrega. O bot é quem chama, com o mesmo Bearer do webhook de eventos —
  * ele não tem porta aberta, então busca em vez de receber.
  */
-function autorizado(request: NextRequest) {
-  const secret = process.env.BOT_WEBHOOK_SECRET;
+async function autorizado(request: NextRequest) {
+  const secret = await segredoOpcional("BOT_WEBHOOK_SECRET");
   return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(request: NextRequest) {
-  if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await autorizado(request))) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const mensagens = await prisma.steamMessage.findMany({
     where: { status: "PENDING" },
@@ -35,7 +36,7 @@ const resultado = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await autorizado(request))) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const parsed = resultado.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });

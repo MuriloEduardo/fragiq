@@ -47,7 +47,7 @@ export async function invocar<T>(
   input: Record<string, unknown>,
   opcoes: { idempotencyKey?: string } = {},
 ): Promise<T> {
-  const config = cogniflowApi();
+  const config = await cogniflowApi();
   const body = JSON.stringify({ input, idempotency_key: opcoes.idempotencyKey });
 
   let res: Response;

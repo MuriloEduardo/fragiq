@@ -2,8 +2,16 @@
 
 Decisão de 13/09/2026: os segredos do FragIQ moram no Secrets Manager, num
 segredo só do tenant, e a Vercel chega nele por OIDC — sem chave AWS
-estática em variável de ambiente. O código está em `src/lib/segredos.ts`
-e roda em `src/instrumentation.ts`, antes de qualquer rota.
+estática em variável de ambiente. O código está em `src/lib/segredos.ts`:
+`segredo()`/`segredoOpcional()` carregam o JSON na primeira leitura, dentro
+de uma requisição, e guardam em `process.env` pela vida da instância.
+
+Não é no boot de propósito. O token OIDC da Vercel é um header da
+requisição (`x-vercel-oidc-token`); um `instrumentation.ts` que tentou
+trocá-lo por credencial antes da primeira requisição derrubou a produção
+por alguns minutos em 14/09/2026 (rollback pela CLI). Todo leitor de
+segredo é async por isso: `authSecret()`, `cogniflow()`, `cogniflowApi()`,
+`cifrar()`/`decifrar()` e a autorização das rotas do bot.
 
 ## O que vai e o que fica
 
@@ -19,6 +27,10 @@ e roda em `src/instrumentation.ts`, antes de qualquer rota.
 Regra: o segredo vence a variável para as chaves que ele tem; uma chave
 que falta nele cai para o ambiente com um aviso no log. Sem
 `FRAGIQ_SECRET_ID` o loader não faz nada — é o modo dev, com `.env`.
+
+Feito em 14/09/2026: segredo criado, provider e role `fragiq-vercel`
+criados, variáveis trocadas na Vercel. O `AUTH_SECRET` foi gerado novo (o
+da Vercel era *Sensitive*, ilegível), o que deslogou todo mundo uma vez.
 
 ## 1. O segredo (uma vez)
 
@@ -87,7 +99,8 @@ Manager da plataforma.
 | `AWS_ROLE_ARN` | `arn:aws:iam::<conta>:role/fragiq-vercel` |
 | `AWS_REGION` | `us-east-1` |
 
-Redeploy. O log de boot mostra `[segredos] carregado de cogniflow/tenants/fragiq via OIDC`.
+Redeploy. O log da primeira requisição de cada instância mostra
+`[segredos] carregado de cogniflow/tenants/fragiq via OIDC`.
 Só então apague `AUTH_SECRET`, `COGNIFLOW_SIGNING_SECRET` e
 `BOT_WEBHOOK_SECRET` da Vercel — e redeploy de novo para provar que o site
 sobe sem elas.

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { segredoOpcional } from "@/lib/segredos";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { agendarCaptura } from "@/lib/capturas";
@@ -23,7 +24,7 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.BOT_WEBHOOK_SECRET;
+  const secret = await segredoOpcional("BOT_WEBHOOK_SECRET");
   if (!secret) {
     console.error("[steam-event] BOT_WEBHOOK_SECRET não configurado");
     return NextResponse.json({ error: "Indisponível." }, { status: 503 });

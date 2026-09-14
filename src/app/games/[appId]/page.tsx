@@ -53,7 +53,7 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
   const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true || !partidasAtivas);
   const leituras = lerSerie(rows, filtro).filter((l) => l.id !== "modo" && l.id !== "mapas");
   const analista =
-    cogniflow() && rows.length >= 2
+    (await cogniflow()) && rows.length >= 2
       ? await Promise.all([listarAnalises(session.userId, appId, { modo, rows }), sessaoSemAnalise(session.userId, appId)])
       : null;
 

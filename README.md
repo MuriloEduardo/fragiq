@@ -265,8 +265,9 @@ contrato das views e prompt do agente em
 
 Em produção `AUTH_SECRET`, `COGNIFLOW_SIGNING_SECRET` e
 `BOT_WEBHOOK_SECRET` não são variáveis da Vercel: vêm do segredo
-`cogniflow/tenants/fragiq` no Secrets Manager, lido por OIDC no boot
-(`src/instrumentation.ts` → `src/lib/segredos.ts`). O que precisa ficar na
+`cogniflow/tenants/fragiq` no Secrets Manager, lido por OIDC na primeira
+leitura dentro de uma requisição (`src/lib/segredos.ts`; não no boot — o
+token OIDC é um header da requisição). O que precisa ficar na
 Vercel, e o passo a passo da AWS, estão em [docs/segredos.md](docs/segredos.md).
 
 ## Limpeza pendente (depois da fase 2 do cogniflow)
@@ -306,7 +307,7 @@ src/lib/
   modo.ts / modo-servidor.ts  o modo como navegação: abas, URL, cookie
   pendencias.ts               o que falta compartilhar, e o aviso no chat
   analise-texto.ts            manchete / parágrafos / ação da resposta do analista
-  segredos.ts                 segredos do Secrets Manager via OIDC (instrumentation.ts)
+  segredos.ts                 segredos do Secrets Manager via OIDC, preguiçosos
   steam/openid.ts             OpenID 2.0
   steam/api.ts                a Steam como capabilities steam.* do cogniflow
   steam/sync.ts               ingestão com gate de playtime

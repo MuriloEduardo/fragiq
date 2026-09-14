@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { segredoOpcional } from "@/lib/segredos";
 import { processarCapturasDevidas } from "@/lib/capturas";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +15,13 @@ export const maxDuration = 60;
  * fila nem precisa: qualquer coisa que chame este endpoint serve de
  * relógio — outro bot, o cron, um curl.
  */
-function autorizado(request: NextRequest) {
-  const secret = process.env.BOT_WEBHOOK_SECRET;
+async function autorizado(request: NextRequest) {
+  const secret = await segredoOpcional("BOT_WEBHOOK_SECRET");
   return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(request: NextRequest) {
-  if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await autorizado(request))) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   return NextResponse.json(await processarCapturasDevidas());
 }
 
@@ -32,7 +33,7 @@ const estado = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await autorizado(request))) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   const parsed = estado.safeParse(await request.json().catch(() => null));
   if (parsed.success) {
     const dados = {

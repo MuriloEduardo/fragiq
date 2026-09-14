@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
-  if (!cogniflow()) {
+  if (!(await cogniflow())) {
     return NextResponse.json({ error: "Analista não configurado." }, { status: 404 });
   }
 

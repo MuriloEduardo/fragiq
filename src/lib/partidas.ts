@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { prisma } from "./prisma";
-import { env } from "./env";
+import { authSecret } from "./env";
 import { decodificarShareCode, normalizarShareCode, shareCodeValido } from "./sharecode";
 import { getPlayerSummaries } from "./steam/api";
 import { CogniflowApiError, invocar } from "./cogniflow-api";
@@ -34,20 +34,20 @@ const MAX_TENTATIVAS = 4;
  * mas é um segredo da pessoa: fica cifrado com uma chave derivada do
  * AUTH_SECRET, e nunca sai do servidor (nem no export, nem em log).
  */
-function chave() {
-  return createHash("sha256").update(`${env().AUTH_SECRET}:partidas`).digest();
+async function chave() {
+  return createHash("sha256").update(`${await authSecret()}:partidas`).digest();
 }
 
-export function cifrar(texto: string): string {
+export async function cifrar(texto: string): Promise<string> {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", chave(), iv);
+  const cipher = createCipheriv("aes-256-gcm", await chave(), iv);
   const corpo = Buffer.concat([cipher.update(texto, "utf8"), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), corpo]).toString("base64url");
 }
 
-export function decifrar(cifrado: string): string {
+export async function decifrar(cifrado: string): Promise<string> {
   const bytes = Buffer.from(cifrado, "base64url");
-  const decipher = createDecipheriv("aes-256-gcm", chave(), bytes.subarray(0, 12));
+  const decipher = createDecipheriv("aes-256-gcm", await chave(), bytes.subarray(0, 12));
   decipher.setAuthTag(bytes.subarray(12, 28));
   return Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString("utf8");
 }
@@ -115,7 +115,7 @@ export async function ativarPartidas(userId: string, steamId: string, authCode: 
   await prisma.user.update({
     where: { id: userId },
     data: {
-      steamAuthCode: cifrar(authCode.trim().toUpperCase()),
+      steamAuthCode: await cifrar(authCode.trim().toUpperCase()),
       shareCodeAtual: share,
       partidasErro: null,
       partidasAtivadasEm: new Date(),
@@ -156,7 +156,7 @@ export async function descobrirPartidas(userId: string): Promise<number> {
   });
   if (!user?.steamAuthCode || !user.shareCodeAtual) return 0;
 
-  const authCode = decifrar(user.steamAuthCode);
+  const authCode = await decifrar(user.steamAuthCode);
   let atual = user.shareCodeAtual;
   let novas = 0;
   try {

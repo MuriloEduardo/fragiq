@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
-import { env } from "./env";
+import { authSecret } from "./env";
 
 const COOKIE = "fragiq_session";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 dias
@@ -11,8 +11,8 @@ export type SessionPayload = {
   steamId: string;
 };
 
-function secret() {
-  return new TextEncoder().encode(env().AUTH_SECRET);
+async function secret() {
+  return new TextEncoder().encode(await authSecret());
 }
 
 export async function createSession(payload: SessionPayload) {
@@ -21,7 +21,7 @@ export async function createSession(payload: SessionPayload) {
     .setSubject(payload.userId)
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE_SECONDS}s`)
-    .sign(secret());
+    .sign(await secret());
 
   const store = await cookies();
   store.set(COOKIE, token, {
@@ -38,7 +38,7 @@ export async function getSession(): Promise<SessionPayload | null> {
   if (!token) return null;
 
   try {
-    const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, await secret(), { algorithms: ["HS256"] });
     if (!payload.sub || typeof payload.steamId !== "string") return null;
     return { userId: payload.sub, steamId: payload.steamId };
   } catch {

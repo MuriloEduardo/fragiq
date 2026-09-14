@@ -149,7 +149,7 @@ export async function garantirAnaliseDaSessao(
   userId: string,
   appId: number,
 ): Promise<{ id: string; criada: boolean } | null> {
-  const config = cogniflow();
+  const config = await cogniflow();
   if (!config) return null;
 
   const sessao = await sessaoMaisRecente(userId, appId);

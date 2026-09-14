@@ -94,7 +94,7 @@ export async function enviarPergunta(
 export async function lerCorpoAssinado(
   request: Request,
 ): Promise<{ ok: true; body: unknown } | { ok: false; status: number; error: string }> {
-  const config = cogniflow();
+  const config = await cogniflow();
   if (!config) return { ok: false, status: 404, error: "Analista não configurado." };
 
   const raw = await request.text();

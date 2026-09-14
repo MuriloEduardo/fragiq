@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { segredoOpcional } from "@/lib/segredos";
 import { gravarMapaDaDemo, gravarPartidaDoGC, registrarFalhaDoGC } from "@/lib/partidas";
 import { garantirAnaliseDaSessao } from "@/lib/analises";
 
@@ -12,13 +13,13 @@ export const dynamic = "force-dynamic";
  * GET devolve share codes pendentes; POST traz o scoreboard (ou o motivo de
  * não ter vindo). Mesmo Bearer da fila de mensagens: é o mesmo bot.
  */
-function autorizado(request: NextRequest) {
-  const secret = process.env.BOT_WEBHOOK_SECRET;
+async function autorizado(request: NextRequest) {
+  const secret = await segredoOpcional("BOT_WEBHOOK_SECRET");
   return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(request: NextRequest) {
-  if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await autorizado(request))) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const [partidas, semMapa] = await Promise.all([
     prisma.match.findMany({
@@ -69,7 +70,7 @@ const resultado = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!autorizado(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await autorizado(request))) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const parsed = resultado.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });

@@ -22,7 +22,7 @@ export default async function AnalistaPage({ params, searchParams }: { params: P
   if (!fonte) notFound();
   const modo = await modoDaRequisicao(searchParams, await abasDoUsuario(session.userId, appId));
 
-  if (!cogniflow() || fonte.rows.length < 2) {
+  if (!(await cogniflow()) || fonte.rows.length < 2) {
     return (
       <p className="rounded-2xl border border-dashed border-line px-6 py-10 text-center text-sm text-ink-faint">
         O analista entra a partir da segunda coleta com partidas.

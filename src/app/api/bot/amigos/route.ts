@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { segredoOpcional } from "@/lib/segredos";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { registrar } from "@/lib/eventos";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 const schema = z.object({ steamIds: z.array(z.string().regex(/^7656119\d{10}$/)).max(5000) });
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.BOT_WEBHOOK_SECRET;
+  const secret = await segredoOpcional("BOT_WEBHOOK_SECRET");
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }

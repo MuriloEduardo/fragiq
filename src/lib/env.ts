@@ -1,10 +1,10 @@
 import { z } from "zod";
+import { segredo, segredoOpcional } from "./segredos";
 
 // Validado uma vez, no boot do servidor. Falhar aqui é muito melhor do que
 // descobrir uma variável vazia dentro de um fetch em produção.
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
-  AUTH_SECRET: z.string().min(32, "AUTH_SECRET precisa ter ao menos 32 caracteres"),
 });
 
 let cached: z.infer<typeof schema> | null = null;
@@ -14,7 +14,6 @@ export function env() {
 
   const parsed = schema.safeParse({
     DATABASE_URL: process.env.DATABASE_URL,
-    AUTH_SECRET: process.env.AUTH_SECRET,
   });
 
   if (!parsed.success) {
@@ -26,6 +25,18 @@ export function env() {
 
   cached = parsed.data;
   return cached;
+}
+
+/**
+ * A chave que assina a sessão. Vem do Secrets Manager (ou do `.env` em
+ * dev) na primeira leitura — por isso é async, e por isso não está no
+ * schema de boot: no boot ainda não há requisição para trocar o token
+ * OIDC por credencial.
+ */
+export async function authSecret(): Promise<string> {
+  const valor = await segredo("AUTH_SECRET");
+  if (valor.length < 32) throw new Error("AUTH_SECRET precisa ter ao menos 32 caracteres");
+  return valor;
 }
 
 /**
@@ -69,11 +80,12 @@ export type Cogniflow = {
   signingSecret: string;
 };
 
-export function cogniflow(): Cogniflow | null {
+export async function cogniflow(): Promise<Cogniflow | null> {
   const webhookUrl = process.env.COGNIFLOW_WEBHOOK_URL?.trim();
   const clientId = process.env.COGNIFLOW_CLIENT_ID?.trim();
-  const signingSecret = process.env.COGNIFLOW_SIGNING_SECRET?.trim();
-  if (!webhookUrl || !clientId || !signingSecret) return null;
+  if (!webhookUrl || !clientId) return null;
+  const signingSecret = await segredoOpcional("COGNIFLOW_SIGNING_SECRET");
+  if (!signingSecret) return null;
   return { webhookUrl, clientId, signingSecret };
 }
 
@@ -96,12 +108,12 @@ export type CogniflowApi = {
 
 let apiCached: CogniflowApi | null = null;
 
-export function cogniflowApi(): CogniflowApi {
+export async function cogniflowApi(): Promise<CogniflowApi> {
   if (apiCached) return apiCached;
   const apiUrl = process.env.COGNIFLOW_API_URL?.trim().replace(/\/$/, "");
   const tenantId = process.env.COGNIFLOW_TENANT_ID?.trim();
   const connectionId = process.env.COGNIFLOW_CONNECTION_ID?.trim();
-  const signingSecret = process.env.COGNIFLOW_SIGNING_SECRET?.trim();
+  const signingSecret = await segredoOpcional("COGNIFLOW_SIGNING_SECRET");
   if (!apiUrl || !tenantId || !connectionId || !signingSecret) {
     throw new Error(
       "A leitura da Steam passa pelo cogniflow: defina COGNIFLOW_API_URL, COGNIFLOW_TENANT_ID, " +
