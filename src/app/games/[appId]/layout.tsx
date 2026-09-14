@@ -9,11 +9,8 @@ import { formatPlaytime } from "@/lib/stats";
 import { isAdmin, seloDe } from "@/lib/admin";
 import { SiteHeader } from "@/components/site-header";
 import { NavJogo } from "@/components/nav-jogo";
-import { ModoNav } from "@/components/modo-nav";
-import { PendenciasBanner } from "@/components/pendencias-banner";
 import { COOKIE_MODO } from "@/lib/modo";
-import { abasDoUsuario } from "@/lib/modo-servidor";
-import { pendenciasDe } from "@/lib/pendencias";
+import { lenteDoUsuario } from "@/lib/modo-servidor";
 
 /**
  * Cabeçalho do jogo e as abas, uma vez só, para todas as áreas.
@@ -22,8 +19,9 @@ import { pendenciasDe } from "@/lib/pendencias";
  * conteúdo; o nome do jogo, as horas e o menu são a mesma coisa em todas —
  * e ficam aqui para que trocar de aba não redesenhe a página inteira.
  *
- * Sob as abas vem o submenu de modos, e acima do conteúdo o aviso do que
- * falta compartilhar na Steam — os dois valem para todas as abas.
+ * A lente de modo fica na linha das abas e vale para todas elas; o que
+ * falta compartilhar na Steam aparece onde o dado falta (linha de
+ * cobertura, rodapé de cartão, onboarding), não num aviso repetido.
  */
 export default async function GameLayout({
   children,
@@ -38,7 +36,7 @@ export default async function GameLayout({
   const appId = Number((await params).appId);
   if (!Number.isInteger(appId)) notFound();
 
-  const [user, userGame, selo, abas, pendencias, jar] = await Promise.all([
+  const [user, userGame, selo, lente, jar] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: { personaName: true, avatarUrl: true, lastSyncedAt: true },
@@ -53,8 +51,7 @@ export default async function GameLayout({
       },
     }),
     seloDe(session.userId),
-    abasDoUsuario(session.userId, appId),
-    appId === 730 ? pendenciasDe(session.userId) : Promise.resolve([]),
+    lenteDoUsuario(session.userId, appId),
     cookies(),
   ]);
   if (!user) redirect("/");
@@ -92,24 +89,12 @@ export default async function GameLayout({
               </div>
               <div className="mt-4">
                 <Suspense>
-                  <NavJogo appId={appId} />
+                  <NavJogo appId={appId} abas={lente.abas} cobertura={lente.cobertura} doCookie={jar.get(COOKIE_MODO)?.value} />
                 </Suspense>
               </div>
             </div>
           </div>
-          {abas.length > 0 && (
-            <div className="border-b border-line-soft bg-surface/60">
-              <div className="mx-auto max-w-6xl px-4 sm:px-6">
-                <Suspense>
-                  <ModoNav abas={abas} doCookie={jar.get(COOKIE_MODO)?.value} />
-                </Suspense>
-              </div>
-            </div>
-          )}
-          <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-            {pendencias.length > 0 && <PendenciasBanner pendencias={pendencias} base={`/games/${appId}`} />}
-            {children}
-          </main>
+          <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
         </>
       ) : (
         children

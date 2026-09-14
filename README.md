@@ -150,29 +150,42 @@ por isso que o preset "Precisão por arma" existe.
 ## Modos: Premier, Competitivo, Casual
 
 A Steam soma todos os modos num contador só, e um K/D de Premier misturado
-com casual não diz nada. Por isso o modo é **navegação**, não filtro: sob
-as abas do jogo há um submenu (Tudo · Premier · Competitivo · Casual ·
-Wingman) que vale para todas elas — Resumo, Estatísticas, Sessões,
-Partidas, Métricas e Análises mostram só aquele modo até a pessoa trocar.
-A escolha vai na URL (`?modo=premier`, compartilhável) e num cookie de 90
-dias (`src/lib/modo.ts`, `src/lib/modo-servidor.ts`, `components/modo-nav.tsx`).
+com casual não diz nada. Por isso o modo é uma **lente** — não um filtro:
+o controle `MODO` na linha das abas vale para todas elas, e nenhum gráfico
+perde pontos por causa dele. A série é sempre inteira; a lente destaca as
+sessões do modo, escolhe a "última sessão" e decide o normal. A escolha vai
+na URL (`?modo=premier`) e num cookie de 90 dias (`src/lib/modo.ts`,
+`modo-servidor.ts`, `components/nav-jogo.tsx`). Listas (Sessões, Partidas,
+Análises) filtram, porque uma lista vazia é honesta; números e gráficos
+não.
 
-De onde vem o modo de cada coisa:
+O **normal** por modo (`normalDe` em `series.ts`) só existe com
+`NORMAL_MIN_SESSOES` sessões e `NORMAL_MIN_ROUNDS` rounds no modo,
+excluindo a sessão lida; abaixo disso a referência é o vitalício, rotulado
+(`vs vitalício 0,70 · 2 de 5 sessões`) e com o chip de delta pontilhado.
+`0%` por falta de base nunca é impresso. O bloco **Por modo** do Resumo
+mostra os modos lado a lado, sem filtrar — é onde "não misturar" acontece
+sem esvaziar a tela.
 
-- **sessão**: o rich presence que o bot observou no fim da partida
-  (`StatSnapshot.matchMode`), ou o que a pessoa marcou à mão no hero;
-- **partida oficial**: `Match.modo`, resolvido na gravação — pelo
-  `gameType` do GC quando o valor é conhecido (8 = competitivo, 264 =
-  Wingman; o Premier ainda depende da presença), senão pelo snapshot de
-  presença de algum dos dez jogadores na janela da partida;
-- **análise**: o modo da sessão analisada; o analista recebe o modo na
-  mensagem e passa `modo=` em toda consulta.
+De onde vem o modo de cada coisa: sessão = rich presence que o bot observou
+(`StatSnapshot.matchMode`) ou marcação à mão (chip `modo? ▾`); partida
+oficial = `Match.modo` (pelo `gameType` do GC — 8 competitivo, 264 Wingman;
+Premier ainda depende da presença — ou pela presença de quem jogou);
+análise = o modo da sessão analisada.
 
-Com modo, o "normal" contra o qual um período é lido deixa de ser o
-vitalício da Steam e vira o acumulado das sessões daquele modo
-(`lifetimeValue` em `series.ts`, `vitaliciosDoHero`, as leituras). Só o
-submenu aparece para quem tem ao menos uma sessão marcada — e quem não tem
-recebe o aviso abaixo.
+### Cartões e gráficos
+
+Um cartão só (`components/stat-card.tsx`): rótulo e chip da lente, número
+e chip de delta (`delta-chip.tsx`, regras em `lib/delta.ts`: pontos
+percentuais para stats em `%`, `≈` abaixo de 3 %, verde/vermelho pela
+direção que é boa para a stat — o laranja nunca diz "subiu"), uma linha de
+referência, o gráfico e o rodapé com a cobertura. Os gráficos são SVG à
+mão sobre `PontoSerie` (`serieDeSessoes`), com domínio robusto por
+mediana/MAD (`lib/dominio.ts`): um outlier vira marcador na borda com o
+valor real, não achata a linha. Pontos com amostra pequena saem vazados e
+ficam fora do domínio e do normal; stats por partida usam a razão móvel das
+últimas 5 sessões. Formatação de números e datas passa por
+`lib/formato.ts` — é o único lugar que muda na internacionalização.
 
 ### Avisos do que falta compartilhar
 
@@ -181,7 +194,10 @@ estatística), bot não é amigo (sessões sem modo nem mapa) e corrente de
 share codes desligada (nenhuma partida oficial). `src/lib/pendencias.ts`
 calcula; `components/pendencias-banner.tsx` mostra em toda aba do jogo
 (no Resumo o onboarding já conta a história), dispensável por uma semana.
-No chat da Steam, para quem o bot alcança, o bot **insiste com teto**
+Não há banner: cada pendência aparece onde o dado falta — a linha de
+cobertura sob as abas (`6 de 10 sessões com modo · Adicionar o bot`), o
+chip `modo? ▾` da sessão, o onboarding do Resumo (compacto quando as
+estatísticas já entram). No chat da Steam, para quem o bot alcança, o bot **insiste com teto**
 (`lembrarPendenciasNoSteam`, chamado pelo cron diário): o primeiro lembrete
 depois de dois dias de amizade — ou, para as partidas, já na terceira
 sessão sem corrente —, os seguintes a cada sete dias, no máximo três por
@@ -257,10 +273,11 @@ Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:
 A análise de cada sessão, na página do jogo, vem de um agente que lê a mesma
 série e responde em texto — disparado por nós a cada sessão fechada (sync,
 cron, bot, scoreboard do GC), nunca por uma pergunta digitada. A resposta
-tem forma fixa (manchete, dois ou três parágrafos, uma linha "→" com a
-ação), que `src/lib/analise-texto.ts` separa e o cartão de
-`components/analista.tsx` mostra com a sessão em cima: modo, mapa, placar
-e os três números contra o normal do modo. Ele não roda aqui: o FragIQ é um tenant do **cogniflow**,
+tem forma fixa (manchete **em negrito**, dois ou três parágrafos, uma linha
+"→" com a ação), que `src/lib/analise-texto.ts` separa por contrato — uma
+manchete só é manchete quando vem marcada — e o cartão de
+`components/analista.tsx` mostra sem números em bloco: "quanto?" é do
+hero, "por quê e o que fazer?" é da análise. Ele não roda aqui: o FragIQ é um tenant do **cogniflow**,
 conectado pelo canal webhook — a pergunta sai assinada, a resposta volta por
 callback, e durante o turno o agente consulta `/api/cogniflow/data`, que
 expõe as mesmas derivações de `series.ts` como views. Provisionamento,

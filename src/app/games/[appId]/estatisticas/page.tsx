@@ -18,7 +18,7 @@ export default async function EstatisticasPage({ params, searchParams }: { param
 
   return (
     <>
-      <Estatisticas key={modo} appId={appId} rows={fonte.rows} modo={filtroDoModo(modo)?.mode ?? null} />
+      <Estatisticas appId={appId} rows={fonte.rows} lente={filtroDoModo(modo)?.mode ?? null} />
       <div className="mt-8">
         <CounterScope appId={appId} gaugesStale={gaugesLookStale(fonte.rows)} />
       </div>

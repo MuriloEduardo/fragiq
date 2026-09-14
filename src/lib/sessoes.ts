@@ -1,5 +1,7 @@
-import { deltaEntre, lifetimeValue, paresDeMovimento, type ContextFilter, type SnapshotRow } from "./series";
+import { deltaEntre, normalDe, paresDeMovimento, type ContextFilter, type Lente, type SnapshotRow } from "./series";
 import { rotularMapa, rotularModo } from "./cs2-labels";
+import { CS2_PANEL } from "./cs2-panel";
+import type { NormaisDoHero } from "@/components/sessao-hero";
 
 /**
  * Uma sessão é o intervalo entre duas coletas em que os rounds subiram.
@@ -78,18 +80,20 @@ export function ultimaSessao(rows: SnapshotRow[], filter?: ContextFilter): Sessa
 }
 
 /**
- * A referência dos três números do hero, para o delta: o vitalício da
- * Steam, ou, com recorte por modo, o acumulado daquele modo (ver
- * `lifetimeValue`).
+ * A referência dos três números do hero, pela regra única (`normalDe`):
+ * vitalício sem lente; com lente, o acumulado do modo quando há base, e o
+ * vitalício rotulado como fraco quando não há.
  */
-export function vitaliciosDoHero(rows: SnapshotRow[], filter?: ContextFilter) {
-  const razao = (a: string, b: string, escala = 1) =>
-    lifetimeValue({ id: a, metric: a, denominator: b, mode: "ratio", scale: escala, filter }, rows);
-  return {
-    kd: razao("total_kills", "total_deaths"),
-    danoPorRound: razao("total_damage_done", "total_rounds_played"),
-    hs: razao("total_kills_headshot", "total_kills", 100),
-  };
+export function normaisDoHero(rows: SnapshotRow[], lente: Lente, sessaoId: string | null): NormaisDoHero {
+  const de = (key: "kd" | "adr" | "hs") => normalDe(rows, CS2_PANEL.find((s) => s.key === key)!, lente, sessaoId, rotularModo);
+  return { kd: de("kd"), adr: de("adr"), hs: de("hs") };
+}
+
+/** Só os valores dos três normais, para quem monta texto (chat da Steam, análises). */
+export function valoresDoNormal(rows: SnapshotRow[], lente: Lente, sessaoId: string | null) {
+  const n = normaisDoHero(rows, lente, sessaoId);
+  const v = (x: (typeof n)["kd"]) => (x.tipo === "nenhum" ? null : x.valor);
+  return { kd: v(n.kd), danoPorRound: v(n.adr), hs: v(n.hs) };
 }
 
 export const FUSO_BR = "America/Sao_Paulo";

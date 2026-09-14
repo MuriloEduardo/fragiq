@@ -18,6 +18,11 @@
   --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
   --color-warn: var(--warn);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-neutral: var(--neutral);
   --color-steam: var(--steam);
   --color-accent-glow: var(--accent-glow);
 
@@ -55,6 +60,14 @@
   --accent-glow: rgba(255, 107, 61, 0.22);
   --danger: #ff7b6e;
   --warn: #e8c25a;
+
+  /* Valência é verde/vermelho; o laranja nunca diz "subiu". Mint frio para
+     contrastar com a marca: 8,9:1 sobre --surface. */
+  --good: #4fd1a5;
+  --good-soft: #0f2b22;
+  --bad: var(--danger);
+  --bad-soft: #331a17;
+  --neutral: var(--ink-muted);
   --steam: #5db1f0;
 
   --side-ct: #7fb4ee;
@@ -230,4 +243,30 @@ body {
   background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
   animation: varrer 9s linear infinite;
   pointer-events: none;
+}
+
+/* ------------------------------ gráfico ---------------------------------- */
+
+/* Cada ponto do gráfico grande é um <g> focável: a guia vertical e a
+   legenda ficam escondidas até o hover ou o foco — sem JavaScript, e por
+   isso funciona no toque e no teclado. */
+.serie .guia,
+.serie .legenda {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.serie .ponto {
+  cursor: default;
+  outline: none;
+}
+.serie .ponto:hover .guia,
+.serie .ponto:focus-visible .guia,
+.serie .ponto:hover .legenda,
+.serie .ponto:focus-visible .legenda {
+  opacity: 1;
+}
+.serie .ponto:hover .rotulo,
+.serie .ponto:focus-visible .rotulo {
+  opacity: 0;
 }

@@ -577,3 +577,166 @@ export function seriesLabel(spec: SeriesSpec, catalog: Map<string, string>): str
     }
   }
 }
+
+/* ------------------------- série por sessão e o normal ------------------------- */
+
+/**
+ * Um ponto da série de uma estatística, com o que a interface precisa para
+ * julgá-lo: quanta amostra ele tem, de que modo é, e de qual coleta veio.
+ *
+ * Substitui o `number[]` que os gráficos recebiam. Sem amostra não dá para
+ * marcar um ponto como fraco; sem modo não dá para a lente destacá-lo; sem
+ * o id da coleta não dá para excluir a própria sessão do normal.
+ */
+export type PontoSerie = {
+  t: number;
+  valor: number;
+  rounds: number;
+  partidas: number;
+  modo: string | null;
+  sessaoId: string | null;
+  /** Amostra abaixo do mínimo da estatística: desenhado vazado, fora do domínio e do normal. */
+  fraco: boolean;
+};
+
+export type Lente = { modo: string | null };
+
+/** O que uma estatística precisa dizer para virar série e normal. */
+export type EspecificacaoSerie = {
+  spec: Omit<SeriesSpec, "id" | "filter">;
+  amostra: { de: "rounds" | "partidas"; minimo: number };
+  movel?: number;
+};
+
+/**
+ * A série inteira de uma razão, uma sessão por ponto, sem recorte.
+ *
+ * O modo nunca entra aqui como filtro: a lente é aplicada na apresentação
+ * (pontos destacados) e no normal (`normalDe`), nunca removendo pontos.
+ * Stats por partida (`movel`) usam a razão móvel das últimas N sessões,
+ * porque a razão de uma sessão de duas partidas só sabe dizer 0, 50 ou 100.
+ */
+export function serieDeSessoes(rows: SnapshotRow[], stat: EspecificacaoSerie): PontoSerie[] {
+  const { spec } = stat;
+  if (spec.mode !== "ratio" || !spec.denominator) return [];
+  const scale = spec.scale ?? 1;
+  const janela: { n: number; d: number }[] = [];
+  const pontos: PontoSerie[] = [];
+
+  for (const par of paresDeMovimento(rows, "total_rounds_played")) {
+    const n = deltaEntre(par, spec.metric);
+    const d = deltaEntre(par, spec.denominator);
+    if (n === null || d === null) continue;
+    const rounds = deltaEntre(par, "total_rounds_played") ?? 0;
+    const partidas = deltaEntre(par, "total_matches_played") ?? 0;
+
+    let numerador = n;
+    let denominador = d;
+    if (stat.movel) {
+      janela.push({ n, d });
+      if (janela.length > stat.movel) janela.shift();
+      numerador = janela.reduce((s, j) => s + j.n, 0);
+      denominador = janela.reduce((s, j) => s + j.d, 0);
+    }
+    if (denominador <= 0) continue;
+
+    const amostra = stat.amostra.de === "rounds" ? rounds : partidas;
+    pontos.push({
+      t: par.curr.capturedAt.getTime(),
+      valor: (numerador / denominador) * scale,
+      rounds,
+      partidas,
+      modo: par.curr.matchMode ?? null,
+      sessaoId: par.curr.id ?? null,
+      fraco: amostra < stat.amostra.minimo,
+    });
+  }
+  return pontos;
+}
+
+/** Mínimos para um modo ter normal próprio. Calibrados a olho; medir com dados reais. */
+export const NORMAL_MIN_SESSOES = 5;
+export const NORMAL_MIN_ROUNDS = 150;
+
+export type Normal =
+  | { tipo: "vitalicio"; valor: number; rotulo: "vitalício" }
+  | { tipo: "modo"; valor: number; rotulo: string; sessoes: number }
+  | {
+      /** A lente pediu um modo sem base: cai no vitalício e diz isso. */
+      tipo: "vitalicio-fraco";
+      valor: number;
+      rotulo: string;
+      progresso: { sessoes: number; minimo: number };
+    }
+  | { tipo: "nenhum"; motivo: "sem-vitalicio" | "sem-sessoes" };
+
+/**
+ * O normal contra o qual um valor é lido.
+ *
+ * Sem lente é o vitalício da Steam: existe desde a primeira coleta e uma
+ * sessão pesa quase nada nele. Com lente é o acumulado das sessões fortes
+ * daquele modo — nunca contando a sessão que está sendo lida, senão uma
+ * sessão sozinha vira o seu próprio normal e o delta é zero por
+ * construção — e só quando há sessões e rounds suficientes. Abaixo disso
+ * volta ao vitalício, com rótulo dizendo que o modo ainda não tem base e
+ * quantas sessões faltam: comparar é a promessa do produto, fingir que o
+ * vitalício é o normal do Premier não é.
+ */
+export function normalDe(
+  rows: SnapshotRow[],
+  stat: EspecificacaoSerie,
+  lente: Lente,
+  sessaoId: string | null,
+  rotuloDoModo: (modo: string) => string = (m) => m,
+): Normal {
+  const vitalicio = lifetimeValue({ ...stat.spec, id: stat.spec.metric }, rows);
+  if (!lente.modo) {
+    return vitalicio === null ? { tipo: "nenhum", motivo: "sem-vitalicio" } : { tipo: "vitalicio", valor: vitalicio, rotulo: "vitalício" };
+  }
+
+  const base = serieDeSessoes(rows, { ...stat, movel: undefined }).filter(
+    (p) => p.modo === lente.modo && !p.fraco && p.sessaoId !== sessaoId,
+  );
+  const rounds = base.reduce((s, p) => s + p.rounds, 0);
+  const rotulo = rotuloDoModo(lente.modo);
+  if (base.length >= NORMAL_MIN_SESSOES && rounds >= NORMAL_MIN_ROUNDS) {
+    const valor = acumuladoDe(rows, stat, base);
+    if (valor !== null) return { tipo: "modo", valor, rotulo: `normal · ${rotulo} · ${base.length} sessões`, sessoes: base.length };
+  }
+  if (vitalicio === null) return { tipo: "nenhum", motivo: "sem-vitalicio" };
+  return {
+    tipo: "vitalicio-fraco",
+    valor: vitalicio,
+    rotulo: `vs vitalício · ${rotulo} sem base (${base.length} de ${NORMAL_MIN_SESSOES})`,
+    progresso: { sessoes: base.length, minimo: NORMAL_MIN_SESSOES },
+  };
+}
+
+/** A razão acumulada das sessões escolhidas (soma dos deltas, não média das razões). */
+function acumuladoDe(rows: SnapshotRow[], stat: EspecificacaoSerie, escolhidas: PontoSerie[]): number | null {
+  return acumuladoDasSessoes(rows, stat, new Set(escolhidas.map((p) => p.sessaoId)));
+}
+
+/** A mesma conta, para quem já tem os ids das coletas que fecharam as sessões. */
+export function acumuladoDasSessoes(rows: SnapshotRow[], stat: EspecificacaoSerie, ids: Set<string | null>): number | null {
+  const { spec } = stat;
+  if (spec.mode !== "ratio" || !spec.denominator) return null;
+  let n = 0;
+  let d = 0;
+  for (const par of paresDeMovimento(rows, "total_rounds_played")) {
+    if (!ids.has(par.curr.id ?? null)) continue;
+    n += deltaEntre(par, spec.metric) ?? 0;
+    d += deltaEntre(par, spec.denominator) ?? 0;
+  }
+  return d > 0 ? (n / d) * (spec.scale ?? 1) : null;
+}
+
+/** Uma série sem sessão por trás (métricas cruas, demonstrações): só valores. */
+export function pontosSimples(valores: number[]): PontoSerie[] {
+  return valores.map((valor, i) => ({ t: i, valor, rounds: Infinity, partidas: Infinity, modo: null, sessaoId: null, fraco: false }));
+}
+
+/** Pontos de `buildSeries` no formato dos gráficos, sem amostra nem modo (métricas cruas). */
+export function pontosDeSerie(pontos: SeriesPoint[]): PontoSerie[] {
+  return pontos.map((p) => ({ t: p.t, valor: p.value, rounds: Infinity, partidas: Infinity, modo: null, sessaoId: null, fraco: false }));
+}

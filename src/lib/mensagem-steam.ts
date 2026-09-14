@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { appUrl } from "./env";
 import { carregarFonte } from "./fonte";
-import { listarSessoes, vitaliciosDoHero, type Sessao } from "./sessoes";
+import { listarSessoes, valoresDoNormal, type Sessao } from "./sessoes";
 import { listarPartidas, type PartidaLinha } from "./partidas";
 import { rotularMapa } from "./cs2-labels";
 import { LEMBRETES_PRIVACIDADE } from "./pendencias";
@@ -57,7 +57,7 @@ export async function montarTextoDaSessao(userId: string, steamId: string, appId
 
   return [
     `FragIQ · ${manchete(sessao, partidas)}`,
-    desvios(sessao, vitaliciosDoHero(fonte.rows)),
+    desvios(sessao, valoresDoNormal(fonte.rows, { modo: sessao.modoId }, sessao.snapshotId)),
     `Leitura completa: ${appUrl()}/cs2${primeira ? ` · para não receber mais: ${appUrl()}/seguranca` : ""}`,
   ]
     .filter(Boolean)

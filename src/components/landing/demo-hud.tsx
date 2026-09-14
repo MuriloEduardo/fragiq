@@ -1,4 +1,5 @@
 import { Sparkline } from "@/components/sparkline";
+import { pontosSimples } from "@/lib/series";
 
 /**
  * O produto, em miniatura, com os componentes reais.
@@ -32,7 +33,7 @@ export function DemoHud() {
                 {t.vit} <span className="ml-1 font-medium text-accent">{t.var}</span>
               </p>
               <div className="mt-3 h-8">
-                <Sparkline values={t.serie} baseline={Number(t.vit.replace(",", "."))} className="h-8 w-full" />
+                <Sparkline pontos={pontosSimples(t.serie)} normal={Number(t.vit.replace(",", "."))} className="h-8 w-full" />
               </div>
             </div>
           ))}

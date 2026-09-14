@@ -1,12 +1,14 @@
 /**
  * A resposta do analista, lida em partes.
  *
- * O prompt pede uma forma fixa: manchete numa linha, dois ou três
- * parágrafos curtos, e uma última linha começando com "→" com a ação para
- * a próxima sessão. Isto reconhece essa forma quando ela veio — e quando
- * não veio (análises antigas, um modelo que desobedeceu), devolve o texto
- * como parágrafos, sem inventar manchete. O cartão decide o que mostrar
- * grande; aqui só se separa.
+ * O prompt pede uma forma fixa: a manchete **em negrito** na primeira
+ * linha, dois ou três parágrafos curtos, e uma última linha começando com
+ * "→" com a ação para a próxima sessão. Isto reconhece essa forma — e só
+ * ela. Uma manchete é manchete quando vem marcada (`**…**` inteira ou
+ * `# `), com até 90 caracteres e sem dois-pontos no fim; um primeiro
+ * parágrafo curto não vira título por ser curto. Foi assim que uma
+ * introdução de 24 px apareceu em produção: heurística promovendo prosa.
+ * Análises antigas e respostas desobedientes começam pelo corpo.
  */
 export type AnaliseLida = {
   manchete: string | null;
@@ -14,7 +16,7 @@ export type AnaliseLida = {
   acao: string | null;
 };
 
-const MAX_MANCHETE = 140;
+const MAX_MANCHETE = 90;
 
 export function lerAnalise(texto: string): AnaliseLida {
   const blocos = texto
@@ -26,8 +28,13 @@ export function lerAnalise(texto: string): AnaliseLida {
   let manchete: string | null = null;
   let acao: string | null = null;
 
-  if (blocos.length > 1 && !blocos[0].includes("\n") && blocos[0].length <= MAX_MANCHETE && !/^\s*[-•*]\s/.test(blocos[0])) {
-    manchete = blocos.shift()!.replace(/^\*\*(.+)\*\*$/, "$1");
+  const primeiro = blocos[0];
+  if (primeiro && blocos.length > 1) {
+    const marcada = /^\*\*([^*\n]+)\*\*$/.exec(primeiro)?.[1] ?? /^#\s+([^\n]+)$/.exec(primeiro)?.[1] ?? null;
+    if (marcada && marcada.trim().length <= MAX_MANCHETE && !marcada.trim().endsWith(":")) {
+      manchete = marcada.trim();
+      blocos.shift();
+    }
   }
   const ultimo = blocos[blocos.length - 1];
   if (ultimo && /^(→|->|➜)\s*/.test(ultimo)) {

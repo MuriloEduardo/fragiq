@@ -1,166 +1,132 @@
-import type { SeriesPoint } from "@/lib/series";
+import type { PontoSerie } from "@/lib/series";
+import { dominioRobusto, grampear } from "@/lib/dominio";
+import { formatarDia, formatarQuando } from "@/lib/formato";
+import { rotularModo } from "@/lib/cs2-labels";
 
 /**
- * Gráfico de uma métrica só, em SVG à mão.
+ * O gráfico de uma estatística, em página inteira.
  *
- * Sem biblioteca de propósito: uma linha com eixos não justifica 50 kB de
- * JavaScript no cliente, e assim ele sai renderizado do servidor — aparece
- * junto com o HTML, sem esperar hidratação.
+ * SVG à mão, renderizado no servidor, sem biblioteca: aparece junto com o
+ * HTML. A série é inteira; a lente destaca os pontos do modo e apaga os
+ * outros. O domínio é o robusto (`dominio.ts`): um outlier vira um
+ * triângulo na borda com o valor real e a amostra — mostrado, nunca
+ * omitido, e nunca mandando no eixo.
  *
- * Sem tooltip, também de propósito. Tooltip esconde o valor atrás de uma
- * interação que não existe no celular; com poucas coletas os pontos são
- * rotulados direto, e quando são muitos rotulamos os que importam — o
- * primeiro, o último, o máximo e o mínimo.
+ * Hover e foco sem JavaScript: cada ponto é um `<g tabindex>` com o rótulo
+ * escondido, que `:hover` e `:focus-visible` mostram. Funciona no toque
+ * (primeiro tap foca) e no teclado.
  */
-
 const W = 720;
 const H = 280;
-const M = { top: 18, right: 16, bottom: 28, left: 52 };
+const M = { top: 22, right: 20, bottom: 30, left: 56 };
 
 type Props = {
-  points: SeriesPoint[];
-  /** Referência do vitalício, quando existe. */
-  baseline?: number | null;
+  pontos: PontoSerie[];
+  normal: { valor: number; rotulo: string } | null;
+  lente?: string | null;
   formatar: (v: number) => string;
-  cor?: string;
+  emPct?: boolean;
+  casas?: number;
+  amostraDe?: "rounds" | "partidas";
 };
 
-export function SerieChart({ points, baseline, formatar, cor = "var(--accent)" }: Props) {
-  if (points.length === 0) {
-    return (
-      <p className="rounded-xl border border-dashed border-line px-6 py-12 text-center text-sm text-ink-faint">
-        Sem pontos para desenhar. Modos derivados precisam de ao menos duas
-        coletas com partidas entre elas.
-      </p>
-    );
-  }
-
-  const valores = points.map((p) => p.value);
-  const comRef =
-    baseline !== null && baseline !== undefined && Number.isFinite(baseline)
-      ? [...valores, baseline]
-      : valores;
-
-  let min = Math.min(...comRef);
-  let max = Math.max(...comRef);
-  if (min === max) {
-    // Série constante: uma faixa artificial evita divisão por zero e deixa a
-    // linha no meio, que é a leitura honesta de "não mudou".
-    min -= Math.abs(min) * 0.1 || 1;
-    max += Math.abs(max) * 0.1 || 1;
-  }
-
-  const t0 = points[0].t;
-  const t1 = points[points.length - 1].t;
+export function SerieChart({ pontos, normal, lente = null, formatar, emPct = false, casas = 2, amostraDe = "rounds" }: Props) {
+  const d = dominioRobusto(pontos, normal?.valor ?? null, emPct, casas);
+  const t0 = pontos[0]?.t ?? 0;
+  const t1 = pontos[pontos.length - 1]?.t ?? 1;
   const spanT = t1 - t0 || 1;
+  const x = (t: number) => (pontos.length < 2 ? (M.left + W - M.right) / 2 : M.left + ((t - t0) / spanT) * (W - M.left - M.right));
+  const y = (v: number) => M.top + (1 - (v - d.min) / (d.max - d.min)) * (H - M.top - M.bottom);
 
-  const x = (t: number) => M.left + ((t - t0) / spanT) * (W - M.left - M.right);
-  const y = (v: number) => M.top + (1 - (v - min) / (max - min)) * (H - M.top - M.bottom);
-
-  const d = points
-    .map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.value).toFixed(1)}`)
-    .join(" ");
-
-  const ticksY = escalaY(min, max);
-
-  const iMax = valores.indexOf(Math.max(...valores));
-  const iMin = valores.indexOf(Math.min(...valores));
+  const desenhados = pontos.map((p) => {
+    const g = grampear(p.valor, d);
+    return { p, x: x(p.t), y: y(g.y), fora: g.fora, noModo: lente ? p.modo === lente : true };
+  });
+  const caminho = desenhados.map((q, i) => `${i ? "L" : "M"}${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" ");
+  const ticksY = escalaY(d.min, d.max);
+  const ticksT = marcasDeTempo(t0, t1);
   const rotulados = new Set(
-    points.length <= 8
-      ? points.map((_, i) => i)
-      : [0, points.length - 1, iMax, iMin],
+    pontos.length <= 8
+      ? pontos.map((_, i) => i)
+      : [0, pontos.length - 1, indiceExtremo(desenhados, "max"), indiceExtremo(desenhados, "min")],
   );
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img">
+    <svg viewBox={`0 0 ${W} ${H}`} className="serie h-auto w-full" role="img">
       {ticksY.map((v) => (
         <g key={v}>
-          <line
-            x1={M.left}
-            x2={W - M.right}
-            y1={y(v)}
-            y2={y(v)}
-            stroke="var(--line-soft)"
-            strokeWidth="1"
-          />
-          <text
-            x={M.left - 8}
-            y={y(v)}
-            textAnchor="end"
-            dominantBaseline="middle"
-            fontSize="11"
-            fill="var(--ink-faint)"
-          >
+          <line x1={M.left} x2={W - M.right} y1={y(v)} y2={y(v)} stroke="var(--line-soft)" strokeWidth="1" />
+          <text x={M.left - 8} y={y(v)} textAnchor="end" dominantBaseline="middle" fontSize="11" fill="var(--ink-faint)" className="tnum">
             {formatar(v)}
           </text>
         </g>
       ))}
 
-      {baseline !== null && baseline !== undefined && Number.isFinite(baseline) && (
+      {normal && (
         <>
-          <line
-            x1={M.left}
-            x2={W - M.right}
-            y1={y(baseline)}
-            y2={y(baseline)}
-            stroke="var(--ink-faint)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-          />
-          <text
-            x={M.left + 4}
-            y={y(baseline) - 6}
-            textAnchor="start"
-            fontSize="11"
-            fill="var(--ink-faint)"
-          >
-            vitalício {formatar(baseline)}
+          <line x1={M.left} x2={W - M.right} y1={y(normal.valor)} y2={y(normal.valor)} stroke="var(--ink-faint)" strokeWidth="1" strokeDasharray="4 4" />
+          <text x={W - M.right} y={y(normal.valor) - 6} textAnchor="end" fontSize="11" fill="var(--ink-faint)">
+            {normal.rotulo} {formatar(normal.valor)}
           </text>
         </>
       )}
 
-      <path
-        d={d}
-        fill="none"
-        stroke={cor}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="tracar"
-      />
+      {pontos.length >= 2 && (
+        <path d={caminho} fill="none" stroke={lente ? "var(--line)" : "var(--accent)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={lente ? undefined : "tracar"} />
+      )}
 
-      {points.map((p, i) => (
-        <g key={p.t}>
-          <circle cx={x(p.t)} cy={y(p.value)} r="3.5" fill={cor} />
-          {rotulados.has(i) && (
-            <text
-              x={x(p.t)}
-              y={y(p.value) - 10}
-              textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
-              fontSize="11"
-              fill="var(--ink)"
-              className="tnum"
-            >
-              {formatar(p.value)}
+      {desenhados.map((q, i) => {
+        const cor = q.noModo ? "var(--accent)" : "var(--ink-faint)";
+        const amostra = amostraDe === "rounds" ? q.p.rounds : q.p.partidas;
+        const legenda = [
+          formatar(q.p.valor),
+          formatarQuando(new Date(q.p.t)),
+          q.p.modo ? rotularModo(q.p.modo) : null,
+          Number.isFinite(amostra) ? `${amostra} ${amostraDe === "rounds" ? "r" : "partidas"}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        const anchor = i === 0 ? "start" : i === desenhados.length - 1 ? "end" : "middle";
+        return (
+          <g key={q.p.t} tabIndex={0} className="ponto" aria-label={legenda}>
+            <line x1={q.x} x2={q.x} y1={M.top} y2={H - M.bottom} stroke="var(--ink-faint)" strokeWidth="1" className="guia" />
+            {q.fora ? (
+              <path
+                d={q.fora === "acima" ? `M${q.x},${q.y + 1} l-5,8 l10,0 z` : `M${q.x},${q.y - 1} l-5,-8 l10,0 z`}
+                fill="var(--ink-faint)"
+              />
+            ) : (
+              <circle cx={q.x} cy={q.y} r={q.noModo ? 4 : 2.5} fill={q.p.fraco ? "var(--surface)" : cor} stroke={cor} strokeWidth={q.p.fraco ? 1.5 : 0} />
+            )}
+            {(rotulados.has(i) || q.fora) && (
+              <text x={q.x} y={q.fora === "abaixo" ? q.y + 20 : q.y - 11} textAnchor={anchor} fontSize="11" fill={q.fora ? "var(--ink-faint)" : "var(--ink)"} className="tnum rotulo">
+                {formatar(q.p.valor)}
+                {q.fora ? ` ${q.fora === "acima" ? "▲" : "▼"} · ${Number.isFinite(amostra) ? amostra : "?"} ${amostraDe === "rounds" ? "r" : "p"}` : ""}
+              </text>
+            )}
+            <text x={q.x} y={M.top - 8} textAnchor={anchor} fontSize="11" fill="var(--ink)" className="tnum legenda">
+              {legenda}
             </text>
-          )}
-        </g>
-      ))}
+          </g>
+        );
+      })}
 
-      {[points[0], points[points.length - 1]].map((p, i) => (
-        <text
-          key={`t${i}`}
-          x={i === 0 ? M.left : W - M.right}
-          y={H - 8}
-          textAnchor={i === 0 ? "start" : "end"}
-          fontSize="11"
-          fill="var(--ink-faint)"
-        >
-          {rotularInstante(p.t, spanT)}
+      {ticksT.map((t, i) => (
+        <text key={t} x={i === 0 ? M.left : i === ticksT.length - 1 ? W - M.right : x(t)} y={H - 8} textAnchor={i === 0 ? "start" : i === ticksT.length - 1 ? "end" : "middle"} fontSize="11" fill="var(--ink-faint)">
+          {formatarDia(new Date(t))}
         </text>
       ))}
     </svg>
   );
+}
+
+function indiceExtremo(qs: { p: PontoSerie; fora: string | null }[], qual: "max" | "min"): number {
+  let melhor = -1;
+  qs.forEach((q, i) => {
+    if (q.fora || q.p.fraco) return;
+    if (melhor === -1 || (qual === "max" ? q.p.valor > qs[melhor].p.valor : q.p.valor < qs[melhor].p.valor)) melhor = i;
+  });
+  return melhor;
 }
 
 /** Quatro marcas em números redondos, não em frações do domínio. */
@@ -168,7 +134,6 @@ function escalaY(min: number, max: number): number[] {
   const passoBruto = (max - min) / 4;
   const mag = 10 ** Math.floor(Math.log10(passoBruto || 1));
   const passo = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((p) => p >= passoBruto) ?? mag * 10;
-
   const inicio = Math.ceil(min / passo) * passo;
   const ticks: number[] = [];
   for (let v = inicio; v <= max + passo * 0.001; v += passo) ticks.push(Number(v.toFixed(10)));
@@ -177,15 +142,13 @@ function escalaY(min: number, max: number): number[] {
 
 const DIA = 86_400_000;
 
-function rotularInstante(t: number, span: number) {
-  const d = new Date(t);
-  if (span < DIA) return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  if (span < 7 * DIA)
-    return d.toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "2-digit" });
+/** Primeiro e último instante; entre eles, uma marca por semana quando o intervalo passa de 14 dias. */
+function marcasDeTempo(t0: number, t1: number): number[] {
+  if (t1 <= t0) return [t0];
+  const marcas = [t0];
+  if (t1 - t0 > 14 * DIA) {
+    for (let t = t0 + 7 * DIA; t < t1 - 3 * DIA; t += 7 * DIA) marcas.push(t);
+  }
+  marcas.push(t1);
+  return marcas;
 }

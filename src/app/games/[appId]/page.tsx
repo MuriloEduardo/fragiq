@@ -4,15 +4,16 @@ import { carregarFonte } from "@/lib/fonte";
 import { cogniflow } from "@/lib/env";
 import { listarAnalises, sessaoSemAnalise } from "@/lib/analises";
 import { lerSerie } from "@/lib/leituras";
-import { ultimaSessao, vitaliciosDoHero } from "@/lib/sessoes";
+import { normaisDoHero, ultimaSessao } from "@/lib/sessoes";
 import { CS2_PANEL } from "@/lib/cs2-panel";
 import { SessaoHero } from "@/components/sessao-hero";
 import { Analista } from "@/components/analista";
-import { Leituras } from "@/components/leituras";
 import { StatPanel } from "@/components/stat-panel";
+import { PorModo } from "@/components/por-modo";
 import { PrimeirosPassos } from "@/components/primeiros-passos";
 import { Secao } from "@/components/secao";
 import { SemDados } from "@/components/sem-dados";
+import { Estado } from "@/components/estado";
 import { botEhAmigo } from "@/lib/bot";
 import { prisma } from "@/lib/prisma";
 import { filtroDoModo, rotuloDoModo, TUDO } from "@/lib/modo";
@@ -21,15 +22,13 @@ import { abasDoUsuario, modoDaRequisicao, type SearchParams } from "@/lib/modo-s
 export const dynamic = "force-dynamic";
 
 /**
- * Resumo: "como foi?" em uma tela.
+ * Resumo: "como foi, e o que fazer na próxima" em uma dobra e meia.
  *
- * A última sessão em três números, a análise que chegou sozinha, as quatro
- * leituras que mais pesam e os seis tiles principais. Tudo o mais tem aba
- * própria — e cada tile leva ao seu gráfico.
- *
- * Tudo aqui respeita o modo do submenu: a última sessão é a última DAQUELE
- * modo, e o "normal" contra o qual ela é medida é o acumulado do modo, não
- * o vitalício que mistura tudo.
+ * Ordem de leitura: o que falta (só enquanto faltar) → a última sessão em
+ * três números → a análise (manchete e ação, sem repetir os números) →
+ * seis cartões → os modos lado a lado. A lente vale para tudo: a última
+ * sessão é a última DAQUELE modo, e o normal é o do modo quando há base.
+ * As leituras de K/D e headshot saíram daqui: eram o hero em prosa.
  */
 export default async function ResumoPage({ params, searchParams }: { params: Promise<{ appId: string }>; searchParams: SearchParams }) {
   const session = await requireSession();
@@ -42,16 +41,16 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
   }
   const { rows } = fonte;
   const modo = await modoDaRequisicao(searchParams, await abasDoUsuario(session.userId, appId));
-  const filtro = filtroDoModo(modo);
+  const lente = filtroDoModo(modo)?.mode ?? null;
 
-  const sessao = ultimaSessao(rows, filtro);
+  const sessao = ultimaSessao(rows, filtroDoModo(modo));
   const amigoDoBot = appId === 730 ? await botEhAmigo(session.steamId) : true;
   const partidasAtivas =
     appId === 730
       ? Boolean((await prisma.user.findUnique({ where: { id: session.userId }, select: { partidasAtivadasEm: true } }))?.partidasAtivadasEm)
       : true;
   const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true || !partidasAtivas);
-  const leituras = lerSerie(rows, filtro).filter((l) => l.id !== "modo" && l.id !== "mapas");
+  const notas = lerSerie(rows, filtroDoModo(modo)).filter((l) => l.id === "amostra" || l.id === "mapas");
   const analista =
     (await cogniflow()) && rows.length >= 2
       ? await Promise.all([listarAnalises(session.userId, appId, { modo, rows }), sessaoSemAnalise(session.userId, appId)])
@@ -66,14 +65,12 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
       )}
 
       {sessao ? (
-        <SessaoHero sessao={sessao} vitalicio={vitaliciosDoHero(rows, filtro)} referencia={modo === TUDO ? "vitalício" : `no ${rotuloDoModo(modo)}`} />
-      ) : (
-        modo !== TUDO && (
-          <p className="rounded-2xl border border-dashed border-line px-6 py-8 text-center text-sm text-ink-faint">
-            Nenhuma sessão de {rotuloDoModo(modo)} ainda.
-          </p>
-        )
-      )}
+        <SessaoHero sessao={sessao} normais={normaisDoHero(rows, { modo: lente }, sessao.snapshotId)} notas={notas} lente={lente} />
+      ) : modo !== TUDO ? (
+        <Estado titulo={`Sem sessões de ${rotuloDoModo(modo)}`} texto="A próxima partida nesse modo aparece aqui." acao={{ rotulo: "Ver tudo", href: `/games/${appId}` }} />
+      ) : rows.length === 1 ? (
+        <Estado titulo="Primeira coleta gravada" texto="A próxima partida vira a primeira sessão." />
+      ) : null}
 
       {analista && (
         <Secao titulo="Análise" href={`/games/${appId}/analista`} acao="histórico">
@@ -81,17 +78,13 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
         </Secao>
       )}
 
-      {leituras.length > 0 && (
-        <Secao titulo="Leituras">
-          <Leituras leituras={leituras} limite={4} />
+      {appId === 730 && (
+        <Secao titulo="Estatísticas" href={`/games/${appId}/estatisticas`} acao="todas">
+          <StatPanel stats={CS2_PANEL} snapshots={rows} lente={lente} appId={appId} limite={6} />
         </Secao>
       )}
 
-      {appId === 730 && (
-        <Secao titulo="Estatísticas" href={`/games/${appId}/estatisticas`} acao="todas">
-          <StatPanel stats={CS2_PANEL} snapshots={rows} filter={filtro} appId={appId} limite={6} />
-        </Secao>
-      )}
+      {appId === 730 && <PorModo rows={rows} lente={lente} base={`/games/${appId}`} />}
     </>
   );
 }

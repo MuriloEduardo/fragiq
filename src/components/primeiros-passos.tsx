@@ -111,14 +111,14 @@ export async function PrimeirosPassos({
   ];
 
   const pendentes = passos.filter((p) => !p.feito).length;
+  const feitos = passos.length - pendentes;
 
-  return (
-    <section className="rounded-2xl bg-surface p-5 ring-1 ring-line sm:p-6">
-      <div className="flex items-baseline gap-3">
-        <h2 className="hud">Primeiros passos</h2>
-        <span className="num text-xs text-ink-faint">{passos.length - pendentes} de {passos.length}</span>
-      </div>
-      <ol className="mt-4 space-y-4">
+  // Com as estatísticas entrando, o cartão inteiro vira uma linha: o que
+  // falta (bot, partidas) é conveniência, não bloqueio, e a tela é da
+  // sessão. O primeiro passo pendente mantém o cartão aberto — sem ele
+  // nada funciona.
+  const lista = (
+    <ol className="mt-4 space-y-4">
         {passos.map((p, i) => (
           <li key={p.titulo} id={p.ancora} className="flex gap-3 scroll-mt-24">
             <span
@@ -140,6 +140,32 @@ export async function PrimeirosPassos({
           </li>
         ))}
       </ol>
+  );
+
+  if (statsVisiveis && pendentes > 0) {
+    return (
+      <details className="group rounded-2xl bg-surface px-5 ring-1 ring-line" id="bot">
+        <summary className="flex cursor-pointer list-none items-center gap-3 py-3">
+          <h2 className="hud">Primeiros passos</h2>
+          <span className="num text-xs text-ink-faint">
+            {feitos} de {passos.length}
+          </span>
+          <span className="ml-auto text-xs text-ink-faint transition group-open:rotate-180">▾</span>
+        </summary>
+        <div className="pb-5">{lista}</div>
+      </details>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl bg-surface p-5 ring-1 ring-line sm:p-6">
+      <div className="flex items-baseline gap-3">
+        <h2 className="hud">Primeiros passos</h2>
+        <span className="num text-xs text-ink-faint">
+          {feitos} de {passos.length}
+        </span>
+      </div>
+      {lista}
     </section>
   );
 }

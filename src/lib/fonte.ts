@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "./prisma";
 import { parseStatSchema } from "./stats";
 import { metricCatalog, type SnapshotRow } from "./series";
@@ -17,7 +18,11 @@ import { rotularMapa } from "./cs2-labels";
 /** Teto de pontos, igual ao da página: a análise recalcula tudo em memória. */
 export const MAX_SNAPSHOTS = 500;
 
-export async function carregarFonte(userId: string, appId: number): Promise<Fonte | null> {
+/**
+ * Memoizada por requisição (`cache` do React): o layout do jogo e a página
+ * pedem o mesmo balde, e sem isso cada tela lia as 500 coletas duas vezes.
+ */
+export const carregarFonte = cache(async (userId: string, appId: number): Promise<Fonte | null> => {
   const userGame = await prisma.userGame.findUnique({
     where: { userId_gameAppId: { userId, gameAppId: appId } },
     select: {
@@ -60,7 +65,7 @@ export async function carregarFonte(userId: string, appId: number): Promise<Font
     catalog: metricCatalog(rows, parseStatSchema(userGame.game.statSchema)),
     partidasOficiais,
   };
-}
+});
 
 async function partidasOficiaisDe(userId: string): Promise<PartidaOficial[]> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { steamId: true } });

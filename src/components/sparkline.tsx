@@ -1,90 +1,90 @@
-/**
- * Linha mínima para dentro de um stat tile.
- *
- * SVG à mão em vez de Recharts: um tile não precisa de eixo, grade nem
- * tooltip, e vinte tiles carregando um gráfico completo cada custa caro à
- * toa. O número é o conteúdo; a linha é contexto.
- */
+import type { PontoSerie } from "@/lib/series";
+import { dominioRobusto, grampear } from "@/lib/dominio";
 
+/**
+ * A linha de dentro de um cartão de estatística.
+ *
+ * SVG à mão e sem animação: doze cartões se desenhando ao mesmo tempo era
+ * ruído. A série é sempre inteira; a lente só destaca. O domínio é o
+ * robusto (`dominio.ts`), então um outlier vira um marcador na borda em vez
+ * de achatar a linha; pontos com pouca amostra saem vazados. Nunca vazia:
+ * com zero pontos desenha a baseline e diz que não há sessões; com um ou
+ * dois, desenha os pontos.
+ */
 type Props = {
-  values: number[];
-  /**
-   * Referência do vitalício. Entra no domínio vertical, não só como enfeite:
-   * sem ela cada tile auto-escalava em torno da própria série e as vinte
-   * linhas saíam com a mesma cara. Com a referência, a altura passa a
-   * significar "acima ou abaixo do seu normal", que é a pergunta que o tile
-   * responde.
-   */
-  baseline?: number | null;
-  color?: string;
+  pontos: PontoSerie[];
+  normal: number | null;
+  lente?: string | null;
+  emPct?: boolean;
+  casas?: number;
   className?: string;
 };
 
-const W = 120;
-const H = 32;
-const PAD = 3;
+const W = 240;
+const H = 40;
+const PAD = 5;
 
-export function Sparkline({ values, baseline, color = "var(--accent)", className }: Props) {
-  if (values.length < 2) return null;
+export function Sparkline({ pontos, normal, lente = null, emPct = false, casas = 2, className }: Props) {
+  const d = dominioRobusto(pontos, normal, emPct, casas);
+  const y = (v: number) => PAD + (1 - (v - d.min) / (d.max - d.min)) * (H - PAD * 2);
+  const x = (i: number) => (pontos.length < 2 ? W / 2 : PAD + (i / (pontos.length - 1)) * (W - PAD * 2));
+  const temNormal = normal !== null && Number.isFinite(normal);
 
-  const temReferencia =
-    baseline !== null && baseline !== undefined && Number.isFinite(baseline);
-  const dominio = temReferencia ? [...values, baseline as number] : values;
-
-  const min = Math.min(...dominio);
-  const max = Math.max(...dominio);
-  // Série constante: uma linha reta no meio, sem divisão por zero.
-  const span = max - min || 1;
-
-  const alturaDe = (v: number) => PAD + (1 - (v - min) / span) * (H - PAD * 2);
-
-  const pontos = values.map((v, i) => {
-    const x = PAD + (i / (values.length - 1)) * (W - PAD * 2);
-    return [x, alturaDe(v)] as const;
+  const desenhados = pontos.map((p, i) => {
+    const g = grampear(p.valor, d);
+    return { p, x: x(i), y: y(g.y), fora: g.fora, noModo: lente ? p.modo === lente : true };
   });
-
-  const d = pontos.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const [ux, uy] = pontos[pontos.length - 1];
+  const caminho = desenhados.map((q, i) => `${i ? "L" : "M"}${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" ");
+  const corLinha = lente ? "var(--line)" : "var(--accent)";
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className={className}
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      {temReferencia && (
-        <line
-          x1={0}
-          x2={W}
-          y1={alturaDe(baseline as number)}
-          y2={alturaDe(baseline as number)}
-          stroke="var(--ink-faint)"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-          vectorEffect="non-scaling-stroke"
-        />
+    <svg viewBox={`0 0 ${W} ${H}`} className={className} preserveAspectRatio="none" aria-hidden>
+      {temNormal && (
+        <line x1={0} x2={W} y1={y(normal)} y2={y(normal)} stroke="var(--ink-faint)" strokeWidth="1" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
       )}
-
-      <path d={d} fill="none" stroke={color} strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke" className="tracar" />
-      {/*
-        O último ponto ancora a leitura no valor atual.
-
-        É um caminho de comprimento zero com ponta arredondada, não um
-        <circle>: o preserveAspectRatio="none" estica o viewBox só na
-        horizontal, e um círculo comum sai achatado em elipse — largo e baixo.
-        A ponta do traço é medida em pixels de tela por causa do
-        vectorEffect, então continua redonda em qualquer largura de cartão.
-      */}
-      <path
-        d={`M${ux.toFixed(1)},${uy.toFixed(1)} L${ux.toFixed(1)},${uy.toFixed(1)}`}
-        stroke={color}
-        strokeWidth="5"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
+      {pontos.length === 0 && (
+        <text x={W / 2} y={H / 2 + 4} textAnchor="middle" fontSize="10" fill="var(--ink-faint)" fontFamily="var(--font-geist-mono)">
+          sem sessões
+        </text>
+      )}
+      {pontos.length >= 2 && (
+        <path d={caminho} fill="none" stroke={corLinha} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      )}
+      {desenhados.map((q, i) => {
+        const ultimo = i === desenhados.length - 1;
+        const raio = q.noModo && (lente || ultimo || pontos.length <= 2) ? 4 : lente ? 2.5 : 0;
+        if (raio === 0 && !q.fora) return null;
+        const cor = q.noModo ? "var(--accent)" : "var(--ink-faint)";
+        if (q.fora) {
+          // Grampeado na borda: um traço vertical curto no lugar do ponto.
+          // O viewBox é esticado só na horizontal, então um triângulo sairia
+          // deformado; o traço, medido em pixels de tela, não.
+          const dy = q.fora === "acima" ? 6 : -6;
+          return (
+            <path
+              key={i}
+              d={`M${q.x.toFixed(1)},${q.y.toFixed(1)} l0,${dy}`}
+              stroke="var(--ink-faint)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              fill="none"
+            />
+          );
+        }
+        return (
+          <path
+            key={i}
+            d={`M${q.x.toFixed(1)},${q.y.toFixed(1)} l0,0`}
+            stroke={q.p.fraco ? "var(--ink-faint)" : cor}
+            strokeWidth={q.p.fraco ? raio : raio * 1.6}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            fill="none"
+            opacity={q.p.fraco ? 0.7 : 1}
+          />
+        );
+      })}
     </svg>
   );
 }

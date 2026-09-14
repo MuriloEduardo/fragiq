@@ -13,8 +13,7 @@ import {
   lifetimeValue,
   ultimoPar,
   type SeriesSpec,
-  type SnapshotRow,
-} from "@/lib/series";
+  type SnapshotRow, pontosDeSerie } from "@/lib/series";
 import { SerieChart } from "@/components/serie-chart";
 
 export const dynamic = "force-dynamic";
@@ -136,18 +135,14 @@ export default async function MetricaPage({
         <section className="mt-8">
           <h3 className="hud">{porRound ? "Taxa por round" : "Por período"}</h3>
           <div className="mt-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
-            <SerieChart points={taxa} baseline={vitalicio} formatar={(v) => fmt(v)} />
+            <SerieChart pontos={pontosDeSerie(taxa)} normal={vitalicio === null ? null : { valor: vitalicio, rotulo: "vitalício" }} formatar={(v) => fmt(v)} />
           </div>
         </section>
 
         <section className="mt-8">
           <h3 className="hud">Acumulado</h3>
           <div className="mt-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
-            <SerieChart
-              points={acumulado}
-              formatar={(v) => fmt(v, 0)}
-              cor="var(--side-ct)"
-            />
+            <SerieChart pontos={pontosDeSerie(acumulado)} normal={null} formatar={(v) => fmt(v, 0)} />
           </div>
         </section>
 

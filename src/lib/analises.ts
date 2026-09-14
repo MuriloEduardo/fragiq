@@ -3,7 +3,7 @@ import { cogniflow } from "./env";
 import { enviarPergunta } from "./cogniflow";
 import { deltaEntre, paresDeMovimento, type SnapshotRow } from "./series";
 import { coerce } from "./fonte";
-import { listarSessoes, vitaliciosDoHero } from "./sessoes";
+import { listarSessoes, valoresDoNormal } from "./sessoes";
 import { rotularMapa, rotularModo } from "./cs2-labels";
 import { TUDO, type Modo } from "./modo";
 
@@ -93,15 +93,6 @@ export async function listarAnalises(
 
 function sessoesPorSnapshot(rows: SnapshotRow[]): Map<string, SessaoDaAnalise> {
   if (rows.length === 0) return new Map();
-  const porModo = new Map<string | null, ReturnType<typeof vitaliciosDoHero>>();
-  const referencia = (modo: string | null) => {
-    let ref = porModo.get(modo);
-    if (!ref) {
-      ref = vitaliciosDoHero(rows, modo ? { mode: modo } : undefined);
-      porModo.set(modo, ref);
-    }
-    return ref;
-  };
   const saida = new Map<string, SessaoDaAnalise>();
   for (const s of listarSessoes(rows)) {
     if (!s.snapshotId) continue;
@@ -116,7 +107,7 @@ function sessoesPorSnapshot(rows: SnapshotRow[]): Map<string, SessaoDaAnalise> {
       kd: s.kd,
       danoPorRound: s.danoPorRound,
       hs: s.hs,
-      referencia: referencia(s.modoId),
+      referencia: valoresDoNormal(rows, { modo: s.modoId }, s.snapshotId),
     });
   }
   return saida;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Search } from "lucide-react";
 import type { LinhaMetrica } from "@/lib/leituras";
 import { Sparkline } from "./sparkline";
+import { pontosSimples } from "@/lib/series";
 import { cn } from "@/lib/utils";
 
 /**
@@ -118,7 +119,7 @@ function Linha({ l, appId }: { l: LinhaMetrica; appId: number }) {
 
       <div className="hidden h-7 w-24 sm:block">
         {l.valores.length >= 2 && (
-          <Sparkline values={l.valores} baseline={l.vitalicio} className="h-7 w-full" />
+          <Sparkline pontos={pontosSimples(l.valores)} normal={l.vitalicio} className="h-7 w-full" />
         )}
       </div>
 
