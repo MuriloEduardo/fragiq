@@ -36,7 +36,21 @@ function deltaDe(l: LinhaMetrica): Delta {
   if (l.variacao === null) return { estado: "sem-base", motivo: "sem-normal" };
   const pct = l.variacao * 100;
   const direcao = Math.abs(pct) < 3 ? "igual" : pct > 0 ? "sobe" : "desce";
-  return { estado: "ok", valor: pct, unidade: "%", direcao, valencia: "neutral", fraco: !l.relevante };
+  return {
+    estado: "ok",
+    valor: pct,
+    unidade: "%",
+    direcao,
+    valencia: "neutral",
+    fraco: !l.relevante || l.referencia === "vitalicio-fraco",
+  };
+}
+
+/** A coluna diz o que o número é: o normal do modo, ou o vitalício quando o modo ainda não tem base. */
+function rotuloDaReferencia(l: LinhaMetrica): string {
+  if (l.referencia === "modo") return "normal do modo";
+  if (l.referencia === "vitalicio-fraco") return "vitalício · sem base";
+  return "vitalício";
 }
 
 export function MetricTable({ linhas, appId, congeladas = false }: { linhas: LinhaMetrica[]; appId: number; congeladas?: boolean }) {
@@ -135,7 +149,7 @@ function Linha({ l, appId }: { l: LinhaMetrica; appId: number }) {
 
         <div className="min-w-16 text-right">
           <p className="text-ink-muted">{fmt(l.vitalicio)}</p>
-          <p className="text-[10px] text-ink-faint">vitalício</p>
+          <p className="text-[10px] text-ink-faint">{rotuloDaReferencia(l)}</p>
         </div>
 
         <div className="min-w-14 text-right">

@@ -135,6 +135,11 @@ A saída (`created: …` / `kept: …`) fica no log group `/ecs/orchestration-se
 stream `ecs/orchestration-service/<id da task>`. Feito em 2026-09-13; v1 do
 prompt publicada.
 
+O prompt abaixo é a **v3** (15/09/2026): referência nomeada pelo tipo,
+causa só com dado, ação derivável. Ainda não publicada no cogniflow — a v2
+continua no ar e funciona com as views novas, porque `vitalicio` manteve o
+nome e só passou a trazer o número certo.
+
 Versões seguintes do prompt entram pelo painel admin
 (`POST /admin/agents/fragiq/analista/versions` com `publish=true`), que copia
 capabilities e graph da anterior.
@@ -239,8 +244,8 @@ registrou.
 
 | view | params | devolve |
 |---|---|---|
-| `resumo` | — | período, `partidasOficiaisNoPeriodo` (scoreboard de cada partida oficial dentro do período), painel (12 estatísticas: período × vitalício), leituras, contextos observados, grupos |
-| `metricas` | `grupo`, `limite` (≤200), `incluirParadas` | todas as métricas por round, período × vitalício, ordenadas por impacto |
+| `resumo` | — | período, `partidasOficiaisNoPeriodo` (scoreboard de cada partida oficial dentro do período), painel (12 estatísticas: período × referência), leituras, contextos observados, grupos |
+| `metricas` | `grupo`, `limite` (≤200), `incluirParadas` | todas as métricas por round, período × referência, ordenadas por impacto |
 | `serie` | `metrica`*, `denominador`, `calculo` (delta/perHour/ratio/cumulative), `bucket` (raw/day/week/month), `pontos` (≤120) | pontos `{t, valor}` + vitalício |
 | `partidas` | `limite` (≤60) | `oficiais` (partidas de matchmaking uma a uma, via share code + Game Coordinator: jogadaEm, mapa, placar, resultado, K/A/D, kd, hsPct, mvps, score) e `partidas` (intervalos entre coletas: mapa, modo, placar, rounds, kills, deaths, kd, dano/round) |
 | `mapas` | — | rounds e vitórias por mapa, período × vitalício (só pool antigo) |
@@ -248,6 +253,28 @@ registrou.
 
 Erros de uso voltam como 400 `{"error": "..."}` e o cogniflow entrega o texto
 ao modelo, que corrige. Teto de resposta: 256 KiB.
+
+### A referência é uma só
+
+O campo `vitalicio` de painel, métricas, série (razões) e armas é **a mesma
+referência que a tela mostra** (`src/lib/referencia.ts` → `normalDe`): com
+`modo`, o acumulado das sessões daquele modo **sem a sessão lida**, e só
+quando o modo tem base (≥ 5 sessões e ≥ 150 rounds); abaixo disso, o
+vitalício de tudo. Antes de 15/09/2026 as views usavam o acumulado do modo
+*com* a sessão dentro e sem mínimo — na primeira sessão de Premier,
+`periodo == vitalicio` e o analista dizia "praticamente o seu normal".
+
+Cada número vem acompanhado de `referencia` dizendo o que ele é:
+
+```json
+{ "valor": 0.70, "tipo": "modo", "rotulo": "normal · Premier · 7 sessões", "sessoes": 7, "progresso": null }
+{ "valor": 0.66, "tipo": "vitalicio-fraco", "rotulo": "vs vitalício · Premier sem base (2 de 5)", "sessoes": null, "progresso": { "sessoes": 2, "minimo": 5 } }
+{ "valor": 0.66, "tipo": "vitalicio", "rotulo": "vitalício", "sessoes": null, "progresso": null }
+```
+
+As `leituras` também trazem `referencia` (só o `tipo`). O prompt manda o
+modelo nomear a referência conforme o tipo; `tests/lib/` fixa o
+comportamento (`npm test`).
 
 ## Prompt do agente
 
@@ -273,15 +300,29 @@ honesto — como um treinador que respeita a inteligência de quem lê.
 4. Compare com o normal do próprio jogador, não com o mundo. O produto
    é "você contra o seu normal". Quando a mensagem da sessão disser o modo
    (premier, competitive, casual, scrimcomp2v2…), passe modo="<id>" em TODA
-   consulta: Premier, Competitivo e Casual não se misturam, e com modo o
-   campo vitalicio das views vira o acumulado daquele modo — é contra ele
-   que a sessão se lê. Diga o modo na manchete ou na primeira frase.
+   consulta: Premier, Competitivo e Casual não se misturam. Diga o modo na
+   manchete ou na primeira frase.
+   O campo vitalicio de cada número é a referência, e o campo referencia
+   ao lado diz o que ela é — nomeie-a conforme o tipo:
+   - tipo "modo": "contra o seu Premier (7 sessões)";
+   - tipo "vitalicio-fraco": o modo ainda não tem base, o número é o
+     vitalício de tudo. Diga isso ("contra o seu vitalício; o Premier ainda
+     tem 2 de 5 sessões") e não chame de normal do modo;
+   - tipo "vitalicio": "contra o seu vitalício".
+   A sessão lida nunca está dentro da própria referência.
 5. O que a Steam não mede, você não inventa: não existe ADR do HLTV, KAST,
-   rating, clutch, entry. "Dano por round" aqui soma todos os modos e não
-   se compara ao ADR de sites de terceiros. Os contadores por mapa não
-   cobrem Mirage, Ancient, Anubis e Overpass. total_shots_hit global está
-   quebrado; precisão só por arma (view armas).
-6. Se a pergunta não for sobre a série (pedido de config, papo aleatório),
+   rating, clutch, entry, bombsite, utilitário, duelo de entrada, posição.
+   "Dano por round" aqui soma todos os modos e não se compara ao ADR de
+   sites de terceiros. Os contadores por mapa não cobrem Mirage, Ancient,
+   Anubis e Overpass. total_shots_hit global está quebrado; precisão só por
+   arma (view armas).
+6. Causa só com dado. Uma frase de causa ("caiu porque…") precisa de um
+   número de outra view que a sustente: HS caiu E abates de SMG subiram;
+   K/D caiu E as três partidas oficiais foram derrotas apertadas; precisão
+   de AWP caiu E os tiros de AWP dobraram. Sem esse segundo número, diga o
+   que mudou e pare — "o que mudou" honesto vale mais que "por quê"
+   inventado. As leituras do resumo dizem o quê; o porquê é seu, com dado.
+7. Se a pergunta não for sobre a série (pedido de config, papo aleatório),
    responda curto e volte ao que você sabe fazer.
 
 # Formato da resposta
@@ -303,8 +344,11 @@ parágrafo e uma lista com "- " quando houver 2 a 4 itens paralelos.
 Linha em branco.
 
 Última linha — a ação: começa com "→ " e traz UMA coisa concreta para a
-próxima sessão (ex.: "→ Na próxima, entre pelo B com flash antes do
-contato: 6 das 9 mortes no A foram sem utilitário.").
+próxima sessão, derivada de um número que você consultou — arma, mapa,
+headshot, dano por round, rounds por partida, resultado das partidas
+oficiais (ex.: "→ Na próxima, segure a AK nos rounds de eco em vez da AWP:
+21 % de precisão de AWP em 60 tiros contra 38 % do seu Premier."). Nunca
+uma ação sobre o que a Steam não mede (site, utilitário, posição).
 
 Sem cabeçalhos, sem tabelas, sem emojis. Números no formato brasileiro
 (1,21 e não 1.21). No máximo ~120 palavras no total.
@@ -325,12 +369,14 @@ não filtre por um que não está lá.
   partidas, mapa, modo do último intervalo com jogo), painel (K/D, dano por
   round, kills por round, headshot %, vitórias %, MVP por partida, rounds
   por partida, precisão AK-47/M4A1/AWP, kills AK por round, kills com
-  granada), cada um com periodo e vitalicio; leituras (frases prontas com
-  tom bom/ruim/neutro/aviso); contextosObservados; coletas.
+  granada), cada um com periodo, vitalicio e referencia {tipo, rotulo,
+  sessoes, progresso}; leituras (frases prontas com tom
+  bom/ruim/neutro/aviso e referencia); partidasOficiaisNoPeriodo;
+  contextosObservados; coletas.
 - metricas: grupo ("Geral", "Por arma", "Por mapa", "Última partida"),
   limite (padrão 40, máx 200), incluirParadas (true para ver contadores que
   não se moveram). Cada linha: chave, nome, periodo e vitalicio por round,
-  variacao (fração: 0.25 = +25%), totalNoPeriodo, relevante.
+  referencia (tipo), variacao (fração: 0.25 = +25%), totalNoPeriodo, relevante.
 - serie: metrica (obrigatória, ex.: total_kills), denominador (para
   razão, ex.: total_deaths), calculo (delta | perHour | ratio |
   cumulative; padrão ratio se houver denominador, senão delta), bucket
@@ -352,7 +398,7 @@ não filtre por um que não está lá.
   vitalicio. roundsForaDosMapasContados diz quantos rounds do período
   caíram em mapas que a Steam não conta.
 - armas: minimoTiros (padrão 1). Por arma: kills, tiros, acertos, precisao
-  (%), periodo e vitalicio.
+  (%), periodo, vitalicio e referencia.
 
 Chaves de métrica seguem o schema da Steam: total_kills, total_deaths,
 total_kills_headshot, total_damage_done, total_rounds_played,

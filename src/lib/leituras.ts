@@ -4,13 +4,15 @@ import {
   deltaEntre,
   groupOf,
   humanizeKey,
-  lifetimeValue,
   ultimoPar,
   type ContextFilter,
+  type Normal,
   type SeriesSpec,
   type SnapshotRow,
 } from "./series";
 import { rotularModo, rotularArma, rotularMapa } from "./cs2-labels";
+import { calcularDelta, type Delta } from "./delta";
+import { lenteDe, nomeDaReferencia, referenciaDe, sessaoLida, valorDe } from "./referencia";
 
 /**
  * Transformar contador em frase.
@@ -19,6 +21,13 @@ import { rotularModo, rotularArma, rotularMapa } from "./cs2-labels";
  * interpretar era o leitor. Aqui o trabalho é feito antes — cada leitura é
  * uma conclusão com o número dentro e a base amostral do lado, porque número
  * sem base é opinião com aparência de fato.
+ *
+ * Uma leitura diz o quê: o número, a referência, a direção e a base. Ela não
+ * diz por quê. "Spray e trocas de perto derrubam essa taxa" era prosa fixa
+ * disparada por qualquer queda de headshot — e como as leituras entram na
+ * view `resumo`, o analista recebia a frase como achado e a repetia. A causa
+ * só entra quando outra métrica a sustenta, e isso é trabalho do analista
+ * com as views, não de um texto pronto.
  */
 
 export type Tom = "neutro" | "bom" | "ruim" | "aviso";
@@ -32,6 +41,8 @@ export type Leitura = {
   /** Sobre quantos dados isso se apoia. */
   base?: string;
   tom: Tom;
+  /** De que tipo é o normal usado, quando a leitura compara com um. */
+  referencia?: Normal["tipo"];
 };
 
 const RATIO = (metric: string, denominator: string, scale = 1): SeriesSpec => ({
@@ -47,18 +58,27 @@ function ultimoValor(rows: SnapshotRow[], spec: SeriesSpec, filter?: ContextFilt
   return pts.length > 0 ? pts[pts.length - 1].value : null;
 }
 
-function pct(v: number) {
-  return `${v > 0 ? "+" : ""}${(v * 100).toFixed(0)}%`;
-}
-
 function num(v: number, casas = 2) {
   return v.toLocaleString("pt-BR", { maximumFractionDigits: casas });
 }
 
-/** Variação relativa entre o período e o vitalício. */
-function variacao(periodo: number | null, vitalicio: number | null) {
-  if (periodo === null || vitalicio === null || vitalicio === 0) return null;
-  return (periodo - vitalicio) / Math.abs(vitalicio);
+/** `▲ 12 %`, `▼ 3 pp`, `≈` — o mesmo chip da tela, em texto. */
+function chip(delta: Delta): string {
+  if (delta.estado !== "ok") return "";
+  if (delta.direcao === "igual") return "≈";
+  const seta = delta.direcao === "sobe" ? "+" : "−";
+  return `${seta}${num(Math.abs(delta.valor), delta.unidade === "pp" ? 1 : 0)} ${delta.unidade}`;
+}
+
+function tomDe(delta: Delta): Tom {
+  if (delta.estado !== "ok") return "neutro";
+  return delta.valencia === "good" ? "bom" : delta.valencia === "bad" ? "ruim" : "neutro";
+}
+
+function julgamento(delta: Delta, fraco: boolean): string {
+  if (delta.estado !== "ok" || delta.direcao === "igual") return "Praticamente o seu normal.";
+  const lado = delta.direcao === "sobe" ? "Acima" : "Abaixo";
+  return `${lado} do seu normal${fraco ? ", em amostra pequena o suficiente para ser uma noite só" : ""}.`;
 }
 
 export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[] {
@@ -66,11 +86,11 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
   const par = ultimoPar(rows, "total_rounds_played", filter);
   if (!par) return leituras;
 
+  const lente = lenteDe(filter);
+  const sessaoId = sessaoLida(rows, filter);
   const rounds = deltaEntre(par, "total_rounds_played");
   const partidas = deltaEntre(par, "total_matches_played");
-  // Com recorte por modo a referência é o acumulado daquele modo, e o texto
-  // precisa dizer isso: "de vitalício" seria mentira.
-  const ref = filter?.mode ? `do seu ${rotularModo(filter.mode)}` : "de vitalício";
+  const fraco = rounds !== null && rounds > 0 && rounds < 50;
   const base =
     rounds !== null
       ? `${rounds} round${rounds === 1 ? "" : "s"}${partidas ? ` em ${partidas} partida${partidas === 1 ? "" : "s"}` : ""}`
@@ -78,31 +98,46 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
 
   /* ------------------------------- amostra -------------------------------- */
 
-  if (rounds !== null && rounds > 0 && rounds < 50) {
+  if (fraco) {
     leituras.push({
       id: "amostra",
       numero: `${rounds} round${rounds === 1 ? "" : "s"}`,
       texto:
-        `Amostra curta. Cada round pesa ${num(100 / rounds, 1)}% de tudo que ` +
+        `Amostra curta. Cada round pesa ${num(100 / rounds!, 1)}% de tudo que ` +
         `está aqui embaixo, então uma partida atípica desloca qualquer um destes ` +
         `números. Trate como indício, não como tendência.`,
       tom: "aviso",
     });
   }
 
-  /* --------------------------- modo provável ------------------------------ */
+  /* ------------------------------- modo ----------------------------------- */
 
-  if (rounds !== null && partidas && partidas > 0) {
+  const modoObservado = filter?.mode ?? par.curr.matchMode ?? null;
+  if (modoObservado) {
+    leituras.push({
+      id: "modo",
+      numero: rotularModo(modoObservado),
+      texto:
+        `Modo observado da sessão${par.curr.matchMap ? `, em ${rotularMapa(par.curr.matchMap)}` : ""}` +
+        `${par.curr.matchScore ? `, placar ${par.curr.matchScore}` : ""}. ` +
+        `Os números abaixo são lidos contra o normal deste modo quando ele já tem base.`,
+      base,
+      tom: "neutro",
+    });
+  } else if (rounds !== null && partidas && partidas > 0) {
+    // Sem bot nem marcação à mão, a única pista do modo é o comprimento
+    // da partida — e ela é só uma pista: casual também pode passar de 13.
     const porPartida = rounds / partidas;
     const competitivo = porPartida >= 13;
     leituras.push({
       id: "modo",
       numero: `${num(porPartida, 1)} rounds/partida`,
       texto: competitivo
-        ? `Compatível com competitivo, que só termina a partir de 13 rounds ganhos. ` +
-          `As médias por round abaixo podem ser lidas de frente.`
-        : `Curto para competitivo, que precisa de 13 rounds para acabar. Isto é ` +
-          `casual, wingman, deathmatch ou partida abandonada — e nesses modos ` +
+        ? `Modo não observado. O comprimento é compatível com competitivo ou Premier, ` +
+          `que só terminam a partir de 13 rounds ganhos — mas é só uma pista; ` +
+          `sem o bot como amigo o modo não fica registrado.`
+        : `Modo não observado. Curto para competitivo, que precisa de 13 rounds para ` +
+          `acabar: casual, wingman, deathmatch ou partida abandonada — e nesses modos ` +
           `abates por round vêm inflados, porque se morre e se mata muito mais.`,
       base,
       tom: competitivo ? "neutro" : "aviso",
@@ -143,46 +178,42 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
 
   /* ------------------------------- K/D ------------------------------------ */
 
-  const kd = ultimoValor(rows, RATIO("total_kills", "total_deaths"), filter);
-  const kdVida = lifetimeValue({ ...RATIO("total_kills", "total_deaths"), filter }, rows);
-  const kdVar = variacao(kd, kdVida);
+  const kdSpec = RATIO("total_kills", "total_deaths");
+  const kd = ultimoValor(rows, kdSpec, filter);
+  const kdNormal = referenciaDe(rows, kdSpec, lente, sessaoId);
+  const kdDelta = calcularDelta({ melhorQuando: "sobe" }, kd, kdNormal, fraco);
 
-  if (kd !== null && kdVida !== null && kdVar !== null) {
-    const melhor = kdVar > 0;
+  if (kd !== null && kdDelta.estado === "ok") {
     leituras.push({
       id: "kd",
       numero: kd.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       texto:
-        `K/D no período contra ${num(kdVida)} ${ref} — ${pct(kdVar)}. ` +
-        (Math.abs(kdVar) < 0.1
-          ? `Praticamente o seu normal.`
-          : melhor
-            ? `Acima do seu normal${rounds !== null && rounds < 50 ? ", mas em amostra pequena o suficiente para ser sorte" : ""}.`
-            : `Abaixo do seu normal.`),
+        `K/D no período contra ${num(valorDe(kdNormal)!)} ${nomeDaReferencia(kdNormal, lente)} — ${chip(kdDelta)}. ` +
+        julgamento(kdDelta, fraco),
       base,
-      tom: Math.abs(kdVar) < 0.1 ? "neutro" : melhor ? "bom" : "ruim",
+      tom: tomDe(kdDelta),
+      referencia: kdNormal.tipo,
     });
   }
 
   /* ---------------------------- headshot ---------------------------------- */
 
-  const hs = ultimoValor(rows, RATIO("total_kills_headshot", "total_kills", 100), filter);
-  const hsVida = lifetimeValue({ ...RATIO("total_kills_headshot", "total_kills", 100), filter }, rows);
-  const hsVar = variacao(hs, hsVida);
+  const hsSpec = RATIO("total_kills_headshot", "total_kills", 100);
+  const hs = ultimoValor(rows, hsSpec, filter);
+  const hsNormal = referenciaDe(rows, hsSpec, lente, sessaoId);
+  const hsDelta = calcularDelta({ unit: "%", melhorQuando: "sobe" }, hs, hsNormal, fraco);
 
-  if (hs !== null && hsVida !== null && hsVar !== null && Math.abs(hsVar) >= 0.05) {
+  if (hs !== null && hsDelta.estado === "ok" && hsDelta.direcao !== "igual") {
     leituras.push({
       id: "hs",
       numero: `${num(hs, 1)}%`,
       texto:
-        `Dos seus abates no período foram na cabeça, contra ${num(hsVida, 1)}% ` +
-        `${ref}. ${
-          hsVar > 0
-            ? `Mira mais alta que o seu costume.`
-            : `Abaixo do seu costume — spray e trocas de perto derrubam essa taxa.`
-        }`,
+        `Dos seus abates no período foram na cabeça, contra ${num(valorDe(hsNormal)!, 1)}% ` +
+        `${nomeDaReferencia(hsNormal, lente)} — ${chip(hsDelta)}. ` +
+        (hsDelta.direcao === "sobe" ? `Acima do seu costume.` : `Abaixo do seu costume.`),
       base,
-      tom: hsVar > 0 ? "bom" : "ruim",
+      tom: tomDe(hsDelta),
+      referencia: hsNormal.tipo,
     });
   }
 
@@ -194,46 +225,46 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
       const arma = k.replace("total_shots_", "");
       const tiros = deltaEntre(par, k) ?? 0;
       const spec = RATIO(`total_hits_${arma}`, k, 100);
-      return {
-        arma,
-        tiros,
-        periodo: ultimoValor(rows, spec, filter),
-        vida: lifetimeValue({ ...spec, filter }, rows),
-      };
+      const periodo = ultimoValor(rows, spec, filter);
+      const normal = referenciaDe(rows, spec, lente, sessaoId);
+      return { arma, tiros, periodo, normal, delta: calcularDelta({ unit: "%", melhorQuando: "sobe" }, periodo, normal, fraco) };
     })
-    .filter((a) => a.tiros >= 25 && a.periodo !== null && a.vida !== null)
-    .map((a) => ({ ...a, var: variacao(a.periodo, a.vida)! }))
-    .sort((a, b) => b.var - a.var);
+    .filter((a) => a.tiros >= 25 && a.periodo !== null && a.delta.estado === "ok")
+    .map((a) => ({ ...a, pp: (a.delta as Extract<Delta, { estado: "ok" }>).valor }))
+    .sort((a, b) => b.pp - a.pp);
 
   if (armas.length > 0) {
     const top = armas[0];
+    const subiu = top.delta.estado === "ok" && top.delta.direcao === "sobe";
     leituras.push({
       id: "arma-melhor",
       numero: `${num(top.periodo!, 1)}%`,
       texto:
-        `Precisão com ${rotularArma(top.arma)} no período, contra ${num(top.vida!, 1)}% ` +
-        `${ref} (${pct(top.var)}). ` +
+        `Precisão com ${rotularArma(top.arma)} no período, contra ${num(valorDe(top.normal)!, 1)}% ` +
+        `${nomeDaReferencia(top.normal, lente)} (${chip(top.delta)}). ` +
         // Quando toda arma caiu, chamar a melhor de "acima do normal" é
         // mentira — ela está acima das outras, não do seu vitalício.
-        (top.var > 0
+        (subiu
           ? `É a sua arma mais acima do normal no recorte.`
           : `Nenhuma arma ficou acima do seu normal neste período; esta foi a que menos caiu.`),
       base: `${top.tiros} tiros`,
-      tom: top.var > 0 ? "bom" : "neutro",
+      tom: subiu ? "bom" : "neutro",
+      referencia: top.normal.tipo,
     });
   }
 
   if (armas.length > 1) {
     const pior = armas[armas.length - 1];
-    if (pior.var < 0) {
+    if (pior.delta.estado === "ok" && pior.delta.direcao === "desce") {
       leituras.push({
         id: "arma-pior",
         numero: `${num(pior.periodo!, 1)}%`,
         texto:
-          `Precisão com ${rotularArma(pior.arma)}, contra ${num(pior.vida!, 1)}% ` +
-          `${ref} (${pct(pior.var)}). É onde você mais caiu em relação a si mesmo.`,
+          `Precisão com ${rotularArma(pior.arma)}, contra ${num(valorDe(pior.normal)!, 1)}% ` +
+          `${nomeDaReferencia(pior.normal, lente)} (${chip(pior.delta)}). É onde você mais caiu em relação a si mesmo.`,
         base: `${pior.tiros} tiros`,
         tom: "ruim",
+        referencia: pior.normal.tipo,
       });
     }
   }
@@ -244,7 +275,7 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
 /* -------------------------------------------------------------------------- */
 
 /**
- * Toda métrica que tem valor no período, já comparada com o vitalício.
+ * Toda métrica que tem valor no período, já comparada com o normal.
  *
  * Cobertura total continua sendo o ponto — o que muda é não pedir que a
  * pessoa monte a consulta. Contador vira taxa por round, que é a única forma
@@ -258,6 +289,8 @@ export type LinhaMetrica = {
   /** Taxa por round no período (ou valor bruto, para métricas de última partida). */
   periodo: number | null;
   vitalicio: number | null;
+  /** De que tipo é o normal em `vitalicio` (modo com base, vitalício, vitalício por falta de base). */
+  referencia: Normal["tipo"] | null;
   variacao: number | null;
   /** Quanto o contador subiu no período, em unidades. */
   total: number | null;
@@ -290,6 +323,12 @@ const DENOMINADOR = "total_rounds_played";
 /** Abaixo disto, a variação é ruído de divisão por número pequeno. */
 const MINIMO_NO_PERIODO = 5;
 
+/** Variação relativa entre o período e a referência. */
+function variacao(periodo: number | null, vitalicio: number | null) {
+  if (periodo === null || vitalicio === null || vitalicio === 0) return null;
+  return (periodo - vitalicio) / Math.abs(vitalicio);
+}
+
 export function todasAsMetricas(
   rows: SnapshotRow[],
   chaves: string[],
@@ -297,6 +336,8 @@ export function todasAsMetricas(
 ): LinhaMetrica[] {
   const par = ultimoPar(rows, DENOMINADOR, filter);
   const roundsDoPeriodo = par ? (deltaEntre(par, DENOMINADOR) ?? 0) : 0;
+  const lente = lenteDe(filter);
+  const sessaoId = sessaoLida(rows, filter);
 
   const linhas = chaves.flatMap((key): LinhaMetrica[] => {
     const kind = classifyMetric(key);
@@ -313,6 +354,7 @@ export function todasAsMetricas(
         key, label, grupo,
         periodo: pts.length ? pts[pts.length - 1].value : null,
         vitalicio: null,
+        referencia: null,
         variacao: null,
         total: null,
         valores: pts.map((p) => p.value),
@@ -331,7 +373,8 @@ export function todasAsMetricas(
 
     const pts = buildSeries(rows, { ...spec, filter }, "raw");
     const periodo = pts.length ? pts[pts.length - 1].value : null;
-    const vitalicio = porRound ? lifetimeValue({ ...spec, filter }, rows) : null;
+    const normal = porRound ? referenciaDe(rows, spec, lente, sessaoId) : null;
+    const vitalicio = normal ? valorDe(normal) : null;
 
     const total = par ? deltaEntre(par, key) : null;
 
@@ -339,6 +382,7 @@ export function todasAsMetricas(
       key, label, grupo,
       periodo,
       vitalicio,
+      referencia: normal?.tipo ?? null,
       variacao: variacao(periodo, vitalicio),
       total,
       valores: pts.map((p) => p.value),

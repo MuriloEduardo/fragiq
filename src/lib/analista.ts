@@ -15,7 +15,9 @@ import {
   type SeriesSpec,
   type SnapshotRow,
 } from "./series";
-import { lerSerie, todasAsMetricas } from "./leituras";
+import { lerSerie, todasAsMetricas, type Leitura } from "./leituras";
+import { lerPartidasOficiais, lerSequencia } from "./leituras-sessoes";
+import { lenteDe, referenciaDe, serializar, sessaoLida, type ReferenciaDTO } from "./referencia";
 import { CS2_PANEL } from "./cs2-panel";
 import { rotularArma, rotularMapa, rotularModo } from "./cs2-labels";
 import { formatPlaytime } from "./stats";
@@ -124,6 +126,10 @@ function iso(d: Date) {
   return d.toISOString();
 }
 
+function comValorArredondado(r: ReferenciaDTO, casas = 3): ReferenciaDTO {
+  return { ...r, valor: arredondar(r.valor, casas) };
+}
+
 /* -------------------------------- views ---------------------------------- */
 
 /**
@@ -149,19 +155,38 @@ function resumo(fonte: Fonte, params: Params) {
       }
     : null;
 
+  // A referência é a mesma do hero e dos cartões (`normalDe`): o acumulado
+  // do modo sem a sessão lida quando há base, o vitalício rotulado quando
+  // não há. `vitalicio` continua sendo o nome do campo com o valor, para o
+  // prompt publicado seguir funcionando; `referencia` diz o que ele é.
+  const lente = lenteDe(f);
+  const sessaoId = sessaoLida(rows, f);
   const painel =
     fonte.appId === 730
       ? CS2_PANEL.map((stat) => {
           const spec: SeriesSpec = { ...stat.spec, id: stat.key, filter: f };
           const pts = buildSeries(rows, spec, "raw");
+          const normal = serializar(referenciaDe(rows, stat.spec, lente, sessaoId, stat.amostra));
           return {
             estatistica: stat.label,
             unidade: stat.unit ?? null,
             periodo: arredondar(pts.length ? pts[pts.length - 1].value : null),
-            vitalicio: arredondar(lifetimeValue(spec, rows)),
+            vitalicio: arredondar(normal.valor),
+            referencia: comValorArredondado(normal),
           };
         }).filter((s) => s.periodo !== null || s.vitalicio !== null)
       : [];
+
+  // As partidas oficiais que caem dentro do período: são o detalhe por
+  // partida do que o período soma. Fora do período, a view `partidas`.
+  const partidasOficiaisNoPeriodo = periodo
+    ? fonte.partidasOficiais.filter((p) => p.jogadaEm >= periodo.de && p.jogadaEm <= periodo.ate)
+    : [];
+  const leituras: Leitura[] = [
+    ...lerSerie(rows, f),
+    lerSequencia(rows, f),
+    lerPartidasOficiais(partidasOficiaisNoPeriodo),
+  ].filter((l): l is Leitura => l !== null);
 
   return {
     jogo: fonte.gameName,
@@ -171,17 +196,14 @@ function resumo(fonte: Fonte, params: Params) {
     ultimaColeta: ultimo ? iso(ultimo.capturedAt) : null,
     filtro: f ?? null,
     periodo,
-    // As partidas oficiais que caem dentro do período: são o detalhe por
-    // partida do que o período soma. Fora do período, a view `partidas`.
-    partidasOficiaisNoPeriodo: periodo
-      ? fonte.partidasOficiais.filter((p) => p.jogadaEm >= periodo.de && p.jogadaEm <= periodo.ate)
-      : [],
+    partidasOficiaisNoPeriodo,
     painel,
-    leituras: lerSerie(rows, f).map((l) => ({
+    leituras: leituras.map((l) => ({
       numero: l.numero,
       texto: l.texto,
       base: l.base ?? null,
       tom: l.tom,
+      referencia: l.referencia ?? null,
     })),
     contextosObservados: {
       modos: opcoes.modes.map(([modo, n]) => ({ modo, rotulo: rotularModo(modo), coletas: n })),
@@ -218,6 +240,7 @@ function metricas(fonte: Fonte, params: Params) {
       porRound: l.porRound,
       periodo: arredondar(l.periodo),
       vitalicio: arredondar(l.vitalicio),
+      referencia: l.referencia,
       variacao: arredondar(l.variacao),
       totalNoPeriodo: l.total,
       relevante: l.relevante,
@@ -274,7 +297,11 @@ function serie(fonte: Fonte, params: Params) {
     denominador: denominador ?? null,
     calculo,
     bucket,
-    vitalicio: arredondar(lifetimeValue(spec, fonte.rows)),
+    vitalicio: arredondar(
+      calculo === "ratio"
+        ? serializar(referenciaDe(fonte.rows, spec, lenteDe(spec.filter), sessaoLida(fonte.rows, spec.filter))).valor
+        : lifetimeValue(spec, fonte.rows),
+    ),
     pontosDisponiveis: todos.length,
     pontos: todos.slice(-pontos).map((p) => ({
       t: new Date(p.t).toISOString(),
@@ -405,6 +432,8 @@ function armas(fonte: Fonte, params: Params) {
   const par = ultimoPar(rows, "total_rounds_played", f);
   const ultimo = rows[rows.length - 1];
   if (!ultimo) return { armas: [] };
+  const lente = lenteDe(f);
+  const sessaoId = sessaoLida(rows, f);
 
   const lista = Object.keys(ultimo.metrics)
     .filter((k) => k.startsWith("total_shots_") && k !== "total_shots_fired" && k !== "total_shots_hit")
@@ -428,8 +457,9 @@ function armas(fonte: Fonte, params: Params) {
           kills: ultimo.metrics[kills] ?? 0,
           tiros: ultimo.metrics[k] ?? 0,
           acertos: ultimo.metrics[hits] ?? 0,
-          precisao: arredondar(lifetimeValue(spec, rows), 1),
+          precisao: arredondar(serializar(referenciaDe(rows, spec, lente, sessaoId)).valor, 1),
         },
+        referencia: comValorArredondado(serializar(referenciaDe(rows, spec, lente, sessaoId)), 1),
       };
     })
     .filter((a) => (a.periodo.tiros ?? 0) >= minimoTiros || (minimoTiros === 1 && a.vitalicio.tiros > 0))

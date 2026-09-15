@@ -11,6 +11,7 @@ docker compose up -d          # Postgres em localhost:5433
 cp .env.example .env          # preencha AUTH_SECRET e as variáveis COGNIFLOW_*
 npm run db:migrate
 npm run dev
+npm test                      # vitest: series, leituras, analista, delta, analise-texto
 ```
 
 Para avaliar a interface sem o cogniflow (e portanto sem Steam):
@@ -173,6 +174,16 @@ oficial = `Match.modo` (pelo `gameType` do GC — 8 competitivo, 264 Wingman;
 Premier ainda depende da presença — ou pela presença de quem jogou);
 análise = o modo da sessão analisada.
 
+### Uma referência só
+
+Hero, cartões, tabela de métricas, leituras e as views do analista leem
+contra o mesmo normal (`lib/referencia.ts` sobre `normalDe`): com lente, o
+acumulado do modo sem a sessão lida e só com base; sem base, o vitalício
+dito como tal. Até 15/09 as leituras e o analista usavam outro (o acumulado
+do modo com a sessão dentro), e na primeira sessão de um modo diziam
+"praticamente o seu normal" por construção. `tests/lib/leituras.test.ts`
+fixa isso.
+
 ### Cartões e gráficos
 
 Um cartão só (`components/stat-card.tsx`): rótulo e chip da lente, número
@@ -312,6 +323,8 @@ src/lib/
   env.ts                      validação de ambiente
   session.ts                  sessão JWT em cookie
   series.ts                   motor de consulta do explorador
+  referencia.ts               o normal, um só, para tela, leituras e analista
+  leituras.ts                 contador em frase: o que mudou, contra o normal, com base
   stats.ts                    formatação e métricas derivadas de CS2
   analista.ts                 views que o analista consulta (data.read)
   cogniflow.ts                assinatura e envio de pedidos de análise ao cogniflow
