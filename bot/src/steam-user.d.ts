@@ -45,6 +45,8 @@ declare module "steam-user" {
     };
 
     static EPersonaState: { Offline: 0; Online: 1; Busy: 2; Away: 3 };
+    /** Nome ↔ número, nos dois sentidos, como a biblioteca exporta. */
+    static EResult: Record<string | number, string | number>;
     static EFriendRelationship: {
       None: 0;
       Blocked: 1;

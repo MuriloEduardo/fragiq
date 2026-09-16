@@ -39,7 +39,15 @@ export type EtapaFunil = {
 };
 
 export type Saude = {
-  bot: { ultimoTickEm: Date; amigos: number; gcConectado: boolean; iniciadoEm: Date | null } | null;
+  bot: {
+    ultimoTickEm: Date;
+    amigos: number;
+    gcConectado: boolean;
+    iniciadoEm: Date | null;
+    logado: boolean;
+    desconectadoDesde: Date | null;
+    motivo: string | null;
+  } | null;
   capturasPendentes: { total: number; maisAntigaEm: Date | null; maxTentativa: number };
   partidasNaFila: number;
   partidasExpiradas: number;

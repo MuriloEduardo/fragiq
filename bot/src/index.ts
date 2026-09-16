@@ -2,8 +2,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import SteamUser from "steam-user";
 import { CS2_APPID, config } from "./config.js";
-import { gravarRefreshToken, secretId } from "./segredos.js";
+import { gravarRefreshToken, lerSegredos, secretId } from "./segredos.js";
 import { ligarPartidas } from "./partidas.js";
+import { supervisionarConexao } from "./conexao.js";
 
 /**
  * Bot de presença.
@@ -17,7 +18,8 @@ import { ligarPartidas } from "./partidas.js";
  * persistente, o que serverless não comporta.
  */
 
-const client = new SteamUser({ autoRelogin: true });
+// Religar é política nossa (conexao.ts), não da biblioteca.
+const client = new SteamUser({ autoRelogin: false });
 
 /** steamId -> estava jogando CS2 na última atualização de estado. */
 const jogando = new Map<string, boolean>();
@@ -37,18 +39,37 @@ const emPartida = new Map<string, boolean>();
 
 /* ---------------------------------- login --------------------------------- */
 
-if (config.refreshToken) {
-  client.logOn({ refreshToken: config.refreshToken });
-} else if (config.password) {
-  console.warn(
-    "Logando com senha. O steam-user vai emitir um refresh token — guarde-o " +
-      "em STEAM_BOT_REFRESH_TOKEN e remova a senha do ambiente.",
-  );
-  client.logOn({ accountName: config.accountName, password: config.password });
-} else {
+/**
+ * As credenciais são relidas a cada logon: em produção o refresh token mora
+ * no Secrets Manager e pode ter sido renovado desde o boot. Sem token, a
+ * senha (só no primeiro login, local, com Steam Guard no terminal).
+ */
+async function credenciais() {
+  const token = (secretId ? (await lerSegredos().catch(() => ({}) as Record<string, string>)).STEAM_BOT_REFRESH_TOKEN : null) || config.refreshToken;
+  if (token) return { refreshToken: token };
+  if (config.password) {
+    console.warn(
+      "Logando com senha. O steam-user vai emitir um refresh token — guarde-o " +
+        "em STEAM_BOT_REFRESH_TOKEN e remova a senha do ambiente.",
+    );
+    return { accountName: config.accountName, password: config.password };
+  }
   console.error("Defina STEAM_BOT_REFRESH_TOKEN ou STEAM_BOT_PASSWORD.");
   process.exit(1);
 }
+
+const conexao = supervisionarConexao(client, {
+  credenciais,
+  nomeDoResultado: (eresult) => String(SteamUser.EResult[eresult] ?? eresult),
+});
+client.logOn(await credenciais());
+
+// Uma promessa rejeitada sem ninguém ouvindo derruba o Node em silêncio no
+// log do container. Dizer o que foi antes de cair é o mínimo.
+process.on("unhandledRejection", (motivo) => {
+  console.error("Promessa rejeitada sem tratamento:", motivo);
+  process.exit(1);
+});
 
 client.on("refreshToken", (token: string) => {
   if (secretId) {
@@ -107,13 +128,6 @@ client.on("loggedOn", () => {
 client.on("accountLimitations", (limited, communityBanned, locked) => {
   console.log(`Limitações da conta: limitada=${limited} banida=${communityBanned} travada=${locked}`);
 });
-
-client.on("error", (err) => {
-  console.error("Erro de conexão:", err.message);
-  process.exit(1);
-});
-
-client.on("disconnected", (_, msg) => console.warn("Desconectado:", msg));
 
 /* -------------------------------- amizades -------------------------------- */
 
@@ -240,15 +254,22 @@ async function avisar(steamId: string, motivo: string) {
 
 /* ---------------------------------- tick ---------------------------------- */
 
-/** O relógio das capturas: o site processa o que venceu; nós só chamamos. */
+/**
+ * O relógio das capturas: o site processa o que venceu; nós só chamamos.
+ *
+ * Bate mesmo deslogado da Steam — é o que separa "o bot morreu" de "o bot
+ * está vivo e sem sessão" no painel, e leva junto o motivo da queda.
+ */
 async function tick() {
-  if (!client.steamID) return;
   try {
-    const amigos = Object.values(client.myFriends).filter((rel) => rel === SteamUser.EFriendRelationship.Friend).length;
+    const estado = conexao.estado();
+    const amigos = estado.logado
+      ? Object.values(client.myFriends).filter((rel) => rel === SteamUser.EFriendRelationship.Friend).length
+      : undefined;
     const res = await fetch(config.tickUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", authorization: `Bearer ${config.webhookSecret}` },
-      body: JSON.stringify({ amigos, gc: partidas.gcConectado(), iniciadoEm }),
+      body: JSON.stringify({ amigos, gc: partidas.gcConectado(), iniciadoEm, ...estado }),
     });
     if (!res.ok) {
       console.warn(`Tick: ${res.status}`);
@@ -337,6 +358,7 @@ for (const sinal of ["SIGINT", "SIGTERM"] as const) {
     clearInterval(tickTimer);
     clearInterval(filaTimer);
     clearInterval(partidas.timer);
+    conexao.encerrar();
     client.logOff();
     process.exit(0);
   });

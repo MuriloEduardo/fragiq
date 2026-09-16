@@ -516,6 +516,10 @@ model BotStatus {
   amigos       Int       @default(0)
   gcConectado  Boolean   @default(false)
   iniciadoEm   DateTime?
+  /// O bot bate mesmo sem sessão na Steam: "parado" e "deslogado" são coisas diferentes.
+  logado            Boolean   @default(true)
+  desconectadoDesde DateTime?
+  motivo            String?
 
   @@map("bot_status")
 }

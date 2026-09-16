@@ -27,9 +27,13 @@ export async function GET(request: NextRequest) {
 
 /** Como o bot está — para o painel ver que ele vive sem ninguém abrir log. */
 const estado = z.object({
-  amigos: z.number().int().nonnegative(),
+  // Sem sessão na Steam o bot não sabe quantos amigos tem; o painel mantém o último valor.
+  amigos: z.number().int().nonnegative().optional(),
   gc: z.boolean(),
   iniciadoEm: z.string().datetime().optional(),
+  logado: z.boolean().optional(),
+  desconectadoDesde: z.string().datetime().nullable().optional(),
+  motivo: z.string().max(500).nullable().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -41,6 +45,10 @@ export async function POST(request: NextRequest) {
       amigos: parsed.data.amigos,
       gcConectado: parsed.data.gc,
       iniciadoEm: parsed.data.iniciadoEm ? new Date(parsed.data.iniciadoEm) : undefined,
+      // Um bot antigo não manda `logado`; sem o campo, assume-se com sessão.
+      logado: parsed.data.logado ?? true,
+      desconectadoDesde: parsed.data.desconectadoDesde ? new Date(parsed.data.desconectadoDesde) : null,
+      motivo: parsed.data.motivo ?? null,
     };
     await prisma.botStatus.upsert({ where: { id: "bot" }, create: { id: "bot", ...dados }, update: dados });
   }

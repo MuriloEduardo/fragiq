@@ -34,6 +34,24 @@ Além do tick, o bot busca duas filas do site: mensagens de chat
 (`/api/bot/outbox`) e share codes para perguntar ao Game Coordinator
 (`/api/bot/partidas`).
 
+## Ficar logado é política do bot, não da biblioteca
+
+`src/conexao.ts` supervisiona a sessão: o cliente nasce com
+`autoRelogin: false`, toda queda (`error` ou `disconnected`) agenda uma nova
+tentativa com espera crescente (30 s → 10 min; 30 min se a Steam pediu
+calma), e um vigia confere a cada minuto que existe sessão. Só dois casos
+encerram o processo, e nos dois o Docker recria o container: credencial
+que a Steam não aceita mais (`InvalidPassword`, `AccessDenied`, `Expired`…
+— aí é preciso gerar um refresh token novo, como no primeiro login) e uma
+hora inteira sem conseguir voltar.
+
+O heartbeat (`POST /api/bot/tick`) bate mesmo sem sessão, com `logado`,
+`desconectadoDesde` e `motivo`: no painel `/admin`, "parado" é processo
+morto e "deslogado" é processo vivo esperando a Steam. Antes disso, um
+`LogonSessionReplaced` (alguém entrou na conta do bot em outro lugar)
+deixava o bot vivo, mudo e sem ninguém saber por quê — foi o que aconteceu
+de 15/09 a 16/09/2026.
+
 ## Por que não roda na Vercel
 
 Um cliente Steam mantém conexão TCP persistente. Serverless não comporta.

@@ -33,6 +33,9 @@ export default async function AdminPage() {
   const { totais, usuarios, porDia, funil, saude, eventos } = painel;
   const tickHa = saude.bot ? Date.now() - saude.bot.ultimoTickEm.getTime() : null;
   const botVivo = tickHa !== null && tickHa < 2 * 60_000;
+  // Três estados, não dois: o processo pode estar vivo e sem sessão na Steam.
+  const botDeslogado = botVivo && saude.bot !== null && !saude.bot.logado;
+  const foraHa = saude.bot?.desconectadoDesde ? Math.round((Date.now() - saude.bot.desconectadoDesde.getTime()) / 60_000) : null;
 
   return (
     <>
@@ -62,13 +65,15 @@ export default async function AdminPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Tile
               rotulo="Bot"
-              valor={botVivo ? "vivo" : saude.bot ? "parado" : "nunca"}
+              valor={botDeslogado ? "deslogado" : botVivo ? "vivo" : saude.bot ? "parado" : "nunca"}
               nota={
-                saude.bot
-                  ? `tick há ${Math.round((tickHa ?? 0) / 1000)} s · ${saude.bot.amigos} amigos · GC ${saude.bot.gcConectado ? "ok" : "fora"}`
-                  : "nenhum tick recebido"
+                botDeslogado && saude.bot
+                  ? `fora da Steam há ${foraHa ?? 0} min · ${saude.bot.motivo ?? "sem motivo registrado"}`
+                  : saude.bot
+                    ? `tick há ${Math.round((tickHa ?? 0) / 1000)} s · ${saude.bot.amigos} amigos · GC ${saude.bot.gcConectado ? "ok" : "fora"}`
+                    : "nenhum tick recebido"
               }
-              alerta={!botVivo}
+              alerta={!botVivo || botDeslogado}
             />
             <Tile
               rotulo="Capturas pendentes"
