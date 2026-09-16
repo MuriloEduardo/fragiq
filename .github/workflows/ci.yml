@@ -17,6 +17,11 @@ jobs:
           node-version: "20"
           cache: npm
       - run: npm ci
-      - run: npx tsc --noEmit -p tsconfig.json
+      # The bot is its own package with its own dependencies and tsconfig;
+      # the root tsconfig excludes it, so `npm run typecheck` covers both and
+      # needs both installed.
+      - run: npm ci
+        working-directory: bot
+      - run: npm run typecheck
       - run: npm run lint
       - run: npm test

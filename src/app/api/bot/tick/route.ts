@@ -34,6 +34,8 @@ const estado = z.object({
   logado: z.boolean().optional(),
   desconectadoDesde: z.string().datetime().nullable().optional(),
   motivo: z.string().max(500).nullable().optional(),
+  /** Quantas vezes o bot já tentou religar; vai para o `motivo` guardado. */
+  tentativas: z.number().int().nonnegative().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -48,7 +50,11 @@ export async function POST(request: NextRequest) {
       // Um bot antigo não manda `logado`; sem o campo, assume-se com sessão.
       logado: parsed.data.logado ?? true,
       desconectadoDesde: parsed.data.desconectadoDesde ? new Date(parsed.data.desconectadoDesde) : null,
-      motivo: parsed.data.motivo ?? null,
+      motivo: parsed.data.motivo
+        ? parsed.data.tentativas
+          ? `${parsed.data.motivo} · ${parsed.data.tentativas} tentativa${parsed.data.tentativas === 1 ? "" : "s"}`
+          : parsed.data.motivo
+        : null,
     };
     await prisma.botStatus.upsert({ where: { id: "bot" }, create: { id: "bot", ...dados }, update: dados });
   }
