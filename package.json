@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "probe": "tsx scripts/probe-steam.ts",
-    "vercel-build": "prisma migrate deploy && next build"
+    "vercel-build": "prisma migrate deploy && next build",
+    "backfill:modo": "tsx scripts/backfill-modo.ts"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1131.0",

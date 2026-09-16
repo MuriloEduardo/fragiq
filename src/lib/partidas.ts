@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { prisma } from "./prisma";
+import { decodificarGameType } from "./game-type";
 import { authSecret } from "./env";
 import { decodificarShareCode, normalizarShareCode, shareCodeValido } from "./sharecode";
 import { getPlayerSummaries } from "./steam/api";
@@ -257,8 +258,12 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
   });
 
   const presenca = await contextoPelaPresenca([...userPorSteam.values()], jogadaEm, p.duracaoS);
-  const mapa = p.mapa ?? presenca.mapa;
-  const modo = modoDoGameType(p.gameType) ?? presenca.modo;
+  // Ordem das fontes: o que o GC diz (bitmask), o cabeçalho da demo, a
+  // presença de quem jogou. O GC vence porque é o único que vem de dentro
+  // da partida; a presença é reserva para o que ele não codifica.
+  const doGC = decodificarGameType(p.gameType);
+  const mapa = p.mapa ?? doGC.mapa ?? presenca.mapa;
+  const modo = doGC.modo ?? presenca.modo;
 
   await prisma.$transaction([
     prisma.match.update({
@@ -285,26 +290,10 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
 }
 
 /**
- * O `game_type` que o GC devolve na reserva da partida, traduzido para o
- * vocabulário do rich presence — o mesmo das sessões, para que o submenu
- * de modos junte as duas fontes.
- *
- * Os valores vêm de partidas observadas, não de documentação da Valve
- * (não existe): 8 é o competitivo clássico desde o CS:GO e 264 o Wingman.
- * O Premier do CS2 ainda não foi visto com certeza — enquanto um valor
- * não estiver aqui, a reserva é a presença de quem jogou, que o bot marca
- * como "premier" sem ambiguidade. Um valor desconhecido devolve null em
- * vez de chutar: um modo errado numa aba é pior que uma partida em "tudo".
+ * `modoDoGameType` mora em `game-type.ts` com o resto do bitmask; fica
+ * reexportado aqui porque a rota do bot e os testes o importam deste módulo.
  */
-const MODO_POR_GAME_TYPE: Record<number, string> = {
-  8: "competitive",
-  264: "scrimcomp2v2",
-};
-
-export function modoDoGameType(gameType: number | null | undefined): string | null {
-  if (gameType === null || gameType === undefined) return null;
-  return MODO_POR_GAME_TYPE[gameType] ?? null;
-}
+export { modoDoGameType } from "./game-type";
 
 /**
  * Reserva para o que o GC não diz: o bot de presença grava mapa e modo no

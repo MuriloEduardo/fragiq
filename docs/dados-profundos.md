@@ -209,6 +209,24 @@ descobrir se o CS Rating do Premier realmente vem e sob quais condições.
 
 Exige processo persistente: não roda em serverless.
 
+### O `game_type` da reserva é um bitmask, e ele diz o modo
+
+Verificado em 2026-09-16 com seis partidas de produção. O `game_type` que
+o GC devolve em `roundstats.reservation` tem duas partes: o byte baixo é o
+modo — `8` competitivo, `7` casual, `10` Wingman, `12` skirmish (Arms
+Race, Demolição, Retakes, cada um com o próprio bit alto), `13` Danger
+Zone — e os bits altos são o mapa da fila quando a fila foi de um mapa só
+(`32768` Mirage, `4096` Inferno, `512` Dust II, `8388608` Anubis…). O
+Premier é `8` com o bit 25 (`33554440`) e nenhum bit de mapa, porque o
+mapa sai do veto. Assim `32776` = competitivo em Mirage e `4104` =
+competitivo em Inferno, exatamente o que o cabeçalho da demo leu nas seis.
+A tabela mora em `src/lib/game-type.ts`; a fonte, além das partidas, é a
+calibração pública do CSGO-GCServer (`game_type_calibration.go`).
+
+Consequência: **competitivo e Premier se separam sem o bot de presença**,
+para qualquer partida com share code. A presença continua sendo a única
+fonte para casual e para quem não liga a corrente de códigos.
+
 ---
 
 ## 4. Share codes e parsing de demos — a camada profunda
