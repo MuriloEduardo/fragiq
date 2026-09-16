@@ -1,129 +1,29 @@
-# FragIQ — plano de design da área do jogo
+# FragIQ — design da área do jogo
 
-Escopo: as abas de `/games/[appId]` (Resumo, Estatísticas, Sessões, Partidas,
-Métricas, Análises, `painel/[key]`, `metricas/[key]`), o submenu de modo, os
-cartões com gráfico, o cartão do analista e os avisos. Não muda identidade
-(escuro, laranja, números em mono, rótulos HUD); muda o que cada tela diz e
-em que ordem.
+O que a área do jogo (`/games/[appId]`) é hoje: as regras que valem para
+todas as telas, as peças que as implementam e onde cada peça mora. Descreve
+o sistema no código; o que ainda não existe está no backlog da rotina
+(`holding/backlog/fragiq.md`, fora deste repositório), não aqui.
 
-Evidência: capturas de produção de 14/09/2026, conta real com 22 coletas, 7
-sessões, 3 com modo (1 Premier, 2 Competitivo). Referências `[S0]…[S9]`
-abaixo apontam para `screenshot-1789424988689-0.jpg` … `-9.jpg`.
+Identidade (escuro, laranja, números em mono, rótulos HUD) vem de
+`src/app/globals.css` e não é assunto deste documento — o que é assunto é
+o que cada tela diz, em que ordem, e contra o quê cada número é lido.
 
-Vocabulário usado neste documento:
+Vocabulário, usado com este sentido no código e nas telas:
 
-- **coleta** — um snapshot dos contadores vitalícios da Steam.
-- **sessão** — o delta entre duas coletas em que `total_rounds_played` subiu.
+- **coleta** — um snapshot dos contadores vitalícios da Steam (`StatSnapshot`).
+- **sessão** — o intervalo entre duas coletas em que `total_rounds_played`
+  subiu. É a unidade do produto: um ponto de gráfico, uma linha de tabela,
+  uma análise.
 - **normal** — a referência contra a qual uma sessão é lida.
-- **lente** — o modo de jogo aplicado como destaque, não como corte.
+- **lente** — o modo de jogo aplicado como destaque, nunca como corte.
 
 ---
 
-## 1. Diagnóstico
+## 1. Princípios
 
-Doze problemas, do mais grave ao mais cosmético. Cada um aponta a captura e
-o trecho de código que o produz.
-
-### D1. A lente de modo esvazia os gráficos `[S7]`
-
-Em "Premier" (1 sessão) os doze tiles de Estatísticas perdem sparkline e
-delta: sobra um número solto por tile. Causa: `StatPanel` passa
-`filter: { mode }` para `buildSeries`, que descarta todo par fora do modo;
-sobra 1 ponto e `Sparkline` exige 2. O mesmo filtro entra em
-`lifetimeValue`, que com filtro vira `accumulatedValue` sobre o mesmo único
-par — a referência é a própria sessão, então o delta é 0 e o chip some.
-Este é o rebaixamento que o dono apontou: os cartões que tinham gráfico
-ficaram sem gráfico.
-
-### D2. A sessão é comparada consigo mesma `[S5]`
-
-No hero em modo Premier os três números mostram `0%` e a linha de referência
-diz "no Premier 0,65" — o mesmo 0,65 do número grande. `vitaliciosDoHero`
-com filtro acumula as sessões do modo, e com uma sessão o acumulado é ela.
-`0%` aqui parece "igual ao normal" e é, na verdade, "não existe normal".
-
-### D3. O cartão do analista repete o hero `[S0] [S5]`
-
-Logo abaixo do hero (três números grandes com delta) vem o cartão de
-análise com **os mesmos três números, os mesmos chips e os mesmos deltas**
-(`Numeros` em `analista.tsx`). Na primeira dobra do Resumo o K/D 0,57
-aparece duas vezes em 30 px de fonte. Dois `glow` na mesma tela, contra a
-regra do próprio `globals.css` ("para um elemento por tela").
-
-### D4. A heurística de manchete promove um parágrafo `[S5]`
-
-"Na sessão de 66 rounds em 3 partidas, aqui estão as mudanças em relação ao
-seu desempenho" virou título de 24 px. `lerAnalise` promove qualquer primeiro
-bloco com ≤ 140 caracteres e sem quebra de linha. Não há marca no texto que
-diga "isto é manchete"; a regra adivinha, e erra quando o modelo escreve uma
-introdução curta.
-
-### D5. O mesmo número aparece quatro vezes na mesma página `[S0] [S1] [S3]`
-
-K/D 0,57 no Resumo: hero → cartão do analista → texto do analista ("K/D
-ainda não mostrou um avanço") → Leituras ("0,57 · K/D no período contra 0,7
-de vitalício — -19%") → tile "0,57 / 0,70 -19%". Headshot 52,9% idem. A
-página inteira é o mesmo dado em cinco roupas. O usuário não sabe qual
-olhar, e por isso "os dados não estão claros".
-
-### D6. Os sparklines carregam a mesma forma, isto é, nenhuma informação `[S3] [S6]`
-
-Nos tiles K/D, Dano por round e Kills por round a linha é idêntica: um pico
-(a sessão de 6,30 de K/D, amostra minúscula) e o resto achatado. O domínio
-vertical inclui o outlier sem peso por amostra. "Vitórias" desenha uma
-serra 0 % / 100 % — taxa de vitória por sessão de 1–2 partidas é binária e
-não é uma série. Não há indicação de quantos pontos nem de que período.
-
-### D7. Um outlier achata o gráfico grande `[S8] [S9]`
-
-`painel/kd`: eixo 0–6,30 por causa de uma sessão; as outras 20 vivem entre
-0,36 e 1,00 como uma linha reta no rodapé. Abaixo, uma lista "data → valor"
-que repete o gráfico com menos informação (sem rounds, sem modo, sem delta).
-Três cartões "agora / vitalício / contra o seu normal" — o terceiro é um
-chip de delta inflado a 30 px.
-
-### D8. O submenu de modo parece navegação e funciona como filtro global `[S0]`
-
-Pílulas "Tudo · Premier 1 · Competitivo 2" numa segunda barra sob as abas.
-Os contadores 1 e 2 são um convite a telas vazias. Em "Tudo", nada indica que
-19 das 22 coletas não têm modo — o número "mistura tudo" sem dizer.
-
-### D9. Semântica de cor inconsistente entre componentes
-
-O laranja (`--accent`) é marca, aba ativa, linha do gráfico **e** "subiu".
-Em `StatPanel` subir é laranja e cair é cinza; em `Leituras` "ruim" é
-`--danger` e "bom" é laranja; no hero cair é `bg-surface-2`. Vitórias
-`-100%` sai em cinza. Não existe token para "bom" nem para "ruim", e nenhum
-componente sabe se subir é bom (deaths, rounds por partida) — a direção é
-sempre "mais é melhor".
-
-### D10. Formatação do mesmo valor diverge entre componentes
-
-Headshot: `52,9%` no hero, `53%` no cartão do analista (`toFixed(0)`),
-`52,9%` no tile. Dano por round: `74` no hero, `74,063` no texto do analista.
-Cada componente tem seu próprio `fmt`; há `"pt-BR"` literal em oito lugares
-e `FUSO_BR` fixo — i18n vai quebrar tudo de uma vez.
-
-### D11. Estados vazios são caixas de texto diferentes entre si, em jargão
-
-"Nenhuma sessão de Premier ainda.", "Sem pontos para desenhar. Modos
-derivados precisam de ao menos duas coletas com partidas entre elas.",
-"Precisa de duas coletas com partidas entre elas.", "O analista entra a
-partir da segunda coleta com partidas." — quatro textos para a mesma
-situação, com palavras internas ("modos derivados", "coletas", "pares").
-Nenhum diz o que fazer.
-
-### D12. O hero mistura dado e ação, e a linha de contexto confunde
-
-"14 de set 01:45 → 14 de set 19:17" é o intervalo entre coletas, não o
-tempo jogado: 17 h para 2 partidas. Abaixo dos números, a régua "Essa sessão
-foi… Competitivo Premier Casual Deathmatch Wingman · o bot marca sozinho…"
-disputa atenção com os números. E o texto das Leituras ("Cada round pesa
-3,1 % de tudo que está aqui embaixo…") é um parágrafo onde cabia um chip.
-
----
-
-## 2. Princípios
+São as cinco regras das quais o resto decorre. Quando uma tela nova
+contradiz alguma, é a tela que está errada.
 
 1. **Um número, um lugar.** Cada valor aparece grande uma vez por tela; nas
    outras vezes é referência pequena ou não aparece.
@@ -131,8 +31,8 @@ disputa atenção com os números. E o texto das Leituras ("Cada round pesa
    por causa do modo — o modo destaca, escolhe a última sessão e a
    referência, e diz quantas sessões cobre.
 3. **Referência honesta ou nenhuma.** O normal nunca inclui a sessão que
-   está sendo lida e nunca tem menos de N sessões; sem isso o chip diz
-   "sem base", nunca `0%`.
+   está sendo lida e nunca tem menos de N sessões; sem isso o chip some e a
+   linha de referência diz por quê. `0%` por falta de base não é impresso.
 4. **Escassez declarada.** Todo gráfico diz quantos pontos tem e desde
    quando; abaixo do mínimo mostra pontos em vez de linha; um bloco vazio
    sempre nomeia o que falta e o próximo passo.
@@ -142,822 +42,458 @@ disputa atenção com os números. E o texto das Leituras ("Cada round pesa
 
 ---
 
-## 3. Sistema
+## 2. Sistema
 
-### 3.1 Tokens
+### 2.1 Tokens
 
-**Espaçamento** (base 4): `4 · 8 · 12 · 16 · 24 · 32 · 48`. Dentro do cartão
-`16` (mobile) / `20` (desktop); entre cartões `12`; entre seções `40`.
+**Cores** (`globals.css`, `:root` e `@theme inline`):
 
-**Raio**: cartão `16`; bloco interno / chip `8`; pílula `999`.
-
-**Tipografia** (a fonte já existe: Geist Sans + Geist Mono):
-
-| Papel | Classe | Tamanho / peso | Uso |
-|---|---|---|---|
-| `hud` | existente | 11 mono, tracking 0,12em, caixa alta | rótulo de cartão, cabeçalho de tabela, título de seção |
-| `body` | `text-sm` | 14 / 400 | texto corrido, células |
-| `body-lg` | `text-[15px]` | 15 / 400 | corpo da análise |
-| `num-sm` | `num text-sm` | 14 mono | células numéricas, referência |
-| `num-md` | `num text-xl` | 20 mono 600 | linha de destaque, painel mobile |
-| `num-lg` | `num text-3xl` | 30 mono 600 | número do tile |
-| `num-xl` | `num text-5xl` | 48 mono 600 (mobile 32) | hero |
-| `title` | `text-xl font-semibold tracking-tight` | 20 / 600 | manchete da análise, título de página |
-
-Regra: **nenhum número grande fora de `num`**; nenhum `text-[11px]` ou
-`text-[10px]` solto — é `hud` ou `text-xs`.
-
-**Cores** — acrescentar papéis semânticos ao `:root` e ao `@theme inline`,
-sem tocar nos existentes:
-
-```
---good:       #4fd1a5     /* mint frio: contrasta com o laranja, 8,9:1 sobre --surface */
---good-soft:  #0f2b22
---bad:        var(--danger)   /* #ff7b6e, já existe */
---bad-soft:   #331a17
---neutral:    var(--ink-muted)
---warn:       já existe
---accent:     marca e atenção — aba ativa, lente ativa, linha principal do gráfico, ação
-```
+| Token | Valor | Papel |
+|---|---|---|
+| `--accent` | `#ff6b3d` | marca, aba ativa, lente ativa, linha do gráfico, ação. Medido 6,2:1 sobre `--surface` |
+| `--good` / `--good-soft` | `#4fd1a5` / `#0f2b22` | movimento bom para a estatística. Mint frio, para não se confundir com a marca; 8,9:1 sobre `--surface` |
+| `--bad` / `--bad-soft` | `var(--danger)` / `#331a17` | movimento ruim |
+| `--neutral` | `var(--ink-muted)` | sem valência, ou diferença dentro do ruído |
+| `--warn` | `#e8c25a` | nota que qualifica a leitura (amostra curta) |
+| `--surface` / `--surface-2` | `#13161a` / `#1a1e24` | cartão / bloco interno |
+| `--line` / `--line-soft` | `#262b32` / `#1e2228` | anel de cartão / divisória de tabela |
 
 Regra dura: **`--accent` nunca codifica valência.** Subiu/caiu é
 `--good`/`--bad`; laranja é "olhe aqui", não "bom".
 
-Cada estatística declara a direção:
+**Classes utilitárias** (as únicas fora do Tailwind):
 
-```ts
-melhorQuando: "sobe" | "desce" | "nenhuma"
-// kd, adr, kpr, hs, winrate, mvp, acc_*: "sobe"
-// deaths (na Métricas), rounds por partida: "nenhuma"
+| Classe | O que é |
+|---|---|
+| `.hud` | 11px mono, caixa alta, tracking `0.12em`, `--ink-faint`. Rótulo de cartão, cabeçalho de tabela, título de seção |
+| `.num` | mono, tabular, tracking `-0.02em`. Todo número grande |
+| `.tnum` | só `tabular-nums`. Números em texto corrido e em células |
+| `.glow` | anel + brilho do acento. **Um por tela**: é o hero |
+| `.grid-bg` | malha discreta atrás do hero |
+| `.tracar` | a linha do gráfico se desenhando. Só no gráfico grande sem lente; nos tiles foi removida (doze animações simultâneas eram ruído) |
+| `.serie .ponto` | hover/foco de um ponto do gráfico grande, em CSS puro (2.4) |
+
+**Direção de cada estatística.** Cada `PanelStat` declara `melhorQuando:
+"sobe" | "desce" | "nenhuma"` (`src/lib/cs2-panel.ts`). `nenhuma` (hoje:
+rounds por partida) pinta o chip em `--neutral` com sinal, sem verde nem
+vermelho. Nenhum componente adivinha a direção.
+
+### 2.2 O motor: série, normal, delta, domínio
+
+Cinco módulos, cada um com uma responsabilidade única. Nenhum componente
+recalcula o que eles fazem.
+
+| Módulo | Responde |
+|---|---|
+| `src/lib/series.ts` | o que é uma sessão, a série de uma estatística, o normal |
+| `src/lib/referencia.ts` | o normal com a amostra padrão, e como nomeá-lo numa frase |
+| `src/lib/delta.ts` | a distância entre um valor e o normal, julgada |
+| `src/lib/dominio.ts` | o eixo vertical de um gráfico, sem outlier mandando |
+| `src/lib/formato.ts` | todo número e toda data, por locale |
+
+**As doze estatísticas** (`cs2-panel.ts`) são todas razões entre dois
+contadores, de propósito: razão é o único modo que se compara com o
+vitalício de forma honesta. Cada uma declara `decimals`, `unit`,
+`melhorQuando`, `amostra` (`rounds`, mínimo 10 — ou `partidas`, mínimo 3) e,
+quando é taxa por partida, `movel: 5`.
+
+**A série** (`serieDeSessoes`) é uma sessão por ponto, sem recorte. Um
+`PontoSerie` carrega `valor`, `rounds`, `partidas`, `modo`, `sessaoId` e
+`fraco` — o que a interface precisa para julgar o ponto sem recalcular nada.
+`fraco` é `amostra < stat.amostra.minimo`. Stats com `movel` usam a razão
+móvel das últimas 5 sessões (soma dos deltas, não média das razões), porque
+uma sessão de duas partidas só sabe dizer 0, 50 ou 100.
+
+**O normal** (`normalDe`) tem quatro resultados, e o tipo faz parte da
+resposta para que nenhum texto chame de "vitalício" o que é o acumulado do
+modo:
+
+```
+NORMAL_MIN_SESSOES = 5   NORMAL_MIN_ROUNDS = 150
+
+sem lente            → vitalicio        rótulo "vitalício"
+lente com base       → modo             rótulo "normal · Premier · 8 sessões"
+lente sem base       → vitalicio-fraco  rótulo "vs vitalício · Premier sem base (2 de 5)"
+sem vitalício/sessões→ nenhum           motivo "sem-vitalicio" | "sem-sessoes"
 ```
 
-`nenhuma` pinta o chip em `--neutral` com sinal, sem verde/vermelho.
+A base do normal do modo são as sessões **fortes** daquele modo,
+**excluindo a sessão lida** (`sessaoId`) — sem isso uma sessão sozinha vira
+o próprio normal e o delta é zero por construção. Abaixo do mínimo volta ao
+vitalício com o rótulo dizendo quantas sessões faltam: comparar é a promessa
+do produto, e o vitalício existe desde a primeira coleta; fingir que ele é o
+normal do Premier é que não pode.
 
-### 3.2 Anatomia do cartão de estatística
+`referencia.ts` é a porta para quem não tem um `PanelStat` em mãos (as
+leituras, as views do analista): `referenciaDe` aplica a mesma regra com a
+amostra padrão de 10 rounds, e `nomeDaReferencia` devolve o nome dentro de
+uma frase ("do seu Premier (7 sessões)", "de vitalício").
 
-Um componente só (`stat-card.tsx`) serve o tile de Estatísticas, o tile do
-Resumo e o bloco-resumo de `painel/[key]`. Seis zonas, todas opcionais
-exceto rótulo e número:
+**O delta** (`calcularDelta`) é um cálculo só, para o hero, o cartão, a
+tabela de sessões e a página da estatística:
+
+- estatísticas com `unit: "%"` comparam em **pontos percentuais**
+  (`▲ 17 pp`), as outras em **razão relativa** (`▼ 19%`);
+- limiar de ruído: `< 3 %` ou `< 1 pp` → `direcao: "igual"`, chip `≈` sem
+  cor;
+- `valencia = direcao × melhorQuando`;
+- amostra pequena não muda o número, muda a confiança: `fraco: true`
+  (herdado também de um normal `vitalicio-fraco`);
+- sem base não há delta: `{ estado: "sem-base", motivo }`, e quem explica é
+  a linha de referência do cartão.
+
+**O domínio** (`dominioRobusto`) sai da mediana e do desvio absoluto mediano
+dos pontos fortes: o que estiver a mais de 3 MAD é grampeado na borda e
+desenhado com marcador — mostrado, nunca omitido. O normal entra no domínio
+sempre, porque a altura de um ponto significa "acima ou abaixo do seu
+normal" e essa leitura exige a baseline dentro do quadro. Com menos de 3
+pontos não há recorte. Stats em `%` ficam presas a `[0, 100]`.
+
+**A formatação** (`formato.ts`) é a única que chama `toLocaleString`:
+`formatarStat` usa as casas e a unidade que a estatística declara,
+`formatarQuando`/`formatarDia`/`formatarDuracao` cuidam de tempo.
+`getLocale()` devolve `pt-BR`/`America/Sao_Paulo` hoje; é a única função que
+muda quando a internacionalização entrar.
+
+### 2.3 O cartão de estatística
+
+`src/components/stat-card.tsx` — o mesmo cartão no Resumo, em Estatísticas e
+no topo de `painel/[key]`. Não calcula nada: recebe a série, o ponto lido, o
+normal e a lente, e mostra. Seis zonas, nesta ordem:
 
 ```
 ┌─────────────────────────────────────────────┐
-│ K/D                              ● Premier  │  1 rótulo (hud) + chip da lente (só quando lente ≠ Tudo)
-│                                             │
-│ 0,57  ▼ 19%                                 │  2 número (num-lg) + chip de delta
-│ normal 0,70 · 22 sessões                    │  3 linha de referência (num-sm, ink-faint)
-│                                             │
-│ ┄┄┄┄┄┄┄┄┄●┄┄┄┄┄┄┄┄○┄┄┄┄┄┄●┄┄┄┄┄┄┄┄┄┄┄┄┄┄●   │  4 área do gráfico (h 40; sparkline + baseline)
-│                                             │
-│ 11 sessões · 12 dias                     ↗  │  5 rodapé: cobertura + seta de navegação
+│ K/D                              ● Premier  │  1 rótulo (hud) + chip da lente
+│ 0,57  ▼ 19%                                 │  2 número (num 3xl) + chip de delta
+│ normal 0,70 · 22 sessões                    │  3 linha de referência
+│ ┄┄┄┄┄┄┄┄┄●┄┄┄┄┄┄┄┄○┄┄┄┄┄┄●┄┄┄┄┄┄┄┄┄┄┄┄┄┄●   │  4 sparkline (h-10)
+│ 11 sessões · desde 03 set                ↗  │  5 rodapé: cobertura + seta
 └─────────────────────────────────────────────┘
 ```
 
-- **1 Rótulo**: `stat.label`. O chip de lente só aparece quando a lente
-  está ativa e diz de qual modo é o número grande.
-- **2 Número**: a última sessão (da lente, se ativa; senão a última de
-  qualquer modo). Formatado por `formatarStat(key, valor, locale)` — um
-  formatador por `key`, importado por todo componente (resolve D10).
-- **3 Referência**: `normal {valor} · {n} sessões` ou
-  `vitalício {valor}` ou `sem base · 1 de 5 sessões`. É a única linha que
-  explica o chip; nunca mais de uma.
-- **4 Gráfico**: regras em 3.3. Nunca vazio: se não há pontos, a área mostra
-  a baseline tracejada com o rótulo `sem sessões` centralizado.
-- **5 Rodapé**: `{n} sessões · {desde}`; a seta indica que o cartão é link.
-  Em estado degradado o rodapé é a explicação: `só vitalício · jogue uma
-  partida`, `sem uso no período`.
+- **Número**: `atual.valor` — a última sessão da lente, ou a última de
+  qualquer modo. Sem sessão nenhuma, cai no valor do normal e o rodapé passa
+  a ser a explicação (`só vitalício · jogue uma partida`).
+- **Referência**: uma linha, sempre. `normal 0,70 · 8 sessões` /
+  `vitalício 0,70` / `vs vitalício 0,70 · 2 de 5 sessões` / `sem base`. É a
+  única linha que explica o chip; nunca mais de uma.
+- **Rodapé**: `{n} sessões · desde {dia}`, mais `· média móvel · 5` quando a
+  estatística é por partida. `sem uso no período` quando a série é vazia.
+- O cartão inteiro é `<a>` para `painel/[key]`, preservando a lente em
+  `?modo=`.
 
-O cartão inteiro é `<a>` para `painel/[key]` (mantém o comportamento atual);
-`hover:ring-accent/50` permanece.
+`stat-panel.tsx` é a grade: para cada estatística calcula a série inteira
+(nunca recortada pela lente), o ponto lido e o normal; descarta as que não
+têm nem ponto nem normal; corta em `limite` (6 no Resumo, todas em
+Estatísticas). Grade de 3 colunas em `lg`, 2 em `sm`, 1 abaixo.
 
-### 3.3 Regras de gráfico
+### 2.4 Gráficos
 
-Os gráficos continuam **SVG à mão, renderizados no servidor** (`sparkline.tsx`,
-`serie-chart.tsx`). Recharts está no `package.json` mas não é usado em
-`src/`; não introduzir — hover e seleção de ponto são resolvidos com CSS
-(`:hover`/`:focus-visible` em `<g tabindex="0">`) sem JavaScript, o que
-funciona no toque e no teclado.
+SVG à mão, renderizados no servidor, sem biblioteca. Recharts está no
+`package.json` e não é usado em `src/`; hover e seleção são CSS
+(`:hover`/`:focus-visible` em `<g tabindex="0">`), o que funciona no toque e
+no teclado sem JavaScript.
 
-**Entrada de um gráfico** deixa de ser `number[]` e passa a ser
-`PontoSerie[]`:
+A entrada dos dois é `PontoSerie[]` — não `number[]`. Sem amostra não dá
+para marcar um ponto como fraco; sem modo não dá para a lente destacá-lo;
+sem o id da coleta não dá para excluir a própria sessão do normal.
+`pontosSimples` e `pontosDeSerie` adaptam séries sem sessão por trás
+(métricas cruas, demonstrações).
 
-```ts
-type PontoSerie = {
-  t: number;           // fim da sessão
-  valor: number;
-  rounds: number;      // peso / amostra (partidas para stats por partida)
-  modo: string | null; // para a lente
-  sessaoId: string | null;
-};
-```
+**`sparkline.tsx`** — a linha de dentro do cartão, 240×40.
 
-**Mínimos de pontos**
+| Pontos | Desenho |
+|---|---|
+| 0 | baseline tracejada + `sem sessões` centralizado |
+| 1–2 | os pontos, cheios, sobre a baseline |
+| ≥ 3 | linha, com o último ponto marcado |
 
-| Pontos elegíveis | Sparkline | Gráfico grande |
+Ponto fraco sai vazado em `--ink-faint` com opacidade 0,7. Ponto fora do
+domínio vira um traço vertical curto na borda (o viewBox é esticado só na
+horizontal, então um triângulo sairia deformado; o traço, medido em pixels
+de tela, não). A baseline é o normal, tracejada `4 4`. Sem tooltip: o tile é
+resumo.
+
+**`serie-chart.tsx`** — o gráfico de página inteira, 720×280. Tudo do
+sparkline, mais:
+
+- eixo Y com quatro marcas em números redondos (`escalaY`), rotuladas pelo
+  `formatar` da estatística;
+- eixo do tempo: primeiro e último instante, mais uma marca por semana
+  quando o intervalo passa de 14 dias;
+- baseline com rótulo na ponta direita (`normal 0,70` / `vitalício 0,70`);
+- ponto fora do domínio vira triângulo `▲`/`▼` com o valor real e a amostra
+  ao lado (`6,30 ▲ · 7 r`);
+- rótulo permanente em até 8 pontos; acima disso, só o primeiro, o último e
+  os dois extremos;
+- cada ponto é `<g tabindex="0">` com uma guia vertical e a legenda
+  `valor · quando · modo · amostra`, reveladas no hover e no foco.
+
+**A lente no gráfico**: a linha inteira vai para `--line` (cinza) e os
+pontos do modo ficam cheios em `--accent`, raio 4; os demais, raio 2,5 em
+`--ink-faint`. Não se desenha uma segunda linha ligando só os pontos do
+modo — ligaria sessões com semanas de buraco entre elas.
+
+### 2.5 O chip de delta
+
+`src/components/delta-chip.tsx`, um para o site inteiro. `▲ 19%` /
+`▼ 17 pp` / `≈`. O ícone é o sinal, então não se repete `+`/`−`. A cor é a
+valência: `text-good` sobre `bg-good-soft`, `text-bad` sobre `bg-bad-soft`,
+`text-neutral` sem fundo. `fraco` tira o fundo e pontilha a borda — o número
+fica, a confiança não. `estado: "sem-base"` não renderiza nada.
+
+### 2.6 Estados vazios e escassos
+
+`src/components/estado.tsx`: título em hud (≤ 5 palavras), uma linha de
+texto opcional, uma ação opcional (link interno ou externo). Substituiu as
+sete caixas tracejadas que cada página escrevia à sua maneira. Onde aparece:
+
+| Situação | Onde | Texto |
 |---|---|---|
-| 0 | baseline tracejada + `sem sessões` | estado E4 (3.5) |
-| 1 | um ponto cheio sobre a baseline | um ponto rotulado + baseline |
-| 2 | dois pontos e o traço entre eles | idem, rotulados |
-| ≥ 3 | linha | linha |
+| lente sem sessões | Resumo | `Sem sessões de Premier` / `A próxima partida nesse modo aparece aqui.` / `Ver tudo` |
+| 1 coleta | Resumo | `Primeira coleta gravada` / `A próxima partida vira a primeira sessão.` |
+| nenhum cartão possível | Estatísticas | `Sem estatísticas ainda` / `A primeira coleta com partidas preenche este painel.` |
+| série vazia | `painel/[key]` | `Sem sessões` / `A primeira partida depois de duas coletas vira o primeiro ponto.` |
+| sem sessão | Sessões | `Nenhuma sessão ainda` / `É preciso duas coletas com partidas entre elas.` |
+| lista vazia na lente | Partidas | `Nenhuma partida em Premier` / `Partidas sem modo conhecido ficam em Tudo.` / `Ver todas` |
+| `last_match_*` congelado | Métricas | grupo colapsado: `▸ 19 contadores de última partida congelados pela Valve` |
 
-**Amostra mínima por ponto**: um ponto com `rounds < MIN_ROUNDS` (padrão
-10; `winrate`/`mvp`: `partidas < 3`) é **fraco**: desenhado vazado
-(`fill: none; stroke: ink-faint`), excluído do cálculo de domínio e do
-normal, mas presente na linha. É o que impede o 6,30 de 7 rounds de mandar
-no eixo.
+Estados que não passam por `Estado` porque são outra coisa: a página inteira
+sem estatísticas públicas na Steam (`sem-dados.tsx`, bloqueante) e o cartão
+do analista (5).
 
-**Domínio vertical (anti-outlier)**
+### 2.7 Skeletons
 
-```
-elegíveis = pontos fortes
-m   = mediana(elegíveis.valor)
-MAD = mediana(|v − m|)   ; se 0 → max(0,1·|m|, menor unidade da stat)
-dentro = elegíveis com |v − m| ≤ 3·MAD
-domínio = [min(dentro ∪ {normal}), max(dentro ∪ {normal})] com 10 % de folga
-stats em %: domínio recortado a [0, 100]
-```
-
-Pontos fora do domínio são **grampeados na borda** e desenhados com um
-marcador distinto (triângulo `▲`/`▼` de 6 px em `ink-faint`). No gráfico
-grande o marcador recebe rótulo com o valor real e a amostra:
-`6,30 ▲ · 7 rounds`. No sparkline, sem rótulo (o tile é resumo). Nunca
-esconder o ponto: grampear é honesto, omitir não.
-
-**Stats por partida (`winrate`, `mvp`, `rounds`)**: o valor de cada ponto é
-a razão **móvel das últimas 5 sessões** (somatório dos deltas), não a razão
-da sessão isolada. Rodapé do tile: `média móvel · 5 sessões`. Resolve a
-serra 0/100 de D6.
-
-**Baseline**: a linha do normal, tracejada `4 4` em `ink-faint`, sempre
-dentro do domínio. No gráfico grande, rótulo na ponta direita:
-`normal 0,70`. Se o normal é o vitalício, `vitalício 0,70`. Sem normal, sem
-linha.
-
-**Lente de modo no gráfico**: a linha inteira é desenhada em `--line`
-(cinza) quando a lente está ativa; os pontos do modo escolhido são cheios em
-`--accent` com raio 4; os demais, raio 2,5 em `ink-faint`. Sem lente, a
-linha é `--accent` como hoje. Não se desenha uma segunda linha ligando só
-os pontos do modo — ligaria sessões com semanas de buraco.
-
-**Hover / seleção (gráfico grande)**: cada ponto é `<g tabindex="0">` com
-um `<text>` filho oculto; `:hover` e `:focus-visible` mostram
-`{valor} · {data curta} · {modo} · {rounds} r`. Uma linha vertical fina
-acompanha. No toque, o primeiro tap foca e mostra; a tabela abaixo destaca
-a linha correspondente (`:target` via `id`). Sem tooltip no sparkline.
-
-**Eixo do tempo (gráfico grande)**: primeiro e último instante como hoje,
-mais marcas de semana quando o intervalo > 14 dias; formatação
-`Intl.DateTimeFormat(locale, {day, month:"short"})`.
-
-**Animação `tracar`**: manter, mas só no gráfico grande. Nos tiles, 12
-animações simultâneas de 1,1 s é ruído — remover a classe.
-
-### 3.4 Chip de delta
-
-Componente `delta-chip.tsx`, usado por hero, tile, tabela de sessões e
-`painel`. Nunca um cálculo local de delta em outro lugar.
-
-```ts
-type Delta =
-  | { estado: "ok"; valor: number; unidade: "%" | "pp"; direcao: "sobe" | "desce" | "igual"; valencia: "good" | "bad" | "neutral"; fraco: boolean }
-  | { estado: "sem-base"; motivo: "sem-normal" | "poucas-sessoes" | "propria-sessao" | "sem-amostra" };
-```
-
-Regras:
-
-- **Unidade**: stats com `unit: "%"` (HS, vitórias, precisão) mostram
-  diferença em **pontos percentuais** (`▼ 41 pp`), não razão (`-100%`).
-  As outras, razão relativa (`▼ 19%`).
-- **Limiar de "igual"**: |Δ| < 3 % (ou < 1 pp) → chip `≈` em `--neutral`,
-  sem sinal. Abaixo disso a diferença é ruído.
-- **Sinal e ícone**: `▲ 19%` / `▼ 19%` / `≈`. O ícone é o sinal; não
-  repetir `+`/`−`.
-- **Cor**: `valencia = direcao × melhorQuando`. `good` → texto `--good`,
-  fundo `--good-soft`; `bad` → `--bad`/`--bad-soft`; `neutral` → `--neutral`
-  sem fundo.
-- **Fraco** (`rounds < MIN_ROUNDS` na sessão): borda pontilhada, sem fundo,
-  `title="amostra de 7 rounds"`. A cor permanece.
-- **Sem base**: o chip não é renderizado; a linha de referência do cartão
-  diz o motivo em hud: `sem base · 1 de 5 sessões` / `sem base · vitalício
-  indisponível` / `sem amostra`. **`0%` nunca é impresso** por ausência de
-  base.
-- Formatação: `Intl.NumberFormat(locale, { maximumFractionDigits: 0 })`; o
-  sinal vem do ícone.
-
-### 3.5 Catálogo de estados vazios e escassos
-
-Um componente `estado.tsx` com `variante` fixa e três campos: `titulo`
-(hud, ≤ 5 palavras), `texto` (≤ 1 linha, opcional), `acao` (link,
-opcional). Substitui as sete caixas tracejadas diferentes.
-
-| Id | Situação | Onde | Título / texto / ação |
-|---|---|---|---|
-| E0 | Steam sem "Detalhes do jogo" público | página inteira | `Sem estatísticas` / `A Steam não deixa ler.` / `Abrir privacidade` |
-| E1 | 1 coleta | tiles, hero, sessões | número = vitalício, rodapé `só vitalício · jogue uma partida`; hero substituído por `Primeira coleta gravada` + `A próxima partida vira a primeira sessão.` |
-| E2 | sessões sem modo (bot não amigo) | rodapé de tile, célula de Sessões, lente oculta | `modo desconhecido` / `Adicionar o bot` |
-| E3 | lente ativa com < N_MIN sessões | referência do cartão | `sem base · 2 de 5 sessões` (chip omitido, gráfico inteiro) |
-| E4 | stat sem uso no período (ex.: AWP) | tile | número = vitalício, área do gráfico `sem uso no período` |
-| E5 | análise pendente | cartão do analista | skeleton (3.6 / 6) |
-| E6 | análise falhou | cartão do analista | `Sem análise desta vez` / — / `Pedir de novo` |
-| E7 | partidas oficiais desligadas | aba Partidas | convite curto (5.4) |
-| E8 | denominador zero (0 partidas no período) | qualquer razão | `—`, nunca `0,0%` |
-| E9 | lente ativa, lista vazia (Sessões/Partidas/Análises) | listas | `0 de 22 sessões em Premier` / — / `Ver todas` |
-| E10 | contadores `last_match_*` congelados | Métricas | grupo colapsado `19 contadores congelados pela Valve` |
-
-### 3.6 Skeletons
-
-Só onde há busca no cliente: o corpo do cartão do analista (polling de
-`/api/analises`). Três barras `h-3` (`w-4/5`, `w-full`, `w-2/3`) em
-`bg-surface-2 animate-pulse`, mais uma barra `h-8 w-1/2` no lugar da
-manchete. O cabeçalho do cartão (contexto da sessão) vem do servidor e não
-tem skeleton. Nenhuma outra página tem skeleton — são server components.
+Só onde há busca no cliente: o corpo do cartão do analista, que consulta
+`/api/analises` a cada 2,5 s enquanto houver análise em aberto. Uma barra
+`h-6 w-1/2` no lugar da manchete e três `h-3` (`w-4/5`, `w-full`, `w-2/3`)
+em `bg-surface-2 animate-pulse`. O cabeçalho do cartão vem do servidor e não
+tem skeleton. Nenhuma outra tela tem: são server components.
 
 ---
 
-## 4. Modo de jogo
+## 3. O modo de jogo é uma lente
 
-### 4.1 Decisão
+`src/lib/modo.ts` — o modo é **global** (URL `?modo=`, com o cookie
+`fragiq_modo` como memória; a URL vence, porque é o que torna o link
+compartilhável). Um modo que não existe na série cai para `tudo` em vez de
+mostrar uma página vazia. Só modos com ao menos uma sessão viram opção
+(`abasDeModo`).
 
-O modo continua **global** (URL `?modo=` + cookie, como hoje) porque as
-listas — Sessões, Partidas, Análises — são naturalmente filtráveis e um
-filtro vazio nelas é honesto (E9). O que muda é o **contrato com os
-números e gráficos**: neles o modo é uma **lente**, e uma lente nunca
-remove pontos.
+O contrato tem dois lados, e a diferença entre eles é o ponto:
 
-Com lente ativa, um cartão/hero/gráfico:
+- **Listas** (Sessões, Partidas, Análises) são naturalmente filtráveis. Em
+  Sessões a lente não esconde: as linhas fora do modo ficam na tabela em
+  `ink-faint` e um rótulo diz `2 de 7 sessões em Competitivo` — sete linhas
+  cabem na tela, esconder cinco não ajuda ninguém. Em Partidas e Análises a
+  lente filtra de verdade, com o estado vazio nomeando o corte.
+- **Números e gráficos** nunca perdem pontos. Com lente ativa, um
+  cartão/hero/gráfico mostra a série inteira com os pontos do modo em
+  destaque, usa como número grande a última sessão **do modo**, usa como
+  normal a regra de 2.2, diz no chip do cartão de que modo é o número e no
+  rodapé quantas sessões existem.
 
-1. mostra a **série inteira** (todas as sessões), com os pontos do modo em
-   destaque e os outros apagados (3.3);
-2. usa como **número grande a última sessão do modo**;
-3. usa como **normal** a regra de 4.3;
-4. diz no chip do cartão de que modo é o número, e no rodapé quantas sessões
-   do modo existem.
+**Apresentação** (`nav-jogo.tsx`): as abas à esquerda e o controle
+segmentado `MODO` à direita, na mesma linha — não é navegação, é um recorte
+que vale para todas as abas. Sem contagens nas opções (um "Premier 1" é
+convite a tela vazia); a contagem vive na linha de cobertura logo abaixo,
+`3 de 7 sessões com modo · Adicionar o bot`, que some quando toda sessão tem
+modo. Sem nenhum modo marcado, o controle não aparece.
 
-Efeito em D1: em "Premier" com 1 sessão o tile de K/D continua com os 11
-pontos da linha, um deles laranja, número 0,65 com chip `Premier`, sem
-delta, referência `sem base · 1 de 5 sessões`.
-
-### 4.2 Apresentação
-
-A segunda barra de pílulas sai. O controle vai para a **mesma linha das
-abas**, à direita, como controle segmentado com rótulo hud `MODO`:
-
-```
-desktop (≥ 1024)
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ [img] Counter-Strike 2                                                       │
-│       2.029 h · 36,2 h em 2 semanas · 22 coletas                             │
-│                                                                              │
-│ Resumo  Estatísticas  Sessões  Partidas  Métricas  Análises   MODO ┌────┬────────┬─────────────┐ │
-│ ‾‾‾‾‾‾                                                             │Tudo│Premier │Competitivo  │ │
-│                                                                    └────┴────────┴─────────────┘ │
-│ 3 de 7 sessões com modo · Adicionar o bot                              (só quando < 100 %)      │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-```
-mobile (390)
-┌──────────────────────────────────┐
-│ Counter-Strike 2                 │
-│ 2.029 h · 22 coletas             │
-│                                  │
-│ Resumo  Estatísticas  Sessões  P…│  ← rolagem horizontal, fade nas bordas
-│ ‾‾‾‾‾‾                           │
-│ MODO ┌────┬────────┬───────────┐ │
-│      │Tudo│Premier │Competit…  │ │  ← segmentado, rolagem horizontal
-│      └────┴────────┴───────────┘ │
-│ 3 de 7 sessões com modo · bot →  │
-└──────────────────────────────────┘
-```
-
-- Sem contagens nas opções (o "1" e o "2" eram convite a tela vazia). A
-  contagem vive na linha de cobertura e no rodapé dos cartões.
-- A **linha de cobertura** `3 de 7 sessões com modo · Adicionar o bot`
-  aparece só quando há sessões sem modo; some quando 100 %. É o único
-  lembrete do bot fora do onboarding (ver 7).
-- Opção ativa: `bg-accent-soft text-accent ring-accent/40` (como hoje).
-  Só modos com ≥ 1 sessão viram opção (regra atual de `abasDeModo`).
-- Sem nenhuma sessão com modo o controle não aparece; no lugar dele, a linha
-  de cobertura: `Sessões sem modo · Adicionar o bot`.
-
-### 4.3 O normal por modo
-
-```
-N_MIN = 5 sessões  e  R_MIN = 150 rounds (somados) no modo, excluindo a sessão lida
-
-normal(stat, lente, sessão):
-  se lente = Tudo:
-      vitalício da Steam (último contador; a sessão pesa < 5 % dele)  → rótulo "vitalício"
-  senão:
-      base = sessões do modo, fortes (3.3), excluindo `sessão`
-      se |base| ≥ N_MIN e rounds(base) ≥ R_MIN:
-          acumulado(base)                                            → rótulo "normal · Premier · 8 sessões"
-      senão:
-          vitalício da Steam                                          → rótulo "vs vitalício · Premier sem base (2 de 5)"
-          chip de delta com borda pontilhada (estado `fraco`)
-```
-
-Por que cair no vitalício e não em "sem base": o produto promete comparação
-e o vitalício existe desde a primeira coleta. O que não se pode é fingir que
-o vitalício é o normal do Premier — daí o rótulo explícito e o chip fraco.
-Quando o modo chega a 5 sessões o rótulo troca sozinho; o rodapé do cartão
-mostra a progressão (`2 de 5`) para a pessoa saber que está construindo a
-própria base.
-
-Onde a regra vive: uma função `normalDe(spec, rows, lente, sessaoId)` em
-`series.ts`, substituindo os dois caminhos de `lifetimeValue`
-(`accumulatedValue` fica como interno). `vitaliciosDoHero`, `lerSerie`,
-`todasAsMetricas`, `StatPanel` e `analises.ts` passam a chamá-la — hoje cada
-um monta a referência por conta própria (D2).
-
-### 4.4 Bloco "Por modo"
-
-Como o modo é uma lente, o Resumo ganha um bloco que mostra os modos **lado
-a lado**, sem filtrar — é onde "não misturar" acontece sem esvaziar nada:
-
-```
-POR MODO
-┌──────────────┬──────────┬────────┬────────────┬────────┬───────────────┐
-│ modo         │ sessões  │ K/D    │ Dano/round │ HS     │ última        │
-├──────────────┼──────────┼────────┼────────────┼────────┼───────────────┤
-│ ● Premier    │ 1 · 2/5  │ 0,65   │ 80         │ 50 %   │ 14 set        │  ← ink-faint: base incompleta
-│ ● Competitivo│ 2 · 2/5  │ 0,57   │ 74         │ 53 %   │ 14 set        │
-│ ○ sem modo   │ 4        │ 0,48   │ 69         │ 41 %   │ 12 set        │  ← link "marcar"
-│   vitalício  │ —        │ 0,70   │ 95         │ 36 %   │               │
-└──────────────┴──────────┴────────┴────────────┴────────┴───────────────┘
-```
-
-Linha com menos de N_MIN sessões em `ink-faint` com `2/5`. Clique na linha
-= ativar a lente. Mobile: cada linha vira um cartão de duas linhas
-(`Premier · 1 sessão` / `0,65 · 80 · 50 %`).
+**Por modo** (`por-modo.tsx`): no Resumo, os modos lado a lado — uma linha
+por modo com sessões, K/D, dano por round, headshot e a última data, mais a
+linha `○ sem modo` e a do vitalício para ancorar. É onde "não misturar
+Premier com casual" acontece sem esvaziar nada. Linha com menos de
+`NORMAL_MIN_SESSOES` fica apagada e mostra o progresso (`2/5`); clicar na
+linha ativa a lente. Só aparece com dois modos ou mais: com um, seria uma
+tabela de uma linha repetindo o hero.
 
 ---
 
-## 5. Páginas
+## 4. Páginas
 
-Ordem de leitura comum a todas: **contexto → número → referência → gráfico
-→ o que falta**. Larguras: `max-w-6xl` como hoje; grid de tiles 3 colunas
-(≥ 1024), 2 (≥ 640), 1 abaixo.
+Ordem de leitura comum: **contexto → número → referência → gráfico → o que
+falta**. Largura `max-w-6xl`.
 
-### 5.1 Resumo
+### 4.1 Resumo — `page.tsx`
 
-**Propósito**: responder "como foi a última sessão, e o que fazer na
-próxima" em uma dobra e meia.
+"Como foi a última sessão, e o que fazer na próxima", em uma dobra e meia.
 
-Hierarquia:
+1. **Primeiros passos**, só enquanto faltar passo (6);
+2. **Hero** (`sessao-hero.tsx`): a última sessão da lente. Contexto numa
+   linha — modo (chip, ou o botão `modo? ▾` quando falta), mapa, placar,
+   partidas, rounds, duração — com o **fim da sessão** à direita; o
+   intervalo `de → até` fica só no `title`, porque 17 h entre coletas não é
+   tempo jogado. Três números em `num` 3xl/5xl, cada um com chip de delta e
+   **uma** linha de referência. No rodapé, as notas que qualificam a leitura
+   (amostra curta, rounds em mapa que a Steam não conta) como chips, não
+   como parágrafo. É o único `glow` da tela.
+3. **Análise** (5): manchete e ação, sem repetir os números do hero.
+4. **Estatísticas**: seis cartões (2.3), com link para a aba.
+5. **Por modo** (3).
 
-1. Onboarding compacto (só enquanto faltar passo — ver 7)
-2. Hero: a última sessão (da lente)
-3. Análise: manchete + ação (sem números)
-4. Estatísticas: 6 tiles
-5. Por modo
+As leituras de K/D, headshot e modo saíram do Resumo: eram o hero em prosa.
+`lerSerie` continua produzindo `amostra` e `mapas` (viram os chips-nota) e
+`arma-melhor`/`arma-pior`, que vivem em Estatísticas.
 
-```
-desktop
-┌──────────────────────────────────────────────────────────────────────────┐
-│ ÚLTIMA SESSÃO   ● Competitivo · Mirage · 13–9 · 2 partidas · 32 r · 47 min│
-│                                                          14 set, 19:17   │
-│                                                                          │
-│   K/D                    DANO / ROUND              HEADSHOT              │
-│   0,57  ▼ 19%            74  ▼ 22%                 52,9%  ▲ 17 pp        │
-│   normal 0,70            normal 95                 normal 36,1%          │
-│                                                                          │
-│   ⚠ amostra curta · 32 rounds        ◌ 12 de 32 rounds em mapa não contado│  ← chips-nota, só quando aplicável
-└──────────────────────────────────────────────────────────────────────────┘
+### 4.2 Estatísticas — `estatisticas/page.tsx`
 
-ANÁLISE                                                        histórico →
-┌──────────────────────────────────────────────────────────────────────────┐
-│ Mira alta, trocas ruins                                                  │  ← manchete (title). Só se marcada.
-│ Headshot e AK acima do normal; K/D caiu porque as mortes vieram em       │
-│ duelos de perto com a Glock…                             ler análise ▾   │  ← 2 linhas, expande
-│ → Próxima: comprar armor + Glock só no pistol; evitar peek duplo.        │  ← ação, sempre que existir
-└──────────────────────────────────────────────────────────────────────────┘
+"Como estou, estatística por estatística", com a série inteira sempre à
+vista.
 
-ESTATÍSTICAS                                                       todas →
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│ K/D          │ │ DANO / ROUND │ │ KILLS / ROUND│
-│ 0,57  ▼ 19%  │ │ 74  ▼ 22%    │ │ 0,53  ▼ 18%  │
-│ normal 0,70  │ │ normal 95    │ │ normal 0,65  │
-│ ┄┄●┄┄○┄┄●┄┄  │ │ ┄┄●┄┄○┄┄●┄┄  │ │ ┄┄●┄┄○┄┄●┄┄  │
-│ 11 s · 12 d ↗│ │ 11 s · 12 d ↗│ │ 11 s · 12 d ↗│
-└──────────────┘ └──────────────┘ └──────────────┘
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│ HEADSHOT     │ │ VITÓRIAS     │ │ PRECISÃO AK  │
-│ …            │ │ 40%  ▼ 1 pp  │ │ …            │
-│              │ │ média móvel·5│ │              │
-└──────────────┘ └──────────────┘ └──────────────┘
+1. **Destaques**: as duas leituras de arma, no formato
+   `8,8% · Precisão AK-47 · contra 7,7% de vitalício · 331 tiros`;
+2. os **doze cartões** na lente;
+3. **Sobre estes contadores** (`counter-scope.tsx`): `details` colapsado com
+   quatro linhas — somam todos os modos, só o pool antigo de mapas, última
+   partida congelada desde o CS:GO (com "confirmado nos seus dados" quando
+   `gaugesLookStale`), dano por round não é ADR. O detalhe medido está em
+   `docs/dados-profundos.md`.
 
-POR MODO
-(tabela de 4.4)
-```
+Não há recorte por mapa aqui: filtrar por mapa tinha o mesmo defeito de
+filtrar por modo — esvaziava os gráficos — e com menos dados ainda. Mapa é
+coluna em Sessões e dimensão de partida em Partidas.
 
-Hero — o que muda:
+### 4.3 Sessões — `sessoes/page.tsx`
 
-- Linha de contexto: `modo · mapa · placar · partidas · rounds · duração`
-  e, à direita, **o fim da sessão** (`14 set, 19:17`). O intervalo
-  `de → até` sai da tela (vai para `title`).
-- Os três números mantêm `num-xl`; o chip de delta segue 3.4; a linha de
-  referência é uma só (`normal 0,70` / `vitalício 0,70` / `sem base · 1 de
-  5`).
-- `MarcarModo` sai do hero como régua. Quando a sessão não tem modo, o chip
-  de modo é um botão `modo? ▾` que abre as 5 opções em popover; a frase "o
-  bot marca sozinho quando é seu amigo" some (a cobertura em 4.2 já diz).
-- Leituras `amostra` e `mapas` viram **chips-nota** no rodapé do hero (uma
-  linha, hud + número). As leituras `kd`, `hs` e `modo` **são removidas**:
-  são o hero. `arma-melhor`/`arma-pior` vão para Estatísticas (5.2).
-- Um `glow` só: o hero. O cartão de análise perde `glow` e `grid-bg`.
+Cada sessão como uma linha, comparável com o normal: `quando · modo · mapa ·
+placar · partidas · rounds · K/D (+chip) · dano/round · HS · min`. Kills,
+deaths e MVP ficam no `title` da linha. O chip de delta do K/D usa o normal
+da lente — é o que torna a tabela a resposta para "em qual noite eu estive
+acima do meu normal". Sessão sem modo tem o chip `modo? ▾`
+(`marcar-modo.tsx`): é aqui que a marcação em massa acontece. No mobile,
+cada linha vira um cartão de duas linhas.
 
-Mobile (390):
+### 4.4 Partidas — `partidas/page.tsx`
 
-- Contexto em duas linhas: chips (modo, mapa, placar) / `2 partidas · 32 r
-  · 47 min · 14 set 19:17`.
-- Três números em `grid-cols-3`, `num` 28 px; chip abaixo do número, não ao
-  lado. Se algum valor tiver mais de 5 caracteres, empilhar em uma coluna.
-- Análise: manchete + ação; corpo colapsado por padrão.
-- Tiles em 1 coluna, sparkline `h-10`.
-- Por modo: cartões de duas linhas.
+Partidas oficiais, uma a uma, com o placar dos dez — o que a Web API não dá.
+Sem a corrente ligada, a página é o convite: título, uma frase, três bullets
+(`Só histórico de partidas`, `Cifrado; revogável aqui`, `FACEIT e Gamers
+Club não entram`) e o formulário ao lado. Com ela ligada, é a tabela, mais o
+estado da fila (o bot pergunta ao Game Coordinator em até um minuto), o erro
+quando a Steam para de aceitar o código, e o rodapé `Corrente ligada ·
+Revogar · gerar outro código`.
 
-O que sai do Resumo: seção Leituras (componente `Leituras` fica só com
-`arma-*`, usado em Estatísticas), os números do cartão de análise, o segundo
-`glow`, o `PendenciasBanner` (7).
+### 4.5 Métricas — `metricas/page.tsx`, `metric-table.tsx`
 
-### 5.2 Estatísticas
+Os ~178 contadores, já comparados, para quem quer procurar. Cada contador
+vira taxa por round no período contra a taxa de vitalício, que é a única
+comparação honesta entre um recorte e uma vida inteira.
 
-**Propósito**: "como estou, estatística por estatística", com a série
-inteira sempre à vista.
+A ordem é informação, em três camadas (`todasAsMetricas`): primeiro o que
+aconteceu e pesou, por **impacto** = |período − normal| × rounds do período;
+depois o que aconteceu pouco; por último o que não aconteceu. Ordenar por
+porcentagem punha cinco abates de MP9 (+4540 % sobre uma base minúscula) na
+frente de 125 abates a mais que o normal. `relevante` exige ao menos
+`MINIMO_NO_PERIODO = 5` eventos no período e vitalício maior que zero.
 
-1. Destaques: 1–2 linhas (`arma-melhor`, `arma-pior`), formato
-   `8,8%  Precisão AK-47 · normal 7,7% · ▲ 1 pp · 331 tiros`
-2. 12 tiles (3.2)
-3. `Sobre estes contadores` — `details` colapsado, **encurtado para 4
-   linhas** (sem modo / mapas legados / última partida congelada / não é
-   ADR) com link para `docs/dados-profundos.md`
+Na tela: chips de grupo (`Geral · Por arma · Por mapa · Última partida`),
+busca, e uma linha por métrica com label, total no período, período,
+referência (rotulada `normal do modo` / `vitalício` / `vitalício · sem
+base`), chip e sparkline. O grupo congelado fica colapsado no fim.
 
-```
-DESTAQUES
- 8,8%   Precisão AK-47 · normal 7,7% · ▲ 1 pp · 331 tiros
- 2,6%   Precisão Glock · normal 12,9% · ▼ 10 pp · 77 tiros
+### 4.6 Análises — `analista/page.tsx`
 
-ESTATÍSTICAS                              12 · 11 sessões · desde 03 set
-┌──────┐ ┌──────┐ ┌──────┐
-│      │ │      │ │      │   × 4 linhas
-└──────┘ └──────┘ └──────┘
+Histórico das leituras do analista, uma por sessão: a mais recente aberta,
+as anteriores colapsadas. Sem bloco de números, sem `glow`.
 
-▸ Sobre estes contadores
-```
+### 4.7 `painel/[key]` — a estatística de perto
 
-O que sai: a barra `ContextFilterBar` (recorte por mapa). Mapa como filtro
-tem o mesmo defeito de D1 e ainda menos dados; mapa passa a ser coluna em
-Sessões e dimensão de partida em Partidas. `CounterScope` é reduzido, não
-removido.
+O mesmo `StatCard` no topo (para a leitura não mudar entre a grade e aqui),
+ao lado de um bloco **Como ler** que nomeia cada marcador do gráfico: ponto
+= sessão, tracejado = normal, vazado = amostra pequena, triângulo = fora da
+escala, laranja = a lente, e a média móvel quando a estatística é por
+partida. Abaixo, o `SerieChart`, e depois cada sessão como linha com o seu
+delta (`quando · modo · rounds · valor · vs normal`).
 
-Mobile: 1 coluna; destaques em duas linhas cada.
+Sessão por sessão, sem agrupar por dia, semana ou mês: a sessão é a unidade
+do produto, e agrupar escondia justamente a que importava.
 
-### 5.3 Sessões
+### 4.8 `metricas/[key]` — uma métrica sozinha
 
-**Propósito**: cada sessão como uma linha, comparável com o normal.
+Taxa por round, acumulado e cada coleta com o seu delta, porque é do delta
+que sai todo o resto e quem duvida do número deveria poder conferir a conta.
 
-Colunas (desktop): `quando · modo · mapa · placar · partidas · rounds · K/D
-(+chip) · dano/round · HS · min`. Kills/deaths/MVP saem para o `title` da
-linha e para a página da sessão (não existe; não criar agora). O chip de
-delta de K/D usa o normal da lente (3.4), o que torna a tabela a resposta
-para "em qual noite eu estive acima do meu normal".
-
-```
-QUANDO        MODO         MAPA     PLACAR  PART  ROUNDS  K/D           DANO/R  HS     MIN
-14 set 19:17  ● Competit.  Mirage   13–9    2     32      0,57 ▼ 19%    74      53%    47
-14 set 01:45  ○ modo? ▾    —        —       1     21      0,40 ▼ 43%    62      38%    29
-```
-
-- Sessão sem modo: chip `modo? ▾` (o mesmo popover do hero). É aqui que a
-  marcação em massa acontece.
-- Lente ativa: linhas fora do modo **ficam** na tabela em `ink-faint`
-  (lente, não corte), e um rótulo acima diz `2 de 7 sessões em Competitivo`.
-  Isso muda o comportamento atual (a lista era filtrada). Motivo: a tabela
-  com 7 linhas cabe na tela; esconder 5 delas não ajuda ninguém.
-- Mobile: cada linha vira cartão: linha 1 `14 set 19:17 · ● Competitivo ·
-  Mirage · 13–9`; linha 2 `0,57 ▼ 19% · 74 · 53% · 32 r`.
-
-### 5.4 Partidas
-
-**Propósito**: partidas oficiais, uma a uma, com o placar dos dez.
-
-- Convite (corrente desligada) encurtado: título `Partidas oficiais`, uma
-  frase `Cada partida com placar e os dez jogadores. Um código da Steam,
-  colado uma vez.`, três bullets de 5 palavras (`Só histórico de partidas`,
-  `Cifrado; revogável aqui`, `FACEIT e GC não entram`), formulário à
-  direita. O texto atual tem 90 palavras; cabe em 30.
-- Tabela como está; coluna `modo` vira chip com a cor da lente; lente
-  ativa filtra (é lista) com rótulo `E9`.
-- Rodapé "Corrente ligada · última conhecida CSGO-xxxx…" → `Corrente ligada
-  · Revogar` (o share code inteiro não interessa a ninguém na tela).
-- Mobile: cartão por partida: `Mirage · 13–9 · Premier · 14 set` /
-  `24-18-6 · K/D 1,33 · HS 42% · 41 min`.
-
-### 5.5 Métricas
-
-**Propósito**: os 178 contadores, comparados, para quem quer procurar.
-
-- Busca como está; acrescentar chips de grupo `Geral · Por arma · Por mapa`
-  (o `groupOf` já existe).
-- Grupo `Última partida` colapsado no fim como E10 quando `gaugesLookStale`.
-- Linha: `label / grupo · total no período` — `período` — `normal` — chip —
-  sparkline. O sparkline segue 3.3 (lente destaca). O chip segue 3.4; a
-  coluna "variação" em texto sai.
-- Mobile: sparkline oculto (já é); chip e período na mesma linha do label.
-
-`metricas/[key]`: mantém a estrutura; os dois gráficos passam a `SerieChart`
-novo (domínio robusto, hover CSS); a lista "coleta a coleta" ganha cabeçalho
-hud e vira tabela com as mesmas colunas de 5.7. Prioridade baixa.
-
-### 5.6 Análises
-
-**Propósito**: histórico das leituras do analista, uma por sessão.
-
-Lista de cartões (6), o mais recente aberto, os anteriores com corpo
-colapsado. Sem bloco `Numeros`. Sem `glow`. Lente ativa filtra (é lista) com
-E9.
-
-### 5.7 painel/[key]
-
-**Propósito**: a estatística de perto — cada sessão como ponto, com amostra
-e modo.
-
-```
-← Estatísticas
-ESTATÍSTICA                                     [cada sessão | dia | semana | mês]
-K/D
-
-┌──────────────────────────────────────────────────────────────┐
-│ ÚLTIMA SESSÃO  ● Competitivo · 14 set                        │
-│ 0,57  ▼ 19%     normal 0,70 · 22 sessões                     │  ← um cartão (não três)
-└──────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────┐
-│ 1,2 ┤                              ▲ 6,30 · 7 r              │  ← grampeado na borda, rotulado
-│ 1,0 ┤        ●                                               │
-│ 0,8 ┤   ●        ●     ○   ●                    ●            │
-│ ─ ─ ┼ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ normal 0,70│
-│ 0,6 ┤                     ●    ●        ●   ●        ●  ●    │
-│ 0,4 ┤                                        ○               │
-│     └────┬────────┬────────┬────────┬────────┬──────         │
-│        03 set    06       09       12      14 set            │
-└──────────────────────────────────────────────────────────────┘
- ● sessão   ○ amostra < 10 rounds   ▲ fora da escala   ● modo da lente
-
-SESSÕES                                                   22 · desde 03 set
-QUANDO        MODO         ROUNDS   K/D      Δ NORMAL
-14 set 19:17  Competitivo  32       0,57     ▼ 19%
-14 set 01:45  —            21       0,40     ▼ 43%
-13 set 20:51  —            7        6,30     ▲ 800%  ⚠ amostra
-…
-```
-
-- Os três `Numero` viram um cartão de estatística (3.2) sem sparkline.
-- Legenda de marcadores em hud abaixo do gráfico, uma linha.
-- Tabela substitui a lista `data → valor`: `quando · modo · rounds · valor ·
-  Δ normal`. Ao focar um ponto do gráfico a linha correspondente recebe
-  `bg-surface-2` (`:target`).
-- Buckets `dia/semana/mês`: o ponto agregado carrega `rounds` somados e
-  `modo` = o modo predominante ou `—`; a tabela mostra a mesma agregação.
-- Mobile: gráfico `h-56`, rótulos dos pontos só no foco; tabela em 3
-  colunas (`quando · valor · Δ`).
+**Esta página ainda não segue o sistema**: recomputa a referência com
+`lifetimeValue` por fora (sem lente e sem limiar de ruído), tem o próprio
+`fmt` e o próprio `toLocaleString`, e mostra "variação" como texto em vez do
+chip. O mesmo número pode, portanto, mudar de sinal ao clicar na linha da
+lista. Está no backlog como item; até ele ser feito, é a única tela da área
+do jogo fora do padrão descrito aqui.
 
 ---
 
-## 6. Cartão do analista
+## 5. O cartão do analista
 
-### 6.1 O que o hero mostra e o que a análise mostra
+`analista.tsx` + `analise-texto.ts`. A divisão de trabalho com o hero é o
+que impede a primeira dobra de mostrar o mesmo K/D duas vezes em 30 px:
 
 | | Hero | Análise |
 |---|---|---|
 | Pergunta | "quanto?" | "por quê, e o que fazer?" |
 | Conteúdo | 3 números, delta, referência, contexto | manchete, juízo em 2–3 parágrafos, uma ação |
-| Números | grandes, formatados por `formatarStat` | só inline no texto, em negrito, nunca em bloco |
-| Referência | linha `normal …` | nenhuma |
-| Destaque visual | `glow` | nenhum |
+| Números | grandes, por `formatarStat` | só inline no texto, em negrito, nunca em bloco |
+| Destaque | `glow` | nenhum |
 
-O bloco `Numeros` de `analista.tsx` é **apagado**. O contexto (modo, mapa,
-placar, quando) fica como cabeçalho do cartão porque na aba Análises não há
-hero acima — no Resumo ele é redundante mas barato (uma linha).
+O contexto (modo, mapa, placar, quando) é o cabeçalho do cartão, porque na
+aba Análises não há hero acima; no Resumo é redundante mas custa uma linha.
 
-### 6.2 Anatomia
+**Manchete é contrato, não heurística.** `lerAnalise` só promove o primeiro
+bloco quando ele vem marcado — `**…**` inteiro ou iniciado por `# ` —, com
+até 90 caracteres e sem dois-pontos no fim. Um primeiro parágrafo curto não
+vira título por ser curto: foi assim que uma introdução de 24 px apareceu em
+produção. Análises antigas e respostas desobedientes começam pelo corpo. A
+ação é a última linha começando por `→` (inclusive quando colada no fim de
+um parágrafo, via `separarAcaoColada`).
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ ● Competitivo · Mirage · 13–9                    14 set, 19:17│  cabeçalho (chips + time)
-│                                                              │
-│ Mira alta, trocas ruins                                      │  manchete (title) — opcional
-│                                                              │
-│ Headshot e AK acima do normal; K/D caiu porque as mortes     │  corpo (body-lg), colapsado a 2 linhas
-│ vieram em duelos de perto com a Glock…         ler análise ▾ │  no Resumo; aberto em Análises
-│                                                              │
-│ → Próxima: comprar armor + Glock só no pistol.               │  ação — opcional, sempre destacada
-└──────────────────────────────────────────────────────────────┘
-```
+Estados do corpo, por `status`: `PENDING`/`ACKNOWLEDGED` → skeleton com o
+cabeçalho real; `FAILED` → `Sem análise desta vez` + `Pedir de novo` (POST
+`/api/analises`); `ANSWERED` → manchete opcional, corpo (`line-clamp-2` com
+manchete, 3 sem, e `ler análise ▾` no Resumo; aberto em Análises) e a ação
+em caixa `border-accent/30`.
 
-- Corpo: parágrafos e listas como hoje (`comNegrito`), `text-[15px]`. No
-  Resumo, `line-clamp-2` com `ler análise ▾` (client, `useState`); na aba
-  Análises o mais recente vem aberto.
-- Ação: caixa `border-accent/30 bg-accent-soft/60` como hoje; o rótulo
-  `próxima` em hud.
+O renderizador entende negrito e listas, e só. Um renderizador de markdown
+inteiro traria tabelas e cabeçalhos que não cabem num cartão.
 
-### 6.3 Manchete: contrato, não heurística
-
-`lerAnalise` deixa de adivinhar. Uma manchete só é manchete quando **vem
-marcada**: primeiro bloco em negrito inteiro (`**…**`) ou iniciado por `# `,
-com ≤ 90 caracteres e sem `:` no fim. O prompt do agente
-(`docs/cogniflow-tenant.md`) passa a exigir `**manchete**` na primeira
-linha. Análises antigas e respostas desobedientes **não têm manchete** — o
-cartão começa pelo corpo. Isso é o oposto de hoje, onde não ter marca e ter
-uma introdução curta produz um título de 24 px (D4).
-
-### 6.4 Fallback exato
-
-| Texto tem | Mostra |
-|---|---|
-| manchete + corpo + ação | tudo |
-| corpo + ação | corpo (aberto na primeira linha, sem clamp de 2 → clamp de 3) + ação |
-| manchete + corpo | manchete + corpo; sem caixa de ação |
-| só corpo | corpo, clamp 3, `ler análise ▾`; nada mais |
-| vazio / `FAILED` | E6: `Sem análise desta vez` + `Pedir de novo` (POST `/api/analises`) |
-| `PENDING`/`ACKNOWLEDGED` | skeleton 3.6 com o cabeçalho real; polling como hoje |
-
-Quando a ação vem colada no fim de um parágrafo (`separarAcaoColada`) a
-regra continua valendo.
-
-### 6.5 Copy do analista
-
-O texto de `[S1]` repete os números do hero em cinco bullets ("Taxa de
-headshots: notável melhoria para 52,9 %… em relação ao vitalício de
-36,1 %"). Isso é problema de prompt, não de cartão: o prompt deve pedir
-juízo e causa, e proibir listar cada métrica com valor e vitalício —
-"o cartão ao lado já mostra os números". Registrar em
-`docs/cogniflow-tenant.md`; fora do escopo deste plano de UI, mas sem isso
-o cartão continua repetindo o hero.
+O que o prompt do agente deve pedir e proibir está em
+`docs/cogniflow-tenant.md`: manchete marcada na primeira linha, juízo e
+causa, e nada de listar cada métrica com valor e vitalício — o cartão ao
+lado já mostra os números.
 
 ---
 
-## 7. Avisos e pendências
+## 6. Avisos e pendências
 
-Três portas (`stats`, `bot`, `partidas`), três lugares, sem repetição:
+Três portas, três lugares, sem repetição:
 
-| Porta | Onde vive | Forma | Frequência |
-|---|---|---|---|
-| `stats` (detalhes privados) | página inteira (E0) e `PrimeirosPassos` | bloqueante: nada funciona sem | sempre, até resolver |
-| `bot` (sem modo/mapa) | linha de cobertura sob as abas (4.2); rodapé de tile `modo desconhecido`; chip `modo? ▾` em Sessões/hero | inline, factual | sempre — é estado, não aviso; não tem "dispensar" |
-| `partidas` (corrente) | aba Partidas (E7) e um passo do onboarding | convite | só ali |
+| Porta | Onde vive | Forma |
+|---|---|---|
+| `stats` (detalhes do jogo privados na Steam) | página inteira (`sem-dados.tsx`) e Primeiros passos | bloqueante: nada funciona sem |
+| `bot` (sessão sem modo/mapa) | linha de cobertura sob as abas, chip `modo? ▾` no hero e em Sessões | inline e factual — é estado, não aviso; não tem "dispensar" |
+| `partidas` (corrente do share code) | aba Partidas e um passo do onboarding | convite, só ali |
 
-`PendenciasBanner` (a pilha amarela em toda aba) **sai**. Um aviso
-`warn` repetido em seis abas, dispensável por sete dias, é o pior dos dois
-mundos: irrita quem já decidiu não adicionar o bot e não ajuda quem quer —
-a informação chega longe do lugar onde o dado falta. Inline, o aviso está
-exatamente onde a lacuna aparece.
+Não existe banner de pendências repetido em todas as abas. Um aviso `warn`
+em seis telas, dispensável por sete dias, irritava quem já decidiu não
+adicionar o bot e não ajudava quem queria — a informação chegava longe do
+lugar onde o dado falta. Inline, o aviso está exatamente onde a lacuna
+aparece.
 
-`PrimeirosPassos` no Resumo:
+**Primeiros passos** (`primeiros-passos.tsx`) tem duas formas: enquanto as
+estatísticas não estão visíveis, o cartão completo; com elas visíveis e
+passos pendentes, um `details` compacto `Primeiros passos · 2 de 4 ▾`. Some
+quando todos os passos estão feitos.
 
-- Enquanto `stats` pendente: cartão completo, como hoje.
-- Com `stats` ok e outros passos pendentes: **linha compacta** `Primeiros
-  passos · 2 de 4 ▾` (hud + progresso), expansível; o cartão completo só ao
-  expandir.
-- 4 de 4: some.
-
-Tom: HUD. Título ≤ 5 palavras, texto ≤ 1 linha, verbo na ação. O texto
-atual dos passos (3 linhas cada, com caminho de menu da Steam) vai para o
-estado expandido; colapsado só o título e o botão.
-
-Mensagens no chat da Steam: sem mudança — a cadência com teto
-(`lembrarPendenciasNoSteam`, três lembretes, um por semana) já está em
-`src/lib/pendencias.ts` e é o canal certo para insistir; a interface não
-insiste.
+Mensagens no chat da Steam são outro canal e têm outra cadência: três
+lembretes, um por semana, com teto (`src/lib/pendencias.ts`). A interface
+não insiste; o chat, com limite, sim.
 
 ---
 
-## 8. Plano de implementação
+## 7. Onde cada regra é testada
 
-Ordem por dependência e por impacto. Tamanhos: S (≤ 2 h), M (½ dia),
-L (1–2 dias). Nada aqui exige biblioteca nova nem migração de banco.
-
-### Passo 1 — Formatação e semântica (fundação) · M
-
-- **Criar** `src/lib/formato.ts`: `formatarStat(key, v, locale)`,
-  `formatarNumero`, `formatarPct`, `formatarPp`, `formatarQuando(d, locale,
-  tz)`, `formatarDuracao`. Tudo por `Intl.*`; `locale` e `tz` vêm de um
-  `getLocale()` (hoje devolve `pt-BR`/`America/Sao_Paulo`; amanhã lê o
-  usuário).
-- **Editar** `src/lib/cs2-panel.ts`: acrescentar `melhorQuando` e
-  `minAmostra` a cada `PanelStat`; `decimals`/`unit` viram a fonte única de
-  formatação.
-- **Editar** `src/app/globals.css`: tokens `--good`, `--good-soft`,
-  `--bad`, `--bad-soft`, `--neutral` no `:root` e no `@theme inline`.
-- **Apagar** os `fmt`/`n`/`toLocaleString("pt-BR")` locais em
-  `stat-panel.tsx`, `sessao-hero.tsx`, `analista.tsx`, `leituras.ts`,
-  `metric-table.tsx`, `sessoes/page.tsx`, `painel/[key]/page.tsx`,
-  `metricas/[key]/page.tsx`, `partidas-tabela.tsx`, `serie-chart.tsx`.
-
-### Passo 2 — O normal e o delta (motor) · M
-
-- **Editar** `src/lib/series.ts`: `normalDe(spec, rows, lente, sessaoId)`
-  com a regra 4.3 (N_MIN, R_MIN, leave-one-out, fallback rotulado);
-  `buildSeries` devolve `PontoSerie` (com `rounds`, `modo`, `sessaoId`) e
-  **não aplica mais** `filter.mode` como corte quando chamado pelos
-  cartões — a lente é aplicada na apresentação. `lifetimeValue` vira
-  wrapper de compatibilidade e depois some.
-- **Criar** `src/lib/delta.ts`: `calcularDelta(stat, valor, normal,
-  rounds)` → `Delta` (3.4).
-- **Editar** `src/lib/sessoes.ts` (`vitaliciosDoHero` → `normalDoHero`
-  usando `normalDe`), `src/lib/analises.ts` (`referencia` idem),
-  `src/lib/leituras.ts` (`todasAsMetricas` idem; `lerSerie` reduzido a
-  `amostra`, `mapas`, `arma-melhor`, `arma-pior`).
-- Testes de unidade para `normalDe` com 1, 4, 5 sessões no modo e para o
-  domínio robusto (Passo 3).
-
-### Passo 3 — Gráficos · L
-
-- **Reescrever** `src/components/sparkline.tsx`: entrada `PontoSerie[]`,
-  domínio robusto (MAD), grampeamento com marcador, pontos fracos vazados,
-  lente (linha cinza + pontos do modo em laranja), estados 0/1/2 pontos,
-  sem `tracar`.
-- **Reescrever** `src/components/serie-chart.tsx`: idem + eixo de tempo com
-  marcas, rótulo da baseline, `<g tabindex>` com rótulo em
-  `:hover/:focus-visible`, `id` por ponto para `:target`, legenda de
-  marcadores.
-- **Criar** `src/lib/dominio.ts` com `dominioRobusto(pontos, normal, stat)`
-  compartilhado pelos dois.
-
-### Passo 4 — Cartão de estatística e chip · M
-
-- **Criar** `src/components/delta-chip.tsx` (3.4) e
-  `src/components/stat-card.tsx` (3.2).
-- **Criar** `src/components/estado.tsx` (3.5) e substituir as sete caixas
-  tracejadas (`stat-panel`, `leituras`, `serie-chart`, `sessoes/page`,
-  `partidas/page`, `analista/page`, `page.tsx` do Resumo).
-- **Reescrever** `src/components/stat-panel.tsx` como grade de `StatCard`;
-  o `Tile` interno some.
-
-### Passo 5 — Lente de modo · M
-
-- **Editar** `src/components/nav-jogo.tsx` + `modo-nav.tsx`: uma linha, abas
-  à esquerda e segmentado `MODO` à direita; sem contagens; linha de
-  cobertura `x de y sessões com modo · Adicionar o bot`.
-- **Editar** `src/app/games/[appId]/layout.tsx`: remover a segunda barra e
-  o `PendenciasBanner`; passar `cobertura` (sessões com modo / total) que
-  `abasDoUsuario` já sabe calcular.
-- **Criar** `src/components/por-modo.tsx` (4.4) e usar no Resumo.
-- **Editar** `src/components/estatisticas.tsx`: remover `ContextFilterBar` e
-  o estado de mapa. **Apagar** `context-filter.tsx` se nenhum outro lugar
-  usar (`p/[steamId]` usa? conferir; se sim, manter só lá).
-
-### Passo 6 — Resumo e hero · M
-
-- **Editar** `src/components/sessao-hero.tsx`: nova linha de contexto, fim
-  da sessão à direita, `DeltaChip`, uma linha de referência, chips-nota
-  (`amostra`, `mapas`), chip `modo? ▾` no lugar da régua.
-- **Editar** `src/components/marcar-modo.tsx`: vira popover acionado por
-  chip; reutilizado em Sessões.
-- **Editar** `src/app/games/[appId]/page.tsx`: ordem hero → análise →
-  tiles → por modo; remover seção Leituras.
-- **Editar** `src/components/primeiros-passos.tsx`: variante compacta.
-
-### Passo 7 — Analista · S
-
-- **Editar** `src/lib/analise-texto.ts`: manchete só marcada (6.3);
-  testes com a resposta de `[S5]` (não deve promover) e com uma marcada
-  (deve).
-- **Editar** `src/components/analista.tsx`: apagar `Numeros`; corpo com
-  clamp e `ler análise ▾`; skeleton; E6 com `Pedir de novo`; sem `glow`.
-- **Editar** `docs/cogniflow-tenant.md`: prompt exige `**manchete**` e
-  proíbe repetir os números do cartão.
-
-### Passo 8 — Sessões, Partidas, Métricas · M
-
-- **Editar** `src/app/games/[appId]/sessoes/page.tsx`: colunas 5.3, chip de
-  delta, lente como destaque (linhas fora do modo em `ink-faint`), cartões
-  no mobile, chip `modo? ▾`.
-- **Editar** `src/app/games/[appId]/partidas/page.tsx`: convite encurtado,
-  rodapé encurtado; `partidas-tabela.tsx`: cartões no mobile.
-- **Editar** `src/components/metric-table.tsx`: chips de grupo, `DeltaChip`,
-  grupo congelado colapsado; `metricas/page.tsx` passa `gaugesLookStale`.
-
-### Passo 9 — painel/[key] e metricas/[key] · M
-
-- **Editar** `painel/[key]/page.tsx`: um `StatCard` no lugar dos três
-  `Numero`; `SerieChart` novo; tabela de sessões com `Δ normal`; legenda.
-- **Editar** `metricas/[key]/page.tsx`: `SerieChart` novo; tabela com
-  cabeçalho. Baixa prioridade; pode ficar para depois do Passo 10.
-
-### Passo 10 — Limpeza · S
-
-- **Apagar**: `pendencias-banner.tsx`; `Leituras` como seção do Resumo (o
-  componente fica, só para Destaques); os `fmt` locais restantes;
-  `lifetimeValue` se nada mais chamar; `context-filter.tsx` se órfão;
-  `counter-scope.tsx` reduzido a 4 itens.
-- Conferir no 390 px: header, abas com fade, segmentado, hero em 3 colunas,
-  tiles em 1 coluna, tabelas em cartões, nenhum scroll horizontal da página.
-
-### Ordem de entrega
-
-1 → 2 → 3 → 4 desbloqueiam tudo; 5 e 6 são o que o dono vê primeiro
-(lente + Resumo); 7 é curto e resolve D3/D4; 8–10 fecham. Entre 4 e 5 a
-aplicação já roda com tiles corretos em "Tudo" — o ponto de checagem é
-abrir "Premier" e ver **onze pontos na linha, um laranja, e `sem base · 1
-de 5`** onde hoje há um número solto.
+`tests/lib/`: `series.test.ts` (pares derivados, atraso da Steam, bucketing,
+normal), `leituras.test.ts` (relevância, impacto, camadas),
+`leituras-sessoes.test.ts`, `analise-texto.test.ts` (manchete marcada vs
+introdução curta), `analista.test.ts` (views). Rodam com
+`npx tsc --noEmit -p tsconfig.json`, `npm run lint` e `npm test`, que é o
+que o CI roda.
