@@ -30,7 +30,7 @@ export default async function AdminPage() {
   ]);
   if (!user) redirect("/");
 
-  const { totais, usuarios, porDia, funil, saude, eventos } = painel;
+  const { totais, usuarios, porDia, funil, saude, eventos, bot } = painel;
   const tickHa = saude.bot ? Date.now() - saude.bot.ultimoTickEm.getTime() : null;
   const botVivo = tickHa !== null && tickHa < 2 * 60_000;
   // Três estados, não dois: o processo pode estar vivo e sem sessão na Steam.
@@ -213,6 +213,34 @@ export default async function AdminPage() {
               </span>,
             ])}
             vazio="Nenhuma análise pedida ainda."
+          />
+        </Secao>
+
+        <Secao titulo="Bot" sub={`O que o bot viu e o que ele disse, sem SSH. ${bot.erros24h} erro${bot.erros24h === 1 ? "" : "s"} em 24 h.`}>
+          <h3 className="mb-2 text-xs font-semibold text-ink-muted">Observações</h3>
+          <Tabela
+            cabecalho={["Quando", "Quem", "Evento", "Modo · mapa · placar", "Ponto", "Trace"]}
+            vazio="Nenhuma observação ainda (o bot passa a gravá-las a partir de 17/09)."
+            linhas={bot.observacoes.map((o) => [
+              <span key="q" className="whitespace-nowrap text-ink-muted" suppressHydrationWarning>{dataHora(o.observedAt)}</span>,
+              o.persona ?? <span key="p" className="font-mono text-xs text-ink-faint">{o.steamId}</span>,
+              <span key="k" className="font-mono text-xs">{o.kind === "MATCH_ENDED" ? "fim de partida" : "saiu do jogo"}</span>,
+              <span key="c" className="text-xs">{[o.mode, o.map, o.score].filter(Boolean).join(" · ") || "—"}</span>,
+              <span key="v" className={cn("text-xs", o.virouPonto ? "text-good" : "text-ink-faint")}>{o.virouPonto ? "gravado" : "ainda não"}</span>,
+              <span key="t" className="font-mono text-[10px] text-ink-faint">{o.traceId.slice(0, 8)}</span>,
+            ])}
+          />
+          <h3 className="mt-6 mb-2 text-xs font-semibold text-ink-muted">Log</h3>
+          <Tabela
+            cabecalho={["Quando", "Nível", "Quem", "Mensagem", "Trace"]}
+            vazio="Nenhuma linha recebida ainda."
+            linhas={bot.logs.map((l) => [
+              <span key="q" className="whitespace-nowrap text-ink-muted" suppressHydrationWarning>{dataHora(l.em)}</span>,
+              <span key="n" className={cn("font-mono text-xs", l.nivel === "ERROR" && "text-danger", l.nivel === "WARN" && "text-warn")}>{l.nivel}</span>,
+              <span key="s" className="font-mono text-[10px] text-ink-faint">{l.steamId ? l.steamId.slice(-6) : "—"}</span>,
+              <span key="m" className="block max-w-lg truncate text-xs" title={l.mensagem}>{l.mensagem}</span>,
+              <span key="t" className="font-mono text-[10px] text-ink-faint">{l.traceId ? l.traceId.slice(0, 8) : ""}</span>,
+            ])}
           />
         </Secao>
 

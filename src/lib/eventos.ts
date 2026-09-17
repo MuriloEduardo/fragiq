@@ -9,9 +9,12 @@ import { prisma } from "./prisma";
  * da Vercel é um erro que ninguém vê. Nunca lança: o diário não pode
  * derrubar o que está registrando.
  */
-export async function registrar(nome: string, opts: { userId?: string | null; dados?: Prisma.InputJsonValue } = {}) {
+export async function registrar(
+  nome: string,
+  opts: { userId?: string | null; traceId?: string | null; dados?: Prisma.InputJsonValue } = {},
+) {
   try {
-    await prisma.evento.create({ data: { nome, userId: opts.userId ?? null, dados: opts.dados } });
+    await prisma.evento.create({ data: { nome, userId: opts.userId ?? null, traceId: opts.traceId ?? null, dados: opts.dados } });
   } catch (e) {
     console.error("[eventos] não registrou:", nome, e instanceof Error ? e.message : e);
   }

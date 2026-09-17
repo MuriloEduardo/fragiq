@@ -27,12 +27,13 @@ const RETRY_MS = [2, 4, 8, 16].map((min) => min * 60_000);
 /** Janela em que um ponto sem contexto ainda é "a partida que o bot viu". */
 const JANELA_ANEXO_MS = 30 * 60_000;
 
-export async function agendarCaptura(userId: string, steamId: string, contexto: MatchContext) {
+export async function agendarCaptura(userId: string, steamId: string, contexto: MatchContext, traceId: string) {
   const dados = {
     steamId,
     matchMap: contexto.map ?? null,
     matchMode: contexto.mode ?? null,
     matchScore: contexto.score ?? null,
+    traceId,
     tentativa: 0,
     proximaEm: new Date(Date.now() + GRACE_MS),
   };
@@ -69,7 +70,9 @@ export async function processarCapturasDevidas(limite = 5): Promise<ResultadoDoT
 
     let gravou = false;
     try {
-      const result = await syncUser(c.userId, c.steamId, "EVENT", contexto);
+      // O trace é o do aviso do bot: é assim que o ponto gravado aqui aponta
+      // de volta para a observação que o pediu.
+      const result = await syncUser(c.userId, c.steamId, "EVENT", contexto, c.traceId ?? undefined);
       gravou = result.snapshotsCreated > 0 || (await anexarContexto(c.userId, contexto));
     } catch (err) {
       await reportarErro("capturas.sync", err, c.userId);
@@ -91,7 +94,7 @@ export async function processarCapturasDevidas(limite = 5): Promise<ResultadoDoT
         void reportarErro("capturas.avisoPrivacidade", e, c.userId);
         return false;
       });
-      await registrar("captura.desistida", { userId: c.userId, dados: { mapa: c.matchMap, avisouPrivacidade: avisou } });
+      await registrar("captura.desistida", { userId: c.userId, traceId: c.traceId, dados: { mapa: c.matchMap, avisouPrivacidade: avisou } });
       r.desistidas++;
       continue;
     }

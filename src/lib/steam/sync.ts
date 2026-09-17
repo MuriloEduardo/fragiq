@@ -62,18 +62,27 @@ export type MatchContext = {
   score?: string | null;
 };
 
+/**
+ * A proveniência que todo ponto carrega: qual coleta o criou, por qual
+ * gatilho e sob qual `traceId`. O trace vem do bot quando a coleta é
+ * reativa; nos outros gatilhos nasce aqui. É o que responde "de onde veio
+ * este número" (docs/dados-confiaveis.md §3.1).
+ */
+export type Proveniencia = { syncRunId: string; trigger: SyncTrigger; traceId: string };
+
 export async function syncUser(
   userId: string,
   steamId: string,
   trigger: SyncTrigger = "MANUAL",
   context?: MatchContext,
+  traceId: string = crypto.randomUUID(),
 ): Promise<SyncResult> {
   const run = await prisma.syncRun.create({
-    data: { userId, trigger, status: "RUNNING" },
+    data: { userId, trigger, status: "RUNNING", traceId },
   });
 
   try {
-    const result = await runSync(userId, steamId, trigger, context);
+    const result = await runSync(userId, steamId, { syncRunId: run.id, trigger, traceId }, context);
 
     await prisma.$transaction([
       prisma.syncRun.update({
@@ -105,9 +114,10 @@ export async function syncUser(
 async function runSync(
   userId: string,
   steamId: string,
-  trigger: SyncTrigger,
+  proveniencia: Proveniencia,
   context?: MatchContext,
 ): Promise<SyncResult> {
+  const { trigger } = proveniencia;
   const summary = await getPlayerSummary(steamId);
   // 3 = público. Abaixo disso a Steam responde vazio para biblioteca e
   // stats, e vazio não pode ser lido como "o jogo não tem stats".
@@ -196,7 +206,7 @@ async function runSync(
     if (record && !record.supportsStats) continue; // já sabemos que não expõe stats.
 
     statCallsSpent++;
-    const outcome = await captureSnapshot(userId, steamId, game, perfilPublico, context);
+    const outcome = await captureSnapshot(userId, steamId, game, perfilPublico, proveniencia, context);
     if (outcome === "created") snapshotsCreated++;
     if (outcome === "unchanged") unchanged.push(game.appid);
 
@@ -300,6 +310,7 @@ async function captureSnapshot(
   steamId: string,
   game: OwnedGame,
   perfilPublico: boolean,
+  proveniencia: Proveniencia,
   context?: MatchContext,
 ): Promise<"created" | "unchanged" | "skipped"> {
   const stats = await getUserStatsForGame(steamId, game.appid);
@@ -368,6 +379,9 @@ async function captureSnapshot(
       matchMap: game.appid === 730 ? (context?.map ?? null) : null,
       matchMode: game.appid === 730 ? (context?.mode ?? null) : null,
       matchScore: game.appid === 730 ? (context?.score ?? null) : null,
+      syncRunId: proveniencia.syncRunId,
+      trigger: proveniencia.trigger,
+      traceId: proveniencia.traceId,
     },
   });
 

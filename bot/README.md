@@ -52,6 +52,18 @@ morto e "deslogado" é processo vivo esperando a Steam. Antes disso, um
 deixava o bot vivo, mudo e sem ninguém saber por quê — foi o que aconteceu
 de 15/09 a 16/09/2026.
 
+## O log vai para o painel
+
+`src/logs.ts` captura tudo o que passa por `console.*`, enfileira e envia
+em lotes para `POST /api/bot/logs` (10 s ou 50 linhas; `FRAGIQ_LOGS_URL`
+sobrescreve a URL, que deriva do webhook). O `/admin` mostra os últimos
+logs na seção **Bot**, com nível, jogador e trace. Cada aviso de fim de
+partida nasce com um `traceId` que vai no corpo do webhook; o site grava
+a observação (`bot_observations`) e a captura com ele, e o ponto que a
+coleta criar carrega o mesmo id — do "o bot viu" ao número na tela
+(`docs/dados-confiaveis.md` §3.4). `docker logs` continua funcionando; é
+o caminho de emergência.
+
 ## Por que não roda na Vercel
 
 Um cliente Steam mantém conexão TCP persistente. Serverless não comporta.

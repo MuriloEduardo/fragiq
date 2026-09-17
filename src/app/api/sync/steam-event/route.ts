@@ -7,20 +7,26 @@ import { agendarCaptura } from "@/lib/capturas";
 export const dynamic = "force-dynamic";
 
 /**
- * O bot de presença viu alguém terminar uma partida.
+ * O bot de presença viu alguém terminar uma partida (ou fechar o jogo).
  *
- * Só gravamos o pedido: a coleta em si acontece no tick (`/api/bot/tick`),
- * depois do prazo que a Steam leva para publicar, e com as retentativas
- * guardadas no banco — não na memória de um processo que reinicia. A
- * resposta é imediata e o bot não precisa lembrar de nada.
+ * Duas gravações, nesta ordem: a **observação** (o que o bot viu — mapa,
+ * modo, placar, quando), que fica para sempre e é a prova de modo das
+ * sessões; e o pedido de coleta, que acontece no tick (`/api/bot/tick`),
+ * depois do prazo que a Steam leva para publicar, com as retentativas
+ * guardadas no banco — não na memória de um processo que reinicia. O
+ * `traceId` nasce no bot e amarra as duas ao ponto que vier.
  */
 const schema = z.object({
   steamId: z.string().regex(/^7656119\d{10}$/),
-  event: z.enum(["match_ended"]),
+  event: z.enum(["match_ended", "left_game"]),
   /** Observado pelo bot no rich presence, quando disponível. */
   map: z.string().max(64).optional(),
   mode: z.string().max(64).optional(),
   score: z.string().max(32).optional(),
+  /** Quando o bot viu; sem ele, agora. */
+  observedAt: z.string().datetime().optional(),
+  /** Um bot antigo não manda; a rota inventa um para o fio não se perder. */
+  traceId: z.string().uuid().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -38,19 +44,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
   }
 
+  const d = parsed.data;
+  const traceId = d.traceId ?? crypto.randomUUID();
   const user = await prisma.user.findUnique({
-    where: { steamId: parsed.data.steamId },
+    where: { steamId: d.steamId },
     select: { id: true, steamId: true },
   });
-  // O bot é amigo de gente que talvez nunca tenha entrado no site.
+
+  // A observação fica mesmo para quem não tem conta: o bot é amigo de gente
+  // que talvez entre no site depois, e aí a história já está lá.
+  await prisma.botObservation.create({
+    data: {
+      steamId: d.steamId,
+      userId: user?.id ?? null,
+      kind: d.event === "match_ended" ? "MATCH_ENDED" : "LEFT_GAME",
+      map: d.map ?? null,
+      mode: d.mode ?? null,
+      score: d.score ?? null,
+      observedAt: d.observedAt ? new Date(d.observedAt) : new Date(),
+      traceId,
+    },
+  });
+
   if (!user) {
-    return NextResponse.json({ skipped: "usuário desconhecido" });
+    return NextResponse.json({ skipped: "usuário desconhecido", traceId });
   }
 
-  const captura = await agendarCaptura(user.id, user.steamId, {
-    map: parsed.data.map,
-    mode: parsed.data.mode,
-    score: parsed.data.score,
-  });
-  return NextResponse.json({ scheduled: captura.proximaEm.toISOString() }, { status: 202 });
+  const captura = await agendarCaptura(user.id, user.steamId, { map: d.map, mode: d.mode, score: d.score }, traceId);
+  return NextResponse.json({ scheduled: captura.proximaEm.toISOString(), traceId }, { status: 202 });
 }

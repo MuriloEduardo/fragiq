@@ -5,6 +5,11 @@ import { CS2_APPID, config } from "./config.js";
 import { gravarRefreshToken, lerSegredos, secretId } from "./segredos.js";
 import { ligarPartidas } from "./partidas.js";
 import { supervisionarConexao } from "./conexao.js";
+import { despedirLogs, ligarLogs, logar } from "./logs.js";
+
+// Antes de qualquer outra linha: tudo o que o bot disser a partir daqui vai
+// também para o painel do site.
+ligarLogs({ url: config.logsUrl, secret: config.webhookSecret });
 
 /**
  * Bot de presença.
@@ -231,24 +236,33 @@ client.on("user", (steamID, user) => {
 
 /* --------------------------------- webhook -------------------------------- */
 
-async function avisar(steamId: string, motivo: string) {
+/**
+ * Cada aviso nasce com um `traceId`. Ele vai no corpo, o site o grava na
+ * observação e na captura, e o ponto que vier carrega o mesmo id — é o fio
+ * que liga "o bot viu" a "o número na tela".
+ */
+async function avisar(steamId: string, motivo: "terminou a partida" | "saiu do CS2") {
   const ctx = contexto.get(steamId);
-  console.log(
-    `${steamId} ${motivo}` + (ctx?.map ? ` (${ctx.mode ?? "?"} em ${ctx.map}${ctx.score ? ` ${ctx.score}` : ""})` : ""),
+  const traceId = crypto.randomUUID();
+  const event = motivo === "terminou a partida" ? "match_ended" : "left_game";
+  logar(
+    "INFO",
+    `${motivo}` + (ctx?.map ? ` (${ctx.mode ?? "?"} em ${ctx.map}${ctx.score ? ` ${ctx.score}` : ""})` : ""),
+    { steamId, traceId, dados: { event, map: ctx?.map, mode: ctx?.mode, score: ctx?.score } },
   );
   try {
     const res = await fetch(config.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", authorization: `Bearer ${config.webhookSecret}` },
-      body: JSON.stringify({ steamId, event: "match_ended", map: ctx?.map, mode: ctx?.mode, score: ctx?.score }),
+      body: JSON.stringify({ steamId, event, map: ctx?.map, mode: ctx?.mode, score: ctx?.score, observedAt: new Date().toISOString(), traceId }),
     });
     const corpo = await res.text();
-    console.log(`Webhook ${steamId}: ${res.status} ${corpo.slice(0, 120)}`);
+    logar(res.ok ? "INFO" : "WARN", `webhook ${res.status} ${corpo.slice(0, 120)}`, { steamId, traceId });
     if (res.ok) contexto.delete(steamId);
   } catch (err) {
     // A rede falhou e o pedido não chegou. O site não sabe desta partida;
     // o próximo evento desta pessoa (ou o cron) a alcança.
-    console.error(`Webhook falhou para ${steamId}:`, err);
+    logar("ERROR", `webhook falhou: ${err instanceof Error ? err.message : String(err)}`, { steamId, traceId });
   }
 }
 
@@ -360,6 +374,6 @@ for (const sinal of ["SIGINT", "SIGTERM"] as const) {
     clearInterval(partidas.timer);
     conexao.encerrar();
     client.logOff();
-    process.exit(0);
+    void despedirLogs().finally(() => process.exit(0));
   });
 }

@@ -55,12 +55,15 @@ export type Saude = {
   erros24h: number;
 };
 
-export type EventoLinha = { id: string; nome: string; persona: string | null; dados: unknown; createdAt: Date };
+export type EventoLinha = { id: string; nome: string; persona: string | null; dados: unknown; createdAt: Date; traceId: string | null };
+export type BotLogLinha = { id: string; nivel: "DEBUG" | "INFO" | "WARN" | "ERROR"; mensagem: string; steamId: string | null; traceId: string | null; em: Date };
+export type ObservacaoLinha = { id: string; kind: "MATCH_ENDED" | "LEFT_GAME"; persona: string | null; steamId: string; map: string | null; mode: string | null; score: string | null; observedAt: Date; traceId: string; virouPonto: boolean };
 
 export type Painel = {
   funil: EtapaFunil[];
   saude: Saude;
   eventos: EventoLinha[];
+  bot: { logs: BotLogLinha[]; erros24h: number; observacoes: ObservacaoLinha[] };
   totais: {
     usuarios: number;
     novos7d: number;
@@ -115,7 +118,7 @@ export type Painel = {
 
 export async function carregarPainel(): Promise<Painel> {
   const semanaAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [funil, saude, eventos] = await Promise.all([carregarFunil(), carregarSaude(), carregarEventos()]);
+  const [funil, saude, eventos, bot] = await Promise.all([carregarFunil(), carregarSaude(), carregarEventos(), carregarBot()]);
 
   const [
     usuarios,
@@ -204,6 +207,7 @@ export async function carregarPainel(): Promise<Painel> {
     funil,
     saude,
     eventos,
+    bot,
     totais: {
       usuarios,
       novos7d,
@@ -389,5 +393,48 @@ async function carregarEventos(): Promise<EventoLinha[]> {
   const ids = [...new Set(linhas.map((l) => l.userId).filter((v): v is string => Boolean(v)))];
   const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, personaName: true } }) : [];
   const nome = new Map(users.map((u) => [u.id, u.personaName]));
-  return linhas.map((l) => ({ id: l.id, nome: l.nome, persona: l.userId ? (nome.get(l.userId) ?? null) : null, dados: l.dados, createdAt: l.createdAt }));
+  return linhas.map((l) => ({ id: l.id, nome: l.nome, persona: l.userId ? (nome.get(l.userId) ?? null) : null, dados: l.dados, createdAt: l.createdAt, traceId: l.traceId }));
+}
+
+/* ----------------------------------- bot ---------------------------------- */
+
+/**
+ * O que o bot disse e o que ele viu, sem SSH.
+ *
+ * Os logs chegam em lotes (`/api/bot/logs`); as observações são a prova de
+ * modo das sessões (docs/dados-confiaveis.md §3.1). `virouPonto` diz se a
+ * observação já tem um snapshot com o mesmo `traceId` — é o fio inteiro,
+ * visto do painel.
+ */
+async function carregarBot(): Promise<Painel["bot"]> {
+  const diaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [logs, erros24h, observacoes] = await Promise.all([
+    prisma.botLog.findMany({ orderBy: { em: "desc" }, take: 60, select: { id: true, nivel: true, mensagem: true, steamId: true, traceId: true, em: true } }),
+    prisma.botLog.count({ where: { nivel: "ERROR", em: { gt: diaAtras } } }),
+    prisma.botObservation.findMany({ orderBy: { observedAt: "desc" }, take: 20 }),
+  ]);
+  const traces = observacoes.map((o) => o.traceId);
+  const pontos = traces.length
+    ? await prisma.statSnapshot.findMany({ where: { traceId: { in: traces } }, select: { traceId: true } })
+    : [];
+  const comPonto = new Set(pontos.map((p) => p.traceId));
+  const ids = [...new Set(observacoes.map((o) => o.userId).filter((v): v is string => Boolean(v)))];
+  const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, personaName: true } }) : [];
+  const nome = new Map(users.map((u) => [u.id, u.personaName]));
+  return {
+    logs,
+    erros24h,
+    observacoes: observacoes.map((o) => ({
+      id: o.id,
+      kind: o.kind,
+      persona: o.userId ? (nome.get(o.userId) ?? null) : null,
+      steamId: o.steamId,
+      map: o.map,
+      mode: o.mode,
+      score: o.score,
+      observedAt: o.observedAt,
+      traceId: o.traceId,
+      virouPonto: comPonto.has(o.traceId),
+    })),
+  };
 }

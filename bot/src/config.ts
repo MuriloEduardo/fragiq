@@ -49,6 +49,10 @@ export const config = {
     ler("FRAGIQ_TICK_URL") ??
     obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/tick"),
   tickMs: Number(process.env.BOT_TICK_MS ?? 30_000),
+  /** Para onde vai o log do bot, em lotes (docs/dados-confiaveis.md §3.4). */
+  logsUrl:
+    ler("FRAGIQ_LOGS_URL") ??
+    obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/logs"),
   /** Para onde vai a lista de amigos do bot. */
   amigosUrl:
     ler("FRAGIQ_AMIGOS_URL") ??

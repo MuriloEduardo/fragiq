@@ -153,11 +153,20 @@ model StatSnapshot {
   matchMode  String?
   matchScore String?
 
+  /// Proveniência: a coleta que criou este ponto, o gatilho dela e o
+  /// `traceId` que amarra bot → captura → coleta → ponto. Nulo no histórico
+  /// anterior a 2026-09-16 (docs/dados-confiaveis.md §3.1).
+  syncRunId String?
+  syncRun   SyncRun?     @relation(fields: [syncRunId], references: [id], onDelete: SetNull)
+  trigger   SyncTrigger?
+  traceId   String?
+
   analyses Analysis[]
 
   @@unique([userGameId, capturedAt])
   @@index([userGameId, capturedAt])
   @@index([userGameId, matchMode])
+  @@index([traceId])
   @@map("stat_snapshots")
 }
 
@@ -226,11 +235,16 @@ model SyncRun {
   gamesSeen   Int         @default(0)
   gamesStored Int         @default(0)
   error       String?
+  /// Vem do bot (evento) ou nasce aqui (cron, manual, login). É o fio da auditoria.
+  traceId     String?
 
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
 
+  snapshots StatSnapshot[]
+
   @@index([userId, startedAt])
+  @@index([traceId])
   @@map("sync_runs")
 }
 
@@ -498,6 +512,7 @@ model PendingCapture {
   matchMap   String?
   matchMode  String?
   matchScore String?
+  traceId    String?
 
   tentativa Int      @default(0)
   proximaEm DateTime
@@ -532,13 +547,80 @@ model BotStatus {
 model Evento {
   id String @id @default(cuid())
 
-  nome   String
-  userId String?
-  dados  Json?
+  nome    String
+  userId  String?
+  dados   Json?
+  traceId String?
 
   createdAt DateTime @default(now())
 
   @@index([createdAt])
   @@index([nome, createdAt])
   @@map("eventos")
+}
+
+/// O que o bot de presença viu, antes de qualquer coleta.
+///
+/// A captura pendente some quando vira ponto; a observação fica. É o único
+/// registro de "houve uma partida de Premier em Mirage às 22:02", e é o que
+/// permite dar modo a uma sessão com prova, não por proximidade
+/// (docs/dados-confiaveis.md §3.1–3.2).
+model BotObservation {
+  id String @id @default(cuid())
+
+  steamId String
+  /// Nulo quando o bot é amigo de alguém que ainda não entrou no site.
+  userId  String?
+
+  kind       BotObservationKind
+  map        String?
+  mode       String?
+  score      String?
+  observedAt DateTime
+  traceId    String
+
+  createdAt DateTime @default(now())
+
+  @@index([steamId, observedAt])
+  @@index([userId, observedAt])
+  @@index([traceId])
+  @@map("bot_observations")
+}
+
+enum BotObservationKind {
+  /// Rich presence perdeu o mapa: voltou ao lobby.
+  MATCH_ENDED
+  /// Fechou o CS2.
+  LEFT_GAME
+}
+
+/// O log do bot, no banco, para o painel ler sem SSH.
+///
+/// O bot envia lotes (`POST /api/bot/logs`); a rota apaga o que tem mais
+/// de 30 dias. Nível, mensagem e, quando o bot sabe, de quem e de qual
+/// trace se trata.
+model BotLog {
+  id String @id @default(cuid())
+
+  nivel    BotLogLevel
+  mensagem String
+  dados    Json?
+  steamId  String?
+  traceId  String?
+  /// Quando o bot escreveu (o `createdAt` é quando chegou).
+  em       DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([em])
+  @@index([nivel, em])
+  @@index([traceId])
+  @@map("bot_logs")
+}
+
+enum BotLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
 }
