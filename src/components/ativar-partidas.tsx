@@ -68,7 +68,7 @@ export function AtivarPartidas({ compacto = false }: { compacto?: boolean }) {
         <li className="flex gap-3">
           <span className="num shrink-0 text-accent">2</span>
           <div>
-            Copie os dois códigos que aparecem lá — o de autenticação e o <strong className="text-ink">share code da sua última partida</strong> — e cole aqui.
+            Copie o código de autenticação e o <strong className="text-ink">share code da última partida</strong>; cole aqui.
           </div>
         </li>
       </ol>
@@ -112,7 +112,7 @@ export function AtivarPartidas({ compacto = false }: { compacto?: boolean }) {
           {enviando ? "Conferindo com a Steam…" : "Ativar partidas"}
         </button>
         <span className="text-xs text-ink-faint">
-          Só lê o histórico de partidas. Não abre inventário, chat nem nada da conta — e você revoga quando quiser.
+          Só o histórico de partidas · revogável aqui
         </span>
       </div>
     </form>

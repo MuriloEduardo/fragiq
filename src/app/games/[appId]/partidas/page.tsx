@@ -41,7 +41,7 @@ export default async function PartidasPage({ params, searchParams }: { params: P
         <section className="rounded-2xl bg-surface p-6 ring-1 ring-line">
           <p className="hud">Partidas oficiais</p>
           <h2 className="mt-2 text-xl font-semibold tracking-tight">Cada partida com placar e os dez jogadores.</h2>
-          <p className="mt-3 text-sm leading-relaxed text-ink-muted">Um código da Steam, colado uma vez.</p>
+          <p className="mt-3 text-sm text-ink-muted">Um código da Steam, colado uma vez.</p>
           <ul className="mt-4 space-y-1.5 text-sm text-ink-muted">
             <li>· Só histórico de partidas</li>
             <li>· Cifrado; revogável aqui</li>

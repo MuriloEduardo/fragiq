@@ -36,7 +36,7 @@ export async function PrimeirosPassos({
       titulo: "Deixe os detalhes do jogo públicos na Steam",
       texto: statsVisiveis
         ? "A Steam mostra suas estatísticas de CS2 para nós."
-        : "É o que permite ler suas estatísticas. Na Steam: Perfil → Editar perfil → Privacidade → \"Detalhes do jogo\" como Público. Depois clique em Sincronizar.",
+        : "Steam → Perfil → Privacidade → \"Detalhes do jogo\": Público. Depois, Sincronizar.",
       acao: statsVisiveis ? null : (
         <div className="flex flex-wrap items-center gap-2">
           <a
@@ -60,7 +60,7 @@ export async function PrimeirosPassos({
         botAmigo === true
           ? "Ele avisa o site quando você termina uma partida, com mapa, modo e placar."
           : botAmigo === null
-            ? "Sua lista de amigos é privada, então não dá para conferir daqui. Ele só lê o que qualquer amigo vê: que você está no CS2 e em que mapa."
+            ? "Lista de amigos privada: não dá para conferir daqui. Ele só vê o que qualquer amigo vê."
             : "Ele avisa o site no fim de cada partida — com mapa, modo e placar — e manda a análise no chat. Só lê o que qualquer amigo vê.",
       acao:
         botAmigo === true ? null : (
@@ -89,7 +89,7 @@ export async function PrimeirosPassos({
         coletas >= 2
           ? "A curva existe: cada nova partida vira um ponto."
           : coletas === 1
-            ? "A primeira coleta já está gravada. A curva nasce na segunda — o bot registra sozinho no fim de cada partida (quando você volta ao lobby), ou clique em Sincronizar depois de jogar. Todo dia às 02:00 coletamos de qualquer jeito."
+            ? "Primeira coleta gravada. A segunda vem do bot no fim da partida, do Sincronizar, ou do cron das 02:00."
             : "Depois do passo 1, a primeira coleta entra na hora e a curva começa na partida seguinte.",
       acao: null,
     },
@@ -98,7 +98,7 @@ export async function PrimeirosPassos({
       titulo: "Ligue as partidas oficiais",
       texto: partidasAtivas
         ? "Cada partida de matchmaking chega com o placar dos dez jogadores."
-        : "Dois códigos de uma página da Steam, colados uma vez, e cada partida chega com K/D, HS, MVPs e placar — não só o total. Só lê o histórico de partidas; nada da conta.",
+        : "Dois códigos da Steam, colados uma vez: cada partida chega com K/D, HS, MVPs e placar.",
       acao: partidasAtivas ? null : (
         <Link
           href="/games/730/partidas"
@@ -134,7 +134,7 @@ export async function PrimeirosPassos({
               <p className={cn("text-sm font-medium", p.feito && "text-ink-muted line-through decoration-line")}>
                 {i + 1}. {p.titulo}
               </p>
-              <p className="mt-0.5 text-sm leading-relaxed text-ink-muted">{p.texto}</p>
+              <p className="mt-0.5 truncate text-sm text-ink-muted" title={p.texto}>{p.texto}</p>
               {p.acao && <div className="mt-3">{p.acao}</div>}
             </div>
           </li>

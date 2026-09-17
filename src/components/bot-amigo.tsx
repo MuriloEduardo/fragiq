@@ -55,26 +55,23 @@ export async function BotAmigo({ amigo, compacto }: { amigo: boolean | null; com
       </div>
 
       {!compacto && (
-        <div className="mt-5 grid gap-4 text-sm leading-relaxed text-ink-muted sm:grid-cols-2">
-          <div>
-            <p className="hud mb-1">O que ele vê</p>
-            O que qualquer amigo seu vê: que você está no CS2, e o rich presence que o jogo
-            publica — mapa, modo e placar. É só isso que ele lê, e é o que dá mapa e modo a
-            cada sessão sua no FragIQ, minutos depois de a partida acabar.
-          </div>
-          <div>
-            <p className="hud mb-1">O que ele faz, e o que não</p>
-            Manda uma mensagem por partida — três linhas, minutos depois de ela terminar —
-            e nada mais: não convida, não entra em partida, não acessa inventário, trocas nem
-            qualquer coisa da sua conta. A mensagem se desliga em Segurança e dados; o bot se
-            remove da lista de amigos quando quiser, e o site segue com a coleta diária.
-          </div>
+        <div className="mt-5 grid gap-4 text-sm text-ink-muted sm:grid-cols-2">
+          <ul className="space-y-1">
+            <li className="hud mb-1">O que ele vê</li>
+            <li>· Que você está no CS2</li>
+            <li>· Mapa, modo e placar (rich presence)</li>
+            <li>· É o que dá modo a cada sessão sua</li>
+          </ul>
+          <ul className="space-y-1">
+            <li className="hud mb-1">O que ele não faz</li>
+            <li>· Não convida, não entra em partida</li>
+            <li>· Não acessa inventário, trocas nem a conta</li>
+            <li>· Uma mensagem por partida; desliga em Segurança</li>
+          </ul>
         </div>
       )}
       {amigo === null && (
-        <p className="mt-4 text-xs text-ink-faint">
-          Sua lista de amigos está privada na Steam, então não dá para conferir daqui se ele já está nela.
-        </p>
+        <p className="mt-4 truncate text-xs text-ink-faint">Lista de amigos privada na Steam: não dá para conferir daqui se ele já está nela.</p>
       )}
     </section>
   );
