@@ -32,8 +32,15 @@ export type Sessao = {
   /** Rótulo ("Premier"); `modoId` é o id cru ("premier"), que o submenu e o analista usam. */
   modo: string | null;
   modoId: string | null;
+  /** Com que prova o modo foi dado (docs/dados-confiaveis.md §3.2); null nas sessões sem sessão materializada. */
+  confianca: "EXATA" | "INFERIDA" | "MISTA" | null;
   placar: string | null;
 };
+
+/** A marca ao lado do modo: ● exata, ◐ inferida, ○ mista/sem modo. */
+export function marcaDeConfianca(c: Sessao["confianca"]): string {
+  return c === "EXATA" ? "●" : c === "INFERIDA" ? "◐" : "○";
+}
 
 export function listarSessoes(rows: SnapshotRow[], filter?: ContextFilter): Sessao[] {
   return paresDeMovimento(rows, "total_rounds_played", filter).map((par) => {
@@ -69,6 +76,7 @@ export function listarSessoes(rows: SnapshotRow[], filter?: ContextFilter): Sess
       mapa: par.curr.matchMap ? rotularMapa(par.curr.matchMap) : null,
       modo: par.curr.matchMode ? rotularModo(par.curr.matchMode) : null,
       modoId: par.curr.matchMode ?? null,
+      confianca: par.curr.modoConfianca ?? null,
       placar: par.curr.matchScore ?? null,
     };
   });

@@ -64,6 +64,7 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   partidas    MatchPlayer[]
+  sessoes     Session[]
   captura     PendingCapture?
   games       UserGame[]
   syncRuns    SyncRun[]
@@ -557,6 +558,70 @@ model Evento {
   @@index([createdAt])
   @@index([nome, createdAt])
   @@map("eventos")
+}
+
+/// Uma sessão, materializada: o intervalo entre duas coletas em que os
+/// rounds subiram, fechado no momento em que a segunda coleta é gravada.
+///
+/// Antes disso a sessão era recalculada a cada request sobre o balde de
+/// snapshots, e o modo era o da coleta que fechava o intervalo — sem prova
+/// de que o intervalo tinha uma partida só. Aqui os deltas são fatos
+/// derivados uma vez, e o modo vem de `atribuirModo` (docs/dados-confiaveis.md
+/// §3.2) com a confiança ao lado. `regraVersao` diz sob qual regra; mudou a
+/// regra, `recompute:sessions` refaz.
+model Session {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameAppId  Int
+  userGameId String
+
+  deSnapshotId  String
+  /// Uma sessão por coleta que a fecha: é a chave da idempotência.
+  ateSnapshotId String @unique
+  de            DateTime
+  ate           DateTime
+
+  /// Deltas do intervalo. `minutos` é o tempo EM PARTIDA quando a Steam dá
+  /// `total_time_played`, senão o playtime.
+  minutos   Int
+  rounds    Int
+  partidas  Int?
+  vitorias  Int?
+  kills     Int?
+  deaths    Int?
+  headshots Int?
+  dano      Int?
+  mvps      Int?
+
+  modo          String?
+  modoConfianca ModoConfianca
+  mapa          String?
+  placar        String?
+  /// As provas usadas: partidas do GC e observações do bot dentro do intervalo.
+  matchIds      String[] @default([])
+  observacaoIds String[] @default([])
+
+  regraVersao Int
+  traceId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, gameAppId, ate])
+  @@index([userId, gameAppId, modo, modoConfianca])
+  @@index([userGameId, ate])
+  @@map("sessions")
+}
+
+enum ModoConfianca {
+  /// Uma partida no intervalo e uma prova dela (GC ou bot).
+  EXATA
+  /// Várias partidas, todas provadas do mesmo modo — ou marca do bot antigo.
+  INFERIDA
+  /// Sem prova suficiente. Nunca entra numa aba nem num normal de modo.
+  MISTA
 }
 
 /// O que o bot de presença viu, antes de qualquer coleta.

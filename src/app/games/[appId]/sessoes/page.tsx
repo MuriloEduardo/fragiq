@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { carregarFonte } from "@/lib/fonte";
-import { listarSessoes, normaisDoHero } from "@/lib/sessoes";
+import { listarSessoes, marcaDeConfianca, normaisDoHero } from "@/lib/sessoes";
 import { CS2_PANEL } from "@/lib/cs2-panel";
 import { calcularDelta } from "@/lib/delta";
 import { formatarDuracao, formatarNumero, formatarQuando, formatarStat } from "@/lib/formato";
@@ -77,7 +77,14 @@ export default async function SessoesPage({ params, searchParams }: { params: Pr
                   </td>
                   <td className="px-4 py-2.5 font-sans whitespace-nowrap">
                     {s.modo ? (
-                      <span className={cn(!fora && lente ? "text-accent" : "")}>● {s.modo}</span>
+                      <span
+                        className={cn(!fora && lente ? "text-accent" : "")}
+                        title={s.confianca === "EXATA" ? "modo exato: uma partida, com prova" : "modo inferido: várias partidas, todas provadas do mesmo modo"}
+                      >
+                        {marcaDeConfianca(s.confianca)} {s.modo}
+                      </span>
+                    ) : s.confianca === "MISTA" && (s.partidas ?? 0) > 1 ? (
+                      <span className="text-ink-faint" title="várias partidas sem prova de modo: não entra em nenhuma aba">○ misto</span>
                     ) : s.snapshotId ? (
                       <MarcarModo snapshotId={s.snapshotId} />
                     ) : (

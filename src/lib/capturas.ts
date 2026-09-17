@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { syncUser, type MatchContext } from "./steam/sync";
 import { avisarPrivacidadeSePreciso } from "./mensagem-steam";
 import { registrar, reportarErro } from "./eventos";
+import { fecharSessao } from "./sessao/materializar";
 
 /**
  * Coleta reativa com memória.
@@ -141,5 +142,7 @@ async function anexarContexto(userId: string, contexto: MatchContext): Promise<b
       matchScore: contexto.score ?? null,
     },
   });
+  // A marca mudou a prova; a sessão que este ponto fecha é refeita.
+  await fecharSessao(ultimo.id).catch((e) => console.error("[capturas] sessão não refez:", e instanceof Error ? e.message : e));
   return true;
 }

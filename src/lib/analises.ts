@@ -1,8 +1,7 @@
 import { prisma } from "./prisma";
 import { cogniflow } from "./env";
 import { enviarPergunta } from "./cogniflow";
-import { deltaEntre, paresDeMovimento, type SnapshotRow } from "./series";
-import { coerce } from "./fonte";
+import type { SnapshotRow } from "./series";
 import { listarSessoes, valoresDoNormal } from "./sessoes";
 import { rotularMapa, rotularModo } from "./cs2-labels";
 import { TUDO, type Modo } from "./modo";
@@ -230,51 +229,25 @@ export async function sessaoSemAnalise(userId: string, appId: number): Promise<b
 }
 
 /**
- * A coleta que fechou a sessão mais recente, e o que ela rendeu.
- *
- * Mesma caminhada de `ultimoPar`: o par mais recente em que os rounds
- * subiram. Pontos sem partida (o cron de todo dia) não contam como sessão.
+ * A sessão mais recente, já materializada: a última linha de `Session` do
+ * jogador. Antes isto recalculava os pares sobre 500 coletas a cada
+ * chamada; agora é uma consulta, e o modo é o provado (só `EXATA` e
+ * `INFERIDA` chegam com modo).
  */
 async function sessaoMaisRecente(userId: string, appId: number) {
-  const userGame = await prisma.userGame.findUnique({
-    where: { userId_gameAppId: { userId, gameAppId: appId } },
-    select: {
-      snapshots: {
-        orderBy: { capturedAt: "asc" },
-        take: 500,
-        select: { id: true, capturedAt: true, playtimeForeverMin: true, metrics: true, matchMode: true, matchMap: true, matchScore: true },
-      },
-    },
+  const s = await prisma.session.findFirst({
+    where: { userId, gameAppId: appId },
+    orderBy: { ate: "desc" },
+    select: { ateSnapshotId: true, ate: true, rounds: true, partidas: true, modo: true, modoConfianca: true, mapa: true, placar: true },
   });
-  if (!userGame) return null;
-
-  const idPorInstante = new Map<number, string>();
-  const rows: SnapshotRow[] = userGame.snapshots.map((s) => {
-    idPorInstante.set(s.capturedAt.getTime(), s.id);
-    return {
-      capturedAt: s.capturedAt,
-      playtimeForeverMin: s.playtimeForeverMin,
-      metrics: coerce(s.metrics),
-      matchMode: s.matchMode,
-      matchMap: s.matchMap,
-      matchScore: s.matchScore,
-    };
-  });
-
-  const pares = paresDeMovimento(rows, "total_rounds_played");
-  const par = pares[pares.length - 1];
-  if (!par) return null;
-
-  const snapshotId = idPorInstante.get(par.curr.capturedAt.getTime());
-  if (!snapshotId) return null;
-
+  if (!s) return null;
   return {
-    snapshotId,
-    capturedAt: par.curr.capturedAt,
-    rounds: deltaEntre(par, "total_rounds_played") ?? 0,
-    partidas: deltaEntre(par, "total_matches_played"),
-    modo: par.curr.matchMode ?? null,
-    mapa: par.curr.matchMap ?? null,
-    placar: par.curr.matchScore ?? null,
+    snapshotId: s.ateSnapshotId,
+    capturedAt: s.ate,
+    rounds: s.rounds,
+    partidas: s.partidas,
+    modo: s.modoConfianca === "MISTA" ? null : s.modo,
+    mapa: s.mapa,
+    placar: s.placar,
   };
 }

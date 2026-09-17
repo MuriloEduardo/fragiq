@@ -16,7 +16,8 @@
     "probe": "tsx scripts/probe-steam.ts",
     "vercel-build": "prisma migrate deploy && next build",
     "backfill:modo": "tsx scripts/backfill-modo.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p bot/tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p bot/tsconfig.json",
+    "recompute:sessions": "tsx scripts/recompute-sessions.ts"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1131.0",

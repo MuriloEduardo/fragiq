@@ -76,10 +76,16 @@ export type SnapshotRow = {
   capturedAt: Date;
   playtimeForeverMin: number;
   metrics: Record<string, number>;
-  /** Observado pelo bot de presença; ausente nas coletas sem bot. */
+  /**
+   * Modo, mapa e placar da sessão que esta coleta fecha. Desde 17/09/2026
+   * vêm da sessão materializada (`Session`, docs/dados-confiaveis.md §3.2):
+   * `matchMode` só existe com prova (`EXATA`/`INFERIDA`); uma sessão
+   * `MISTA` chega sem modo, e é assim que nada de cron entra numa aba.
+   */
   matchMap?: string | null;
   matchMode?: string | null;
   matchScore?: string | null;
+  modoConfianca?: "EXATA" | "INFERIDA" | "MISTA" | null;
 };
 
 export type SeriesPoint = { t: number; value: number };

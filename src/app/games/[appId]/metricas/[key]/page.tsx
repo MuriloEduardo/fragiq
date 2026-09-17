@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { carregarFonte } from "@/lib/fonte";
 import { requireSession } from "@/lib/session";
-import { parseStatSchema } from "@/lib/stats";
 import {
   buildSeries,
   classifyMetric,
@@ -13,12 +12,11 @@ import {
   lifetimeValue,
   ultimoPar,
   type SeriesSpec,
-  type SnapshotRow, pontosDeSerie } from "@/lib/series";
+  pontosDeSerie } from "@/lib/series";
 import { SerieChart } from "@/components/serie-chart";
 
 export const dynamic = "force-dynamic";
 
-const MAX_SNAPSHOTS = 500;
 const DENOMINADOR = "total_rounds_played";
 
 /**
@@ -42,33 +40,12 @@ export default async function MetricaPage({
   const key = decodeURIComponent(keyRaw);
   if (!Number.isInteger(appId)) notFound();
 
-  const userGame = await prisma.userGame.findUnique({
-    where: { userId_gameAppId: { userId: session.userId, gameAppId: appId } },
-    select: {
-      game: { select: { name: true, statSchema: true } },
-      snapshots: {
-        orderBy: { capturedAt: "asc" },
-        take: MAX_SNAPSHOTS,
-        select: {
-          capturedAt: true,
-          playtimeForeverMin: true,
-          metrics: true,
-          matchMap: true,
-          matchMode: true,
-        },
-      },
-    },
-  });
-  if (!userGame) notFound();
-
-  const schema = parseStatSchema(userGame.game.statSchema);
-  const rows: SnapshotRow[] = userGame.snapshots.map((s) => ({
-    capturedAt: s.capturedAt,
-    playtimeForeverMin: s.playtimeForeverMin,
-    metrics: coerce(s.metrics),
-    matchMap: s.matchMap,
-    matchMode: s.matchMode,
-  }));
+  // O mesmo balde da página do jogo — com a sessão materializada por cima,
+  // para que o modo de cada ponto seja o provado, e não a marca crua.
+  const fonte = await carregarFonte(session.userId, appId);
+  if (!fonte) notFound();
+  const rows = fonte.rows;
+  const schema: Record<string, string> = Object.fromEntries(fonte.catalog.map((c) => [c.key, c.label]));
 
   const existe = rows.some((r) => key in r.metrics);
   if (!existe) notFound();
@@ -210,13 +187,3 @@ function fmt(v: number | null, casas = 2) {
   return v.toLocaleString("pt-BR", { maximumFractionDigits: precisao });
 }
 
-/** Json do Prisma vira Record<string, number>, descartando o que não for número. */
-function coerce(value: unknown): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (value && typeof value === "object") {
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
-    }
-  }
-  return out;
-}

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { fecharSessao } from "@/lib/sessao/materializar";
 import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -37,5 +38,8 @@ export async function POST(request: NextRequest) {
   if (alterado.count === 0) {
     return NextResponse.json({ error: "Essa coleta não existe, não é sua ou já tem modo." }, { status: 404 });
   }
-  return NextResponse.json({ ok: true });
+  // A marca manual é prova de uma partida só; a sessão que este ponto fecha
+  // decide (INFERIDA para uma partida, MISTA para várias — §3.2).
+  const sessao = await fecharSessao(parsed.data.snapshotId);
+  return NextResponse.json({ ok: true, modo: sessao?.modo ?? null, confianca: sessao?.modoConfianca ?? null });
 }

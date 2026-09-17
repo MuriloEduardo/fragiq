@@ -45,17 +45,35 @@ export const carregarFonte = cache(async (userId: string, appId: number): Promis
   });
   if (!userGame) return null;
 
-  const partidasOficiais = appId === 730 ? await partidasOficiaisDe(userId) : [];
+  const [partidasOficiais, sessoes] = await Promise.all([
+    appId === 730 ? partidasOficiaisDe(userId) : Promise.resolve([]),
+    // A sessão materializada manda sobre a marca da coleta: é ela que tem
+    // a prova. Uma coleta sem sessão (a primeira, ou sem rounds) fica sem
+    // modo, como sempre foi.
+    prisma.session.findMany({
+      where: { userId, gameAppId: appId },
+      select: { ateSnapshotId: true, modo: true, modoConfianca: true, mapa: true, placar: true },
+    }),
+  ]);
+  const sessaoDe = new Map(sessoes.map((x) => [x.ateSnapshotId, x]));
 
-  const rows: SnapshotRow[] = userGame.snapshots.map((s) => ({
-    id: s.id,
-    capturedAt: s.capturedAt,
-    playtimeForeverMin: s.playtimeForeverMin,
-    metrics: coerce(s.metrics),
-    matchMap: s.matchMap,
-    matchMode: s.matchMode,
-    matchScore: s.matchScore,
-  }));
+  const rows: SnapshotRow[] = userGame.snapshots.map((s) => {
+    const sessao = sessaoDe.get(s.id);
+    if (!sessao) {
+      return { id: s.id, capturedAt: s.capturedAt, playtimeForeverMin: s.playtimeForeverMin, metrics: coerce(s.metrics), matchMap: null, matchMode: null, matchScore: null, modoConfianca: null };
+    }
+    const provado = sessao.modoConfianca !== "MISTA";
+    return {
+      id: s.id,
+      capturedAt: s.capturedAt,
+      playtimeForeverMin: s.playtimeForeverMin,
+      metrics: coerce(s.metrics),
+      matchMap: sessao.mapa,
+      matchMode: provado ? sessao.modo : null,
+      matchScore: sessao.placar,
+      modoConfianca: sessao.modoConfianca,
+    };
+  });
 
   return {
     appId,

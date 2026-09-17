@@ -3,6 +3,7 @@ import { garantirAnaliseDaSessao } from "@/lib/analises";
 import { descobrirPartidas } from "@/lib/partidas";
 import { avisarPartidasSePreciso } from "@/lib/pendencias";
 import { prisma } from "../prisma";
+import { fecharSessao } from "../sessao/materializar";
 import {
   getGameStatSchema,
   getOwnedGames,
@@ -367,7 +368,7 @@ async function captureSnapshot(
     return "unchanged";
   }
 
-  await prisma.statSnapshot.create({
+  const criado = await prisma.statSnapshot.create({
     data: {
       userGameId: userGame.id,
       playtimeForeverMin: game.playtime_forever,
@@ -384,6 +385,12 @@ async function captureSnapshot(
       traceId: proveniencia.traceId,
     },
   });
+
+  // A sessão fecha aqui, uma vez, com a regra vigente — não na leitura.
+  // Falhar em fechar não pode perder o ponto: o recompute refaz.
+  if (game.appid === CS2_APPID) {
+    await fecharSessao(criado.id).catch((e) => console.error("[sync] sessão não fechou:", e instanceof Error ? e.message : e));
+  }
 
   return "created";
 }

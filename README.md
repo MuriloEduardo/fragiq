@@ -23,6 +23,7 @@ Para avaliar a interface sem o cogniflow (e portanto sem Steam):
 
 ```bash
 npm run seed                  # 90 dias de histórico fictício de CS2
+npm run recompute:sessions    # refaz as sessões materializadas (após mudar a regra de modo)
 ```
 
 e acesse `/api/auth/dev-login` (só existe fora de produção; aceita
