@@ -90,11 +90,11 @@ export function NavJogo({ appId, abas, cobertura, doCookie }: { appId: number; a
       </div>
 
       {cobertura.total > 0 && semModo > 0 && (
-        <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
+        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs leading-relaxed text-ink-faint">
           <span className="num">
             {cobertura.comModo} de {cobertura.total} {cobertura.total === 1 ? "sessão" : "sessões"} com modo
           </span>
-          <span aria-hidden>·</span>
+          <span aria-hidden className="text-ink-faint/60">·</span>
           <Link href={`${base}#bot`} className="text-accent hover:underline">
             Adicionar o bot
           </Link>
