@@ -1,13 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { carregarFonte } from "@/lib/fonte";
-import { cogniflow } from "@/lib/env";
-import { listarAnalises, sessaoSemAnalise } from "@/lib/analises";
 import { lerSerie } from "@/lib/leituras";
 import { normaisDoHero, ultimaSessao } from "@/lib/sessoes";
 import { CS2_PANEL } from "@/lib/cs2-panel";
 import { SessaoHero } from "@/components/sessao-hero";
-import { Analista } from "@/components/analista";
 import { StatPanel } from "@/components/stat-panel";
 import { PorModo } from "@/components/por-modo";
 import { PrimeirosPassos } from "@/components/primeiros-passos";
@@ -28,10 +25,12 @@ export const dynamic = "force-dynamic";
  * Resumo: "como foi, e o que fazer na próxima" em uma dobra e meia.
  *
  * Ordem de leitura: o que falta (só enquanto faltar) → a última sessão em
- * três números → a análise (manchete e ação, sem repetir os números) →
- * seis cartões → os modos lado a lado. A lente vale para tudo: a última
+ * três números → os insights (uma linha e um desenho cada, lidos do banco)
+ * → seis cartões → os modos lado a lado. A lente vale para tudo: a última
  * sessão é a última DAQUELE modo, e o normal é o do modo quando há base.
- * As leituras de K/D e headshot saíram daqui: eram o hero em prosa.
+ * A análise em prosa saiu daqui em 17/09 (docs/dados-confiaveis.md §3.5):
+ * vive em /analista, para quem quiser perguntar; a tela principal não tem
+ * texto de mais de uma linha.
  */
 export default async function ResumoPage({ params, searchParams }: { params: Promise<{ appId: string }>; searchParams: SearchParams }) {
   const session = await requireSession();
@@ -56,10 +55,6 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
   const notas = lerSerie(rows, filtroDoModo(modo)).filter((l) => l.id === "amostra" || l.id === "mapas");
   const [daSessao, doModo] =
     appId === 730 ? await Promise.all([insightsDaUltimaSessao(session.userId, lente), insightsDoModo(session.userId, lente)]) : [null, []];
-  const analista =
-    (await cogniflow()) && rows.length >= 2
-      ? await Promise.all([listarAnalises(session.userId, appId, { modo, rows }), sessaoSemAnalise(session.userId, appId)])
-      : null;
 
   return (
     <>
@@ -96,11 +91,6 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
         </Secao>
       )}
 
-      {analista && (
-        <Secao titulo="Análise" href={`/games/${appId}/analista`} acao="histórico">
-          <Analista appId={appId} iniciais={analista[0]} sessaoSemAnalise={analista[1] && modo === TUDO} apresentacao="resumo" modo={modo} />
-        </Secao>
-      )}
 
       {appId === 730 && (
         <Secao titulo="Estatísticas" href={`/games/${appId}/estatisticas`} acao="todas">

@@ -44,6 +44,12 @@ export async function enfileirarAnaliseNoSteam(analysisId: string): Promise<bool
 }
 
 /** As três linhas, ou null se a sessão não existe mais na série. */
+/**
+ * A mensagem da sessão: a manchete (placar, quando o GC deu a partida), a
+ * classificação e os dois insights de maior desvio — as mesmas linhas da
+ * tela, lidas de `insights`, nunca prosa do modelo (docs/dados-confiaveis.md
+ * §3.5). Sem insight materializado ainda, cai nos desvios calculados.
+ */
 export async function montarTextoDaSessao(userId: string, steamId: string, appId: number, snapshotId: string): Promise<string | null> {
   const fonte = await carregarFonte(userId, appId);
   if (!fonte) return null;
@@ -55,9 +61,21 @@ export async function montarTextoDaSessao(userId: string, steamId: string, appId
   );
   const primeira = (await prisma.steamMessage.count({ where: { userId } })) === 0;
 
+  const materializada = await prisma.session.findUnique({ where: { ateSnapshotId: snapshotId }, select: { id: true } });
+  const insights = materializada
+    ? await prisma.insight.findMany({ where: { escopo: "SESSAO", escopoId: materializada.id }, select: { regra: true, linha: true, delta: true } })
+    : [];
+  const selo = insights.find((i) => i.regra === "sessao.classificacao")?.linha;
+  const chips = insights
+    .filter((i) => i.regra !== "sessao.classificacao" && i.delta !== null)
+    .sort((a, b) => Math.abs(b.delta!) - Math.abs(a.delta!))
+    .slice(0, 2)
+    .map((i) => i.linha);
+  const leitura = chips.length ? chips.join(" · ") : desvios(sessao, valoresDoNormal(fonte.rows, { modo: sessao.modoId }, sessao.snapshotId));
+
   return [
-    `FragIQ · ${manchete(sessao, partidas)}`,
-    desvios(sessao, valoresDoNormal(fonte.rows, { modo: sessao.modoId }, sessao.snapshotId)),
+    `FragIQ · ${manchete(sessao, partidas)}${selo ? ` · ${selo}` : ""}`,
+    leitura,
     `Leitura completa: ${appUrl()}/cs2${primeira ? ` · para não receber mais: ${appUrl()}/seguranca` : ""}`,
   ]
     .filter(Boolean)
