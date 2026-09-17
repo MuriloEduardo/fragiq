@@ -52,6 +52,15 @@ morto e "deslogado" é processo vivo esperando a Steam. Antes disso, um
 deixava o bot vivo, mudo e sem ninguém saber por quê — foi o que aconteceu
 de 15/09 a 16/09/2026.
 
+## Preços do Mercado
+
+`src/precos.ts`: a Steam responde 429 ao `priceoverview` para o IP da
+plataforma (ECS) e 200 para este host, então quem lê o Mercado é o bot. O
+site entrega a fila de nomes vencidos em `GET /api/bot/precos` (≤ 10 por
+rodada, 24 h de validade; 7 dias para item fora do mercado), o bot lê um
+por vez com 4 s de espaço e devolve em `POST /api/bot/precos`. Um 429
+encerra a rodada e dobra a espera até a próxima (máx. 30 min).
+
 ## O log vai para o painel
 
 `src/logs.ts` captura tudo o que passa por `console.*`, enfileira e envia

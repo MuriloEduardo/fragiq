@@ -6,6 +6,7 @@ import { gravarRefreshToken, lerSegredos, secretId } from "./segredos.js";
 import { ligarPartidas } from "./partidas.js";
 import { supervisionarConexao } from "./conexao.js";
 import { despedirLogs, ligarLogs, logar } from "./logs.js";
+import { ligarPrecos } from "./precos.js";
 
 // Antes de qualquer outra linha: tudo o que o bot disser a partir daqui vai
 // também para o painel do site.
@@ -363,6 +364,7 @@ async function entregar(m: Mensagem) {
 
 const filaTimer = setInterval(() => void entregarFila(), config.outboxPollMs);
 const partidas = ligarPartidas(client);
+const precos = ligarPrecos(() => Boolean(client.steamID));
 
 /* ------------------------------- encerramento ------------------------------ */
 
@@ -372,6 +374,7 @@ for (const sinal of ["SIGINT", "SIGTERM"] as const) {
     clearInterval(tickTimer);
     clearInterval(filaTimer);
     clearInterval(partidas.timer);
+    precos.parar();
     conexao.encerrar();
     client.logOff();
     void despedirLogs().finally(() => process.exit(0));

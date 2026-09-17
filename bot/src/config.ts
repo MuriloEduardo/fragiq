@@ -53,6 +53,10 @@ export const config = {
   logsUrl:
     ler("FRAGIQ_LOGS_URL") ??
     obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/logs"),
+  /** A fila de preços do Mercado que o site quer lidos (docs em precos.ts). */
+  precosUrl:
+    ler("FRAGIQ_PRECOS_URL") ??
+    obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/precos"),
   /** Para onde vai a lista de amigos do bot. */
   amigosUrl:
     ler("FRAGIQ_AMIGOS_URL") ??
