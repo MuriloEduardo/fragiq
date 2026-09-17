@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { getInventory, SteamApiError } from "./steam/api";
 import { registrar, reportarErro } from "./eventos";
+import { precosDe } from "./precos";
 
 /**
  * O inventário de CS2 de um jogador, como fato com história.
@@ -110,6 +111,9 @@ export function posicaoDaRaridade(key: string | null): number {
 export type ItemDoInventario = {
   id: string;
   name: string;
+  marketHashName: string | null;
+  /** Menor anúncio no Mercado, em centavos de BRL; null = sem preço conhecido. */
+  precoCents: number | null;
   imageUrl: string | null;
   rarity: string | null;
   rarityKey: string | null;
@@ -123,19 +127,65 @@ export type ItemDoInventario = {
   primeiraVezEm: Date;
 };
 
-/** Os itens atuais, do mais raro ao comum, e o resumo por categoria. */
-export async function listarInventario(userId: string): Promise<{ itens: ItemDoInventario[]; porCategoria: { categoria: string; n: number }[]; lidoEm: Date | null; publico: boolean | null; sairam30d: number }> {
-  const [user, linhas, sairam30d] = await Promise.all([
+export type Mudanca = { id: string; name: string; imageUrl: string | null; rarityColor: string | null; quando: Date; tipo: "entrou" | "saiu" };
+
+export type Inventario = {
+  itens: ItemDoInventario[];
+  porCategoria: { categoria: string; n: number }[];
+  porRaridade: { raridade: string; cor: string | null; n: number }[];
+  /** Soma dos menores anúncios dos itens com preço, e quantos têm. */
+  valorCents: number;
+  comPreco: number;
+  lidoEm: Date | null;
+  publico: boolean | null;
+  sairam30d: number;
+  mudancas: Mudanca[];
+};
+
+/** Os itens atuais, do mais raro ao comum, com preço quando conhecido, resumos e a linha do tempo de 30 dias. */
+export async function listarInventario(userId: string): Promise<Inventario> {
+  const ha30d = new Date(Date.now() - 30 * 86_400_000);
+  const [user, linhas, saidos] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { inventarioLidoEm: true, inventarioPublico: true } }),
     prisma.inventoryItem.findMany({
       where: { userId, saiuEm: null },
-      select: { id: true, name: true, imageUrl: true, rarity: true, rarityKey: true, rarityColor: true, exterior: true, weapon: true, category: true, stattrak: true, souvenir: true, tradable: true, primeiraVezEm: true },
+      select: { id: true, name: true, marketHashName: true, imageUrl: true, rarity: true, rarityKey: true, rarityColor: true, exterior: true, weapon: true, category: true, stattrak: true, souvenir: true, tradable: true, primeiraVezEm: true },
     }),
-    prisma.inventoryItem.count({ where: { userId, saiuEm: { gt: new Date(Date.now() - 30 * 86_400_000) } } }),
+    prisma.inventoryItem.findMany({ where: { userId, saiuEm: { gt: ha30d } }, select: { id: true, name: true, imageUrl: true, rarityColor: true, saiuEm: true } }),
   ]);
-  const itens = linhas.sort((a, b) => posicaoDaRaridade(a.rarityKey) - posicaoDaRaridade(b.rarityKey) || a.name.localeCompare(b.name));
+  const precos = await precosDe(linhas.map((l) => l.marketHashName));
+  const itens: ItemDoInventario[] = linhas
+    .map((l) => ({ ...l, precoCents: precos.get(l.marketHashName ?? "")?.menorCents ?? null }))
+    .sort((a, b) => posicaoDaRaridade(a.rarityKey) - posicaoDaRaridade(b.rarityKey) || (b.precoCents ?? -1) - (a.precoCents ?? -1) || a.name.localeCompare(b.name));
+
   const contagem = new Map<string, number>();
   for (const i of itens) contagem.set(i.category ?? "Outros", (contagem.get(i.category ?? "Outros") ?? 0) + 1);
   const porCategoria = [...contagem.entries()].map(([categoria, n]) => ({ categoria, n })).sort((a, b) => b.n - a.n);
-  return { itens, porCategoria, lidoEm: user?.inventarioLidoEm ?? null, publico: user?.inventarioPublico ?? null, sairam30d };
+  const rar = new Map<string, { cor: string | null; n: number; pos: number }>();
+  for (const i of itens) {
+    const k = i.rarity ?? "Sem raridade";
+    const atual = rar.get(k) ?? { cor: i.rarityColor, n: 0, pos: posicaoDaRaridade(i.rarityKey) };
+    rar.set(k, { ...atual, n: atual.n + 1 });
+  }
+  const porRaridade = [...rar.entries()]
+    .sort((a, b) => a[1].pos - b[1].pos)
+    .map(([raridade, v]) => ({ raridade, cor: v.cor, n: v.n }));
+
+  const comPreco = itens.filter((i) => i.precoCents !== null);
+  const mudancas: Mudanca[] = [
+    ...linhas.filter((l) => l.primeiraVezEm > ha30d).map((l) => ({ id: l.id, name: l.name, imageUrl: l.imageUrl, rarityColor: l.rarityColor, quando: l.primeiraVezEm, tipo: "entrou" as const })),
+    ...saidos.map((l) => ({ id: l.id, name: l.name, imageUrl: l.imageUrl, rarityColor: l.rarityColor, quando: l.saiuEm as Date, tipo: "saiu" as const })),
+  ].sort((a, b) => b.quando.getTime() - a.quando.getTime());
+
+  return {
+    itens,
+    porCategoria,
+    porRaridade,
+    valorCents: comPreco.reduce((a, i) => a + (i.precoCents ?? 0), 0),
+    comPreco: comPreco.length,
+    lidoEm: user?.inventarioLidoEm ?? null,
+    publico: user?.inventarioPublico ?? null,
+    sairam30d: saidos.length,
+    mudancas,
+  };
 }

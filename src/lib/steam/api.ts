@@ -213,3 +213,10 @@ export type InventoryItemRead = {
 export async function getInventory(steamId: string): Promise<{ public: boolean; total: number; items: InventoryItemRead[] }> {
   return capability("steam.inventory.read", { steam_id: steamId, app_id: 730 });
 }
+
+export type MarketPrice = { listed: boolean; lowest_cents: number | null; median_cents: number | null; volume: number | null; currency: number };
+
+/** O preço de um item no Mercado da Comunidade, em BRL (moeda 7). */
+export async function getMarketPrice(marketHashName: string): Promise<MarketPrice> {
+  return capability("steam.market.price", { market_hash_name: marketHashName, app_id: 730, currency: 7 });
+}

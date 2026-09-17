@@ -738,6 +738,23 @@ model InventoryItem {
   @@map("inventory_items")
 }
 
+/// O preço de um item no Mercado da Comunidade, por `market_hash_name`
+/// (um só para todos os jogadores que o têm), em centavos de BRL, com a
+/// data. `listado = false` quando o mercado não o vende. Renovado pelo
+/// tick do bot, um item por vez, o mais velho primeiro.
+model ItemPrice {
+  marketHashName String   @id
+  listado        Boolean  @default(true)
+  menorCents     Int?
+  medianaCents   Int?
+  volume         Int?
+  moeda          String   @default("BRL")
+  atualizadoEm   DateTime @default(now())
+
+  @@index([atualizadoEm])
+  @@map("item_prices")
+}
+
 /// O que o bot de presença viu, antes de qualquer coleta.
 ///
 /// A captura pendente some quando vira ponto; a observação fica. É o único

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { ItemDoInventario } from "@/lib/inventario";
+import { formatarBRL } from "@/lib/precos";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,7 +29,10 @@ export function InventarioGrade({ itens, limite }: { itens: ItemDoInventario[]; 
             </div>
           </div>
           <div className="space-y-0.5 p-2.5">
-            <p className="truncate text-sm font-medium">{i.name}</p>
+            <p className="flex items-baseline justify-between gap-2">
+              <span className="truncate text-sm font-medium">{i.name}</span>
+              {i.precoCents !== null && <span className="num shrink-0 text-xs text-ink-muted">{formatarBRL(i.precoCents)}</span>}
+            </p>
             <p className={cn("truncate text-xs text-ink-muted")} style={{ color: i.rarityColor ?? undefined }}>
               {[i.exterior, i.rarity].filter(Boolean).join(" · ") || i.category || "—"}
             </p>

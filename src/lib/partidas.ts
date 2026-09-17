@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { prisma } from "./prisma";
 import { decodificarGameType } from "./game-type";
+import { fecharSessao } from "./sessao/materializar";
 import { authSecret } from "./env";
 import { decodificarShareCode, normalizarShareCode, shareCodeValido } from "./sharecode";
 import { getPlayerSummaries } from "./steam/api";
@@ -286,7 +287,21 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
     prisma.matchPlayer.deleteMany({ where: { matchId } }),
     prisma.matchPlayer.createMany({ data: jogadores.map((j) => ({ ...j, matchId })) }),
   ]);
-  return [...userPorSteam.values()];
+  // A partida chegou depois de a sessão fechar (o GC responde minutos ou
+  // horas depois): a sessão que a contém é refeita, porque agora existe
+  // prova de modo onde antes havia MISTA.
+  const fim = new Date(jogadaEm.getTime() + p.duracaoS * 1000);
+  const usuarios2 = [...userPorSteam.values()];
+  if (usuarios2.length) {
+    const sessoes = await prisma.session.findMany({
+      where: { userId: { in: usuarios2 }, de: { lt: fim }, ate: { gte: new Date(fim.getTime() - 10 * 60_000) } },
+      select: { ateSnapshotId: true },
+    });
+    for (const sessao of sessoes) {
+      await fecharSessao(sessao.ateSnapshotId).catch((e) => console.error("[partidas] sessão não refez:", e instanceof Error ? e.message : e));
+    }
+  }
+  return usuarios2;
 }
 
 /**

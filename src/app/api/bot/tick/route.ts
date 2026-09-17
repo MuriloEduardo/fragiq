@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { segredoOpcional } from "@/lib/segredos";
 import { processarCapturasDevidas } from "@/lib/capturas";
+import { atualizarUmPreco } from "@/lib/precos";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -58,5 +59,7 @@ export async function POST(request: NextRequest) {
     };
     await prisma.botStatus.upsert({ where: { id: "bot" }, create: { id: "bot", ...dados }, update: dados });
   }
-  return NextResponse.json(await processarCapturasDevidas());
+  // O mesmo relógio renova um preço do Mercado por tick (docs em precos.ts).
+  const [capturas] = await Promise.all([processarCapturasDevidas(), atualizarUmPreco().catch(() => null)]);
+  return NextResponse.json(capturas);
 }
