@@ -74,3 +74,18 @@ const ARMAS: Record<string, string> = {
 export function rotularArma(arma: string) {
   return ARMAS[arma] ?? arma.toUpperCase();
 }
+
+/**
+ * Quais armas aparecem num conjunto de contadores da Steam.
+ *
+ * Uma arma é o que tem `total_shots_<arma>` — `total_shots_fired` e
+ * `total_shots_hit` são globais, e o segundo ainda está quebrado na Valve
+ * (README, "Uma armadilha da Valve"). Faca e granada matam sem disparar,
+ * então ficam de fora por construção: sem par tiros/acertos não há
+ * precisão para comparar.
+ */
+export function armasNasMetricas(metrics: Record<string, number>): string[] {
+  return Object.keys(metrics)
+    .filter((k) => k.startsWith("total_shots_") && k !== "total_shots_fired" && k !== "total_shots_hit")
+    .map((k) => k.replace("total_shots_", ""));
+}

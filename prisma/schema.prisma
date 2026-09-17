@@ -601,6 +601,11 @@ model Session {
   dano      Int?
   mvps      Int?
 
+  /// Deltas por arma no intervalo: `{ "ak47": { "kills": 12, "tiros": 340, "acertos": 90 } }`.
+  /// Só as armas que se moveram. Os contadores por arma da Steam somam todos
+  /// os modos; é o intervalo desta sessão que os torna atribuíveis a um modo.
+  armas Json?
+
   modo          String?
   modoConfianca ModoConfianca
   mapa          String?

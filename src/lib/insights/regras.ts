@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { calcularDelta, type Delta } from "../delta";
-import { rotularMapa, rotularModo } from "../cs2-labels";
-import { formatarNumero, formatarPp } from "../formato";
+import { rotularArma, rotularMapa, rotularModo } from "../cs2-labels";
+import type { ArmaNaSessao } from "../sessao/montar";
+import { formatarNumero, formatarPct, formatarPp } from "../formato";
 import { NORMAL_MIN_ROUNDS, NORMAL_MIN_SESSOES, type Normal } from "../series";
 
 /**
@@ -35,6 +36,8 @@ export type SessaoFato = {
   modo: string | null;
   confianca: Confianca;
   mapa: string | null;
+  /** Deltas por arma do intervalo. Vazio nas sessões anteriores à Fase 3c. */
+  armas: Record<string, ArmaNaSessao>;
   /** Totais da Steam no fechamento: a base do vitalício "na hora". */
   vitalicio: { kills: number; deaths: number; headshots: number; dano: number; rounds: number } | null;
 };
@@ -336,6 +339,79 @@ export function consistencia(sessoes: SessaoFato[], modo: string | null): Insigh
   };
 }
 
+/**
+ * `arma.destaque` — a arma cuja fatia dos abates mais se afastou do normal.
+ *
+ * A fatia (abates com a arma ÷ abates da sessão) é a única leitura por arma
+ * que sobrevive à mistura de modos do contador da Steam: ela não depende do
+ * vitalício, só do que se moveu entre duas coletas, e a sessão já diz com
+ * prova qual foi o modo. Comparar a janela recente com o que veio antes dela
+ * responde "o que mudou no seu arsenal", não "o que você mais usa" — que a
+ * pessoa já sabe. Sem direção boa ou ruim: usar mais AWP não é melhor nem
+ * pior, então o tom é NEUTRO (docs/dados-confiaveis.md §4.5).
+ *
+ * Sessões sem `armas` registrada ficam de fora inteiras: entrar só no
+ * denominador encolheria a fatia de todas as armas por um dado que não
+ * existe. Depois de `recompute:sessions` não sobra nenhuma.
+ */
+const MIN_KILLS_ARMA = 15;
+const MIN_KILLS_BASE = 60;
+
+function fatia(sessoes: SessaoFato[], arma: string): { fatia: number; kills: number; total: number } | null {
+  const total = sessoes.reduce((a, s) => a + (s.kills ?? 0), 0);
+  if (!total) return null;
+  const kills = sessoes.reduce((a, s) => a + (s.armas[arma]?.kills ?? 0), 0);
+  return { fatia: (kills / total) * 100, kills, total };
+}
+
+export function armaDestaque(sessoes: SessaoFato[], modo: string | null): InsightCalculado {
+  const comArmas = sessoesDaLente(sessoes, modo)
+    .filter((s) => Object.keys(s.armas).length > 0)
+    .sort((a, b) => a.ate.getTime() - b.ate.getTime());
+  const janela = comArmas.slice(-JANELA);
+  const antes = comArmas.slice(0, -JANELA);
+  const nomes = [...new Set(janela.flatMap((s) => Object.keys(s.armas)))];
+  const temBase = antes.reduce((a, s) => a + (s.kills ?? 0), 0) >= MIN_KILLS_BASE;
+
+  const linhas = (temBase ? nomes : [])
+    .map((arma) => ({ arma, rotulo: rotularArma(arma), atual: fatia(janela, arma), normal: fatia(antes, arma) }))
+    .filter((l) => l.atual !== null && l.normal !== null && l.atual.kills >= MIN_KILLS_ARMA)
+    .map((l) => ({ ...l, delta: l.atual!.fatia - l.normal!.fatia }))
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  const top = linhas[0];
+  const rounds = janela.reduce((a, s) => a + s.rounds, 0);
+  const linha = !top
+    ? nomes.length === 0
+      ? "Por arma — sem sessões com contador de arma ainda"
+      : `Por arma — faltam abates para comparar (${MIN_KILLS_ARMA} com uma arma, ${MIN_KILLS_BASE} de base)`
+    : `${top.rotulo} ${formatarPct(top.atual!.fatia)} dos abates · normal ${formatarPct(top.normal!.fatia)} (${top.delta > 0 ? "+" : "−"}${formatarPp(top.delta)})`;
+
+  return {
+    regra: "arma.destaque",
+    regraVersao: VERSAO_MODO,
+    valor: top?.atual?.fatia ?? null,
+    referencia: top?.normal?.fatia ?? null,
+    referenciaTipo: top ? "modo" : null,
+    delta: top?.delta ?? null,
+    deltaUnidade: top ? "pp" : null,
+    tom: top ? "NEUTRO" : "AVISO",
+    confianca: modo ? "INFERIDA" : null,
+    base: { rounds, sessoes: janela.length },
+    visual: "BARRA",
+    dados: {
+      atual: top?.atual?.fatia ?? null,
+      referencia: top?.normal?.fatia ?? null,
+      rotulos: ["janela", "normal"],
+      arma: top?.arma ?? null,
+      kills: top?.atual?.kills ?? null,
+      linhas: linhas.slice(0, 6).map((l) => ({ rotulo: l.rotulo, delta: l.delta })),
+      janela: JANELA,
+    },
+    linha,
+  };
+}
+
 /** `cobertura.modo` — quantos rounds do período têm modo provado; o anel. */
 export function coberturaDeModo(sessoes: SessaoFato[]): InsightCalculado {
   const total = sessoes.reduce((a, s) => a + s.rounds, 0);
@@ -360,7 +436,7 @@ export function coberturaDeModo(sessoes: SessaoFato[]): InsightCalculado {
 }
 
 export function insightsDoModo(sessoes: SessaoFato[], modo: string | null): InsightCalculado[] {
-  const lista = [tendenciaKd(sessoes, modo), formaVsVitalicio(sessoes, modo), rankingDeMapas(sessoes, modo), consistencia(sessoes, modo)];
+  const lista = [tendenciaKd(sessoes, modo), formaVsVitalicio(sessoes, modo), rankingDeMapas(sessoes, modo), armaDestaque(sessoes, modo), consistencia(sessoes, modo)];
   if (modo === null) lista.push(coberturaDeModo(sessoes));
   return lista;
 }
@@ -368,5 +444,5 @@ export function insightsDoModo(sessoes: SessaoFato[], modo: string | null): Insi
 /** As regras em vigor, com a versão de cada uma — o que o painel de dados confere contra o banco. */
 export const REGRAS_EM_VIGOR: { regra: string; versao: number; escopo: "SESSAO" | "MODO" }[] = [
   ...["kd.vs.normal", "adr.vs.normal", "hs.vs.normal", "sessao.classificacao"].map((regra) => ({ regra, versao: VERSAO_SESSAO, escopo: "SESSAO" as const })),
-  ...["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "consistencia", "cobertura.modo"].map((regra) => ({ regra, versao: VERSAO_MODO, escopo: "MODO" as const })),
+  ...["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "arma.destaque", "consistencia", "cobertura.modo"].map((regra) => ({ regra, versao: VERSAO_MODO, escopo: "MODO" as const })),
 ];

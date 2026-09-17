@@ -133,6 +133,13 @@ competitivo), e os contadores por mapa estão **congelados em mapas legados** �
 Mirage, Ancient, Anubis e Overpass não são rastreados. Detalhes em
 [docs/dados-profundos.md](docs/dados-profundos.md).
 
+A primeira ressalva tem saída, e é a razão de a sessão existir
+materializada: o vitalício por arma mistura modos para sempre, mas o que o
+contador andou **entre duas coletas** pertence ao que foi jogado nesse
+intervalo. `Session.armas` guarda esse delta (kills/tiros/acertos por arma)
+e a sessão já sabe, com prova, qual foi o modo — então `arma.destaque` é um
+número por arma de um modo só.
+
 ### Nem todo contador é cumulativo
 
 Tratar todos como cumulativos gera gráficos silenciosamente errados, então

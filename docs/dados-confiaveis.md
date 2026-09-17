@@ -74,8 +74,18 @@ Uma linha por par de snapshots com rounds > 0, criada **no momento em que
 o segundo snapshot é gravado** (não na leitura). Campos: `userId`,
 `appId`, `deSnapshotId`, `ateSnapshotId`, `de`, `ate`, os deltas dos
 contadores que o painel usa (rounds, kills, deaths, hs, dano, mvps,
-partidas, vitórias, tempo em partida), `modo`, `modoConfianca`, `mapa`,
-`placar`, `matchIds[]`, `regraVersao`.
+partidas, vitórias, tempo em partida), `armas`, `modo`, `modoConfianca`,
+`mapa`, `placar`, `matchIds[]`, `regraVersao`.
+
+`armas` (Json, desde 17/09) é o delta por arma do intervalo —
+`{ "ak47": { "kills": 14, "tiros": 180, "acertos": 40 } }`, só as que se
+moveram. É o que torna um número por arma atribuível a um modo: o
+contador por arma da Steam soma todos os modos para sempre, mas o que se
+moveu entre duas coletas pertence ao que foi jogado nesse intervalo — e a
+sessão já diz, com prova, qual foi o modo. Arma é o que tem
+`total_shots_<arma>` (`armasNasMetricas` em `cs2-labels.ts`): faca e
+granada matam sem disparar e ficam de fora, porque sem par tiros/acertos
+não há precisão para comparar.
 
 **Regra de atribuição de modo** (a peça central; testada em
 `tests/lib/sessao.test.ts`):
@@ -123,7 +133,7 @@ Catálogo inicial de regras (todas determinísticas, todas de uma linha):
 | `tendencia.kd.5` | período | sparkline | `K/D nas últimas 5: subindo` |
 | `forma.vs.vitalicio` | modo | barra dupla | `Forma atual 1,21 · vitalício 1,08` |
 | `mapa.melhor` / `mapa.pior` | modo | rank | `Mirage +14 % · Inferno −9 %` (só EXATA/INFERIDA, mín. rounds) |
-| `arma.destaque` | período | barra | `AK-47: 38 % dos abates (normal 31 %)` |
+| `arma.destaque` | modo | barra | `AK-47 38% dos abates · normal 31% (+7 pp)` |
 | `consistencia` | modo | faixa | `Variação de K/D entre sessões: baixa` |
 | `cobertura.modo` | período | anel | `72 % dos rounds com modo conhecido` |
 
@@ -132,10 +142,20 @@ teste em `tests/lib/insights.test.ts`); `materializar.ts` grava ao fechar a
 sessão e no `recompute:insights`; `ler.ts` é o que a tela consulta;
 `components/insight.tsx` desenha pelo `visual`. `entradasHash` = sha256
 das entradas serializadas. Implementadas em 17/09: os 4 de sessão
-(`kd|adr|hs.vs.normal`, `sessao.classificacao`) e 5 de modo
-(`tendencia.kd.5`, `forma.vs.vitalicio`, `mapa.ranking`, `consistencia`,
-`cobertura.modo`); `arma.destaque` fica para quando as sessões guardarem
-deltas por arma.
+(`kd|adr|hs.vs.normal`, `sessao.classificacao`) e 6 de modo
+(`tendencia.kd.5`, `forma.vs.vitalicio`, `mapa.ranking`, `arma.destaque`,
+`consistencia`, `cobertura.modo`).
+
+`arma.destaque` compara a **fatia dos abates** de cada arma nas últimas 5
+sessões da lente com a fatia nas sessões anteriores a essa janela (mín. 15
+abates com a arma na janela, 60 abates de base), e mostra a que mais se
+afastou. A fatia é a única leitura por arma que não depende do vitalício
+misturado: ela sai só dos deltas de `Session.armas`. A pergunta é "o que
+mudou no seu arsenal", não "o que você mais usa" — que a pessoa já sabe.
+Sem direção boa ou ruim (§4.5): usar mais AWP não é melhor nem pior, o tom
+é NEUTRO. Sessão sem `armas` registrada fica de fora inteira — entrar só
+no denominador encolheria a fatia de todas as armas por um dado que não
+existe.
 
 ### 3.4 Camada 3 — operação, auditoria, tracing
 

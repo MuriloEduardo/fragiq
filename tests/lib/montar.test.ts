@@ -35,6 +35,23 @@ describe("montarSessao — deltas do par e modo com prova", () => {
     expect(s).toMatchObject({ rounds: 70, partidas: 3, modo: null, modoConfianca: "MISTA", mapa: null, placar: null });
   });
 
+  it("guarda os deltas das armas que se moveram, e só delas", () => {
+    const comArmas = { ...base, total_shots_ak47: 4000, total_hits_ak47: 900, total_kills_ak47: 300, total_shots_awp: 500, total_hits_awp: 200, total_kills_awp: 150, total_shots_fired: 9000, total_shots_hit: 600 };
+    const prev = ponto("a", 0, comArmas);
+    const curr = ponto("b", 45, { ...comArmas, total_rounds_played: 1022, total_kills: 5020, total_shots_ak47: 4180, total_hits_ak47: 940, total_kills_ak47: 314 });
+    const s = montarSessao(prev, curr, []);
+    // A AWP não saiu da mochila; `total_shots_fired`/`_hit` são globais.
+    expect(s!.armas).toEqual({ ak47: { kills: 14, tiros: 180, acertos: 40 } });
+  });
+
+  it("arma sem contador no par não vira zero nem quebra a sessão", () => {
+    const prev = ponto("a", 0, { ...base, total_shots_ak47: 4000 });
+    const curr = ponto("b", 45, { ...base, total_rounds_played: 1022, total_shots_ak47: 4180, total_kills_ak47: 10 });
+    const s = montarSessao(prev, curr, []);
+    // `total_kills_ak47` só existe na segunda coleta: sem par não há delta.
+    expect(s!.armas).toEqual({ ak47: { kills: 0, tiros: 180, acertos: 0 } });
+  });
+
   it("sem total_time_played os minutos vêm do playtime", () => {
     const { total_time_played: _t, ...semTempo } = base;
     void _t;

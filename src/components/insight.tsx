@@ -78,7 +78,9 @@ function Visual({ insight: i }: { insight: InsightLinha }) {
     case "BARRA": {
       if ("cv" in i.dados) return <Faixa valor={(i.dados.cv as number | null) ?? null} faixas={i.dados.faixas as number[]} />;
       const atual = (i.dados.atual as number | null) ?? null;
-      const ref = (i.dados.vitalicio as number | null) ?? null;
+      // A segunda barra é o que a regra usou como referência: o vitalício em
+      // `forma.vs.vitalicio`, o normal da janela anterior em `arma.destaque`.
+      const ref = ((i.dados.vitalicio ?? i.dados.referencia) as number | null) ?? null;
       return <BarraDupla atual={atual} referencia={ref} />;
     }
     case "RANK": {

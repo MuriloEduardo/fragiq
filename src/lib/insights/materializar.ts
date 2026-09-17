@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "../prisma";
 import { coerce } from "../fonte";
 import { hashEntradas, insightsDaSessao, insightsDoModo, type InsightCalculado, type SessaoFato } from "./regras";
+import type { ArmaNaSessao } from "../sessao/montar";
 
 /**
  * Materializar insights: da sessão que acabou de fechar e do jogador.
@@ -27,8 +28,14 @@ const selecaoSessao = {
   modo: true,
   modoConfianca: true,
   mapa: true,
+  armas: true,
   ateSnapshotId: true,
 } satisfies Prisma.SessionSelect;
+
+/** `Session.armas` é Json: uma sessão anterior à Fase 3c não tem nenhuma. */
+function armasDe(valor: Prisma.JsonValue | null): Record<string, ArmaNaSessao> {
+  return valor && typeof valor === "object" && !Array.isArray(valor) ? (valor as unknown as Record<string, ArmaNaSessao>) : {};
+}
 
 /** As sessões do jogador como fatos, com o vitalício da coleta que fechou cada uma. */
 async function fatosDoJogador(userId: string): Promise<SessaoFato[]> {
@@ -54,6 +61,7 @@ async function fatosDoJogador(userId: string): Promise<SessaoFato[]> {
     modo: s.modo,
     confianca: s.modoConfianca,
     mapa: s.mapa,
+    armas: armasDe(s.armas),
     vitalicio: vitalicioDe.get(s.ateSnapshotId) ?? null,
   }));
 }

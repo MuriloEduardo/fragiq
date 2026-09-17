@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classificacaoDaSessao, coberturaDeModo, formaVsVitalicio, insightsDaSessao, metricaVsNormal, normalNaHora, rankingDeMapas, tendenciaKd, type SessaoFato } from "@/lib/insights/regras";
+import { armaDestaque, classificacaoDaSessao, coberturaDeModo, formaVsVitalicio, insightsDaSessao, metricaVsNormal, normalNaHora, rankingDeMapas, tendenciaKd, type SessaoFato } from "@/lib/insights/regras";
 
 const dia = (n: number) => new Date(Date.UTC(2026, 8, 1 + n, 20));
 const sessao = (n: number, o: Partial<SessaoFato> = {}): SessaoFato => ({
@@ -14,9 +14,12 @@ const sessao = (n: number, o: Partial<SessaoFato> = {}): SessaoFato => ({
   modo: "premier",
   confianca: "EXATA",
   mapa: "de_mirage",
+  armas: {},
   vitalicio: { kills: 5000, deaths: 5000, headshots: 2000, dano: 400000, rounds: 5000 },
   ...o,
 });
+
+const arma = (kills: number) => ({ kills, tiros: kills * 12, acertos: kills * 3 });
 
 describe("normal na hora", () => {
   it("sem 5 sessões anteriores do modo cai no vitalício da coleta, rotulado como fraco", () => {
@@ -81,6 +84,32 @@ describe("insights de modo", () => {
     expect((r.dados.linhas as unknown[]).length).toBe(2);
     expect(r.linha).toMatch(/Mirage|Inferno/);
     expect(rankingDeMapas(dez.map((s) => ({ ...s, confianca: "MISTA" as const, modo: null })), null).linha).toMatch(/faltam 30 rounds/);
+  });
+  it("arma em destaque: a fatia dos abates da janela contra a das sessões anteriores", () => {
+    // Antes: 5 de 20 abates com AK (25%); agora: 8 de 20 (40%).
+    const antes = [1, 2, 3, 4, 5].map((i) => sessao(i, { kills: 20, armas: { ak47: arma(5), awp: arma(2) } }));
+    const agora = [6, 7, 8, 9, 10].map((i) => sessao(i, { kills: 20, armas: { ak47: arma(8), awp: arma(2) } }));
+    const a = armaDestaque([...antes, ...agora], "premier");
+    expect(a).toMatchObject({ regra: "arma.destaque", visual: "BARRA", tom: "NEUTRO", deltaUnidade: "pp", referenciaTipo: "modo" });
+    expect(a.valor).toBeCloseTo(40, 5);
+    expect(a.referencia).toBeCloseTo(25, 5);
+    expect(a.linha).toBe("AK-47 40% dos abates · normal 25% (+15 pp)");
+    // A AWP tem 10 abates na janela: abaixo do mínimo, fica fora do ranking.
+    expect(a.dados.linhas).toEqual([{ rotulo: "AK-47", delta: 15 }]);
+  });
+  it("sessão sem contador de arma não entra no denominador da fatia", () => {
+    const antes = [1, 2, 3, 4, 5].map((i) => sessao(i, { kills: 20, armas: { ak47: arma(5) } }));
+    const agora = [6, 7, 8, 9, 10].map((i) => sessao(i, { kills: 20, armas: { ak47: arma(8) } }));
+    // Uma sessão antiga (sem `armas`) no meio da janela não pode diluir nada.
+    const a = armaDestaque([...antes, sessao(11, { kills: 500 }), ...agora], "premier");
+    expect(a.valor).toBeCloseTo(40, 5);
+    expect(a.base.sessoes).toBe(5);
+  });
+  it("sem base anterior a regra diz o que falta, e não inventa número", () => {
+    const a = armaDestaque([sessao(1, { kills: 20, armas: { ak47: arma(16) } })], "premier");
+    expect(a).toMatchObject({ tom: "AVISO", valor: null, referencia: null, delta: null });
+    expect(a.linha).toMatch(/faltam abates para comparar/);
+    expect(armaDestaque([], null).linha).toMatch(/sem sessões com contador de arma/);
   });
   it("cobertura conta rounds provados sobre o total", () => {
     const c = coberturaDeModo([...dez.slice(0, 2), sessao(20, { modo: null, confianca: "MISTA", rounds: 48 })]);

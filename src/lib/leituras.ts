@@ -10,7 +10,7 @@ import {
   type SeriesSpec,
   type SnapshotRow,
 } from "./series";
-import { rotularModo, rotularArma, rotularMapa } from "./cs2-labels";
+import { armasNasMetricas, rotularModo, rotularArma, rotularMapa } from "./cs2-labels";
 import { calcularDelta, type Delta } from "./delta";
 import { lenteDe, nomeDaReferencia, referenciaDe, sessaoLida, valorDe } from "./referencia";
 
@@ -219,10 +219,9 @@ export function lerSerie(rows: SnapshotRow[], filter?: ContextFilter): Leitura[]
 
   /* ------------------------------ armas ----------------------------------- */
 
-  const armas = Object.keys(par.curr.metrics)
-    .filter((k) => k.startsWith("total_shots_") && k !== "total_shots_fired" && k !== "total_shots_hit")
-    .map((k) => {
-      const arma = k.replace("total_shots_", "");
+  const armas = armasNasMetricas(par.curr.metrics)
+    .map((arma) => {
+      const k = `total_shots_${arma}`;
       const tiros = deltaEntre(par, k) ?? 0;
       const spec = RATIO(`total_hits_${arma}`, k, 100);
       const periodo = ultimoValor(rows, spec, filter);

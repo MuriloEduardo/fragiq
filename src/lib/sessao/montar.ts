@@ -1,3 +1,4 @@
+import { armasNasMetricas } from "../cs2-labels";
 import { atribuirModo, type Evidencia } from "./atribuir";
 
 /**
@@ -18,6 +19,9 @@ export type PontoDaSessao = {
   traceId: string | null;
 };
 
+/** O que uma arma rendeu no intervalo. Só existe quando algo se moveu. */
+export type ArmaNaSessao = { kills: number; tiros: number; acertos: number };
+
 export type SessaoMontada = {
   de: Date;
   ate: Date;
@@ -30,6 +34,7 @@ export type SessaoMontada = {
   headshots: number | null;
   dano: number | null;
   mvps: number | null;
+  armas: Record<string, ArmaNaSessao>;
   modo: string | null;
   modoConfianca: "EXATA" | "INFERIDA" | "MISTA";
   mapa: string | null;
@@ -44,6 +49,28 @@ function delta(prev: PontoDaSessao, curr: PontoDaSessao, key: string): number | 
   if (a === undefined || b === undefined) return null;
   const d = b - a;
   return d < 0 ? null : d;
+}
+
+/**
+ * Os deltas por arma do intervalo: kills, tiros e acertos de cada arma que
+ * se moveu.
+ *
+ * Guardar isto na sessão é o que torna o número por arma atribuível a um
+ * modo: o contador por arma da Steam soma todos os modos para sempre
+ * (README), mas o que se moveu entre duas coletas pertence ao que foi
+ * jogado nesse intervalo — e a sessão já sabe, com prova, qual foi o modo.
+ * Arma parada não entra: zerar 90 armas em toda sessão é ruído no banco e
+ * na conta de quem lê.
+ */
+function armasDoIntervalo(prev: PontoDaSessao, curr: PontoDaSessao): Record<string, ArmaNaSessao> {
+  const armas: Record<string, ArmaNaSessao> = {};
+  for (const arma of armasNasMetricas(curr.metrics)) {
+    const kills = delta(prev, curr, `total_kills_${arma}`) ?? 0;
+    const tiros = delta(prev, curr, `total_shots_${arma}`) ?? 0;
+    const acertos = delta(prev, curr, `total_hits_${arma}`) ?? 0;
+    if (kills > 0 || tiros > 0 || acertos > 0) armas[arma] = { kills, tiros, acertos };
+  }
+  return armas;
 }
 
 /** Pura: os deltas do par e o modo com prova. `null` quando não houve rounds. */
@@ -71,6 +98,7 @@ export function montarSessao(prev: PontoDaSessao, curr: PontoDaSessao, evidencia
     headshots: delta(prev, curr, "total_kills_headshot"),
     dano: delta(prev, curr, "total_damage_done"),
     mvps: delta(prev, curr, "total_mvps"),
+    armas: armasDoIntervalo(prev, curr),
     modo: atribuicao.modo,
     modoConfianca: atribuicao.confianca,
     mapa: atribuicao.mapa,

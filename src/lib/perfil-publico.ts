@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { getPlayerSummary, getUserStatsForGame, resolveVanityUrl, type SteamPlayer } from "./steam/api";
-import { rotularArma, rotularMapa } from "./cs2-labels";
+import { armasNasMetricas, rotularArma, rotularMapa } from "./cs2-labels";
 
 /**
  * A página pública de um jogador: o que a Steam já mostra a qualquer um.
@@ -85,11 +85,9 @@ async function montar(steamId: string): Promise<PerfilPublico> {
   const fmt = (v: number | null, casas: number, sufixo = "") =>
     v === null ? "—" : v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas }) + sufixo;
 
-  const armas = Object.keys(m)
-    .filter((k) => k.startsWith("total_shots_") && k !== "total_shots_fired" && k !== "total_shots_hit")
-    .map((k) => {
-      const arma = k.replace("total_shots_", "");
-      const tiros = m[k] ?? 0;
+  const armas = armasNasMetricas(m)
+    .map((arma) => {
+      const tiros = m[`total_shots_${arma}`] ?? 0;
       const acertos = m[`total_hits_${arma}`] ?? 0;
       return {
         arma: rotularArma(arma),

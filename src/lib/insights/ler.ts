@@ -8,7 +8,7 @@ import type { InsightLinha } from "@/components/insight";
 const CS2_APPID = 730;
 
 const ORDEM_SESSAO = ["sessao.classificacao", "kd.vs.normal", "adr.vs.normal", "hs.vs.normal"];
-const ORDEM_MODO = ["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "consistencia", "cobertura.modo"];
+const ORDEM_MODO = ["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "arma.destaque", "consistencia", "cobertura.modo"];
 
 function paraLinha(i: {
   id: string;

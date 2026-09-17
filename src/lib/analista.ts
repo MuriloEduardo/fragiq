@@ -19,7 +19,7 @@ import { lerSerie, todasAsMetricas, type Leitura } from "./leituras";
 import { lerPartidasOficiais, lerSequencia } from "./leituras-sessoes";
 import { lenteDe, referenciaDe, serializar, sessaoLida, type ReferenciaDTO } from "./referencia";
 import { CS2_PANEL } from "./cs2-panel";
-import { rotularArma, rotularMapa, rotularModo } from "./cs2-labels";
+import { armasNasMetricas, rotularArma, rotularMapa, rotularModo } from "./cs2-labels";
 import { formatPlaytime } from "./stats";
 
 /**
@@ -435,10 +435,9 @@ function armas(fonte: Fonte, params: Params) {
   const lente = lenteDe(f);
   const sessaoId = sessaoLida(rows, f);
 
-  const lista = Object.keys(ultimo.metrics)
-    .filter((k) => k.startsWith("total_shots_") && k !== "total_shots_fired" && k !== "total_shots_hit")
-    .map((k) => {
-      const arma = k.replace("total_shots_", "");
+  const lista = armasNasMetricas(ultimo.metrics)
+    .map((arma) => {
+      const k = `total_shots_${arma}`;
       const hits = `total_hits_${arma}`;
       const kills = `total_kills_${arma}`;
       const spec: SeriesSpec = { id: arma, metric: hits, denominator: k, mode: "ratio", scale: 100, filter: f };
