@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { AnaliseDTO } from "@/lib/analises";
-import { lerAnalise } from "@/lib/analise-texto";
-import { formatarQuando } from "@/lib/formato";
+import { lerAnalise, lerAnaliseEstruturada, type Achado } from "@/lib/analise-texto";
+import { formatarNumero, formatarQuando } from "@/lib/formato";
+import { calcularDelta } from "@/lib/delta";
+import { DeltaChip } from "@/components/delta-chip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,11 +17,11 @@ import { cn } from "@/lib/utils";
  * sync, no cron, no bot, e quando o scoreboard da partida chega do GC.
  * Não há caixa de pergunta: as análises são disparadas por nós.
  *
- * O cartão responde "por quê, e o que fazer"; "quanto?" é do hero. Por
- * isso não há números em bloco aqui: contexto numa linha, a manchete
- * quando o analista a marcou, o corpo (duas linhas no Resumo, com "ler
- * análise"; aberto na aba Análises) e a ação em destaque. Sem `glow`: o
- * da tela é o hero.
+ * O cartão é desenhado, não lido (docs/dados-confiaveis.md §4): contexto
+ * numa linha, a manchete numa linha, os três números da sessão contra a
+ * referência como tiles com chip, os achados do agente como barras valor ×
+ * referência, e causa e ação numa linha cada. Análises antigas em prosa
+ * ficam colapsadas numa linha, com "ler" para quem quiser o texto.
  *
  * A resposta vem por callback, então a lista é consultada enquanto há algo
  * em aberto e para quando não há.
@@ -145,6 +147,7 @@ function Cartao({ analise, colapsado, pedir }: { analise: AnaliseDTO; colapsado:
       </header>
 
       <div className="mt-3">
+        {s && analise.status === "ANSWERED" && <Tiles sessao={s} />}
         <Corpo analise={analise} colapsado={colapsado} pedir={pedir} />
       </div>
     </article>
@@ -202,52 +205,119 @@ function Falhou({ pedir }: { pedir: () => Promise<void> }) {
   );
 }
 
-/**
- * Manchete quando marcada, parágrafos com ar, ação em destaque. O agente
- * escreve com, no máximo, negrito e listas; um renderizador de markdown
- * inteiro traria tabelas e cabeçalhos que não cabem num cartão.
- */
-function Resposta({ texto, colapsado }: { texto: string; colapsado: boolean }) {
-  const { manchete, paragrafos, acao } = lerAnalise(texto);
-  const [aberto, setAberto] = useState(!colapsado);
-  const linhas = manchete ? 2 : 3;
+/** Os três números da sessão, cada um contra a sua referência: o "quanto" em tiles. */
+function Tiles({ sessao: s }: { sessao: NonNullable<AnaliseDTO["sessao"]> }) {
+  const tiles = [
+    { rotulo: "K/D", valor: s.kd, ref: s.referencia.kd, casas: 2, unit: undefined },
+    { rotulo: "Dano/round", valor: s.danoPorRound, ref: s.referencia.danoPorRound, casas: 0, unit: undefined },
+    { rotulo: "HS", valor: s.hs, ref: s.referencia.hs, casas: 0, unit: "%" },
+  ];
+  return (
+    <div className="mb-3 grid grid-cols-3 gap-2">
+      {tiles.map((t) => {
+        const normal = t.ref === null ? ({ tipo: "nenhum", motivo: "sem-sessoes" } as const) : ({ tipo: "vitalicio", valor: t.ref, rotulo: "vitalício" } as const);
+        const delta = calcularDelta({ unit: t.unit, melhorQuando: "sobe" }, t.valor, normal, s.rounds < 10);
+        return (
+          <div key={t.rotulo} className="rounded-xl bg-surface-2/60 px-3 py-2">
+            <p className="hud text-[10px]">{t.rotulo}</p>
+            <p className="num flex items-baseline gap-2 text-lg font-semibold">
+              {t.valor === null ? "—" : `${formatarNumero(t.valor, t.casas)}${t.unit ?? ""}`}
+              <DeltaChip delta={delta} />
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
+/** Um achado do agente: rótulo, valor contra referência em duas barras, chip. */
+function AchadoLinha({ achado: a }: { achado: Achado }) {
+  const normal = a.referencia === null ? ({ tipo: "nenhum", motivo: "sem-sessoes" } as const) : ({ tipo: "vitalicio", valor: a.referencia, rotulo: "vitalício" } as const);
+  const delta = calcularDelta({ unit: a.unidade === "%" ? "%" : undefined, melhorQuando: a.melhorQuando }, a.valor, normal);
+  const max = Math.max(Math.abs(a.valor), Math.abs(a.referencia ?? 0)) || 1;
+  const casas = a.unidade === "n" ? 0 : Math.abs(a.valor) >= 10 ? 0 : 2;
+  const fmt = (v: number) => `${formatarNumero(v, casas)}${a.unidade === "%" ? "%" : ""}`;
+  return (
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-1.5">
+      <div className="min-w-0">
+        <p className="truncate text-sm" title={a.nota ?? a.rotulo}>
+          <span className="font-medium text-ink">{a.rotulo}</span>
+          {a.nota && <span className="text-ink-faint"> · {a.nota}</span>}
+        </p>
+        <div className="mt-1 flex flex-col gap-0.5" aria-hidden>
+          <span className="h-1.5 rounded bg-accent" style={{ width: `${Math.max(4, (Math.abs(a.valor) / max) * 100)}%` }} />
+          {a.referencia !== null && <span className="h-1.5 rounded bg-ink-faint/50" style={{ width: `${Math.max(4, (Math.abs(a.referencia) / max) * 100)}%` }} />}
+        </div>
+      </div>
+      <p className="num flex items-center gap-2 text-sm whitespace-nowrap">
+        <span className="font-semibold">{fmt(a.valor)}</span>
+        {a.referencia !== null && <span className="text-ink-faint">vs {fmt(a.referencia)}</span>}
+        <DeltaChip delta={delta} />
+      </p>
+    </li>
+  );
+}
+
+function Resposta({ texto, colapsado }: { texto: string; colapsado: boolean }) {
+  const estruturada = lerAnaliseEstruturada(texto);
+  if (estruturada) {
+    return (
+      <div>
+        <p className="truncate text-xl font-semibold tracking-tight text-ink" title={estruturada.manchete}>{estruturada.manchete}</p>
+        {estruturada.achados.length > 0 && (
+          <ul className="mt-2 divide-y divide-line-soft">
+            {estruturada.achados.map((a, i) => <AchadoLinha key={i} achado={a} />)}
+          </ul>
+        )}
+        {estruturada.causa && (
+          <p className="mt-2 truncate text-sm text-ink-muted" title={estruturada.causa}>
+            <span className="hud mr-2">porque</span>{estruturada.causa}
+          </p>
+        )}
+        {estruturada.acao && <Acao texto={estruturada.acao} />}
+      </div>
+    );
+  }
+  return <RespostaLegada texto={texto} colapsado={colapsado} />;
+}
+
+function Acao({ texto }: { texto: string }) {
+  return (
+    <p className="mt-3 flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft/60 px-4 py-2.5 text-sm text-ink">
+      <ArrowRight className="size-4 shrink-0 text-accent" aria-hidden />
+      <span className="hud text-accent">próxima</span>
+      <span className="truncate" title={texto}>{comNegrito(texto)}</span>
+    </p>
+  );
+}
+
+/**
+ * Análises anteriores a 17/09/2026 vieram em prosa. Ficam numa linha —
+ * manchete ou primeira frase — com "ler" para abrir o texto; a ação, que
+ * sempre foi uma linha, continua em destaque.
+ */
+function RespostaLegada({ texto, colapsado }: { texto: string; colapsado: boolean }) {
+  const { manchete, paragrafos, acao } = lerAnalise(texto);
+  const [aberto, setAberto] = useState(false);
+  const primeira = manchete ?? paragrafos[0]?.split(/(?<=[.!?])\s/)[0] ?? "";
+  void colapsado;
   return (
     <div>
-      {manchete && <p className="text-xl font-semibold tracking-tight text-ink">{comNegrito(manchete)}</p>}
-      <div className={cn("relative space-y-3 text-[15px] leading-relaxed text-ink-muted", manchete && "mt-2", !aberto && (linhas === 2 ? "line-clamp-2" : "line-clamp-3"))}>
-        {paragrafos.map((bloco, i) => {
-          const itens = bloco.split("\n");
-          const lista = itens.every((l) => /^\s*[-•*]\s+/.test(l));
-          if (lista) {
-            return (
-              <ul key={i} className="space-y-1.5 pl-1">
-                {itens.map((l, j) => (
-                  <li key={j} className="flex gap-2">
-                    <span className="mt-[9px] size-1.5 shrink-0 rounded-full bg-ink-faint" aria-hidden />
-                    <span>{comNegrito(l.replace(/^\s*[-•*]\s+/, ""))}</span>
-                  </li>
-                ))}
-              </ul>
-            );
-          }
-          return <p key={i}>{comNegrito(itens.join(" "))}</p>;
-        })}
-      </div>
-      {!aberto && paragrafos.length > 0 && (
-        <button type="button" onClick={() => setAberto(true)} className="mt-1 text-xs text-ink-faint transition hover:text-ink">
-          ler análise ▾
-        </button>
+      <p className="flex items-baseline gap-2">
+        <span className="min-w-0 truncate text-base font-medium text-ink" title={primeira}>{comNegrito(primeira)}</span>
+        {paragrafos.length > 0 && (
+          <button type="button" onClick={() => setAberto((v) => !v)} className="shrink-0 text-xs text-ink-faint transition hover:text-ink">
+            {aberto ? "fechar ▴" : "ler ▾"}
+          </button>
+        )}
+      </p>
+      {aberto && (
+        <div className="mt-2 space-y-2 text-sm leading-relaxed text-ink-muted">
+          {paragrafos.map((bloco, i) => <p key={i}>{comNegrito(bloco.replace(/^\s*[-•*]\s+/gm, "").split("\n").join(" "))}</p>)}
+        </div>
       )}
-      {acao && (
-        <p className="mt-4 flex gap-2.5 rounded-xl border border-accent/30 bg-accent-soft/60 px-4 py-3 text-sm text-ink">
-          <ArrowRight className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-          <span>
-            <span className="hud mr-2 text-accent">próxima</span>
-            {comNegrito(acao)}
-          </span>
-        </p>
-      )}
+      {acao && <Acao texto={acao} />}
     </div>
   );
 }

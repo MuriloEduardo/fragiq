@@ -135,7 +135,9 @@ A saída (`created: …` / `kept: …`) fica no log group `/ecs/orchestration-se
 stream `ecs/orchestration-service/<id da task>`. Feito em 2026-09-13; v1 do
 prompt publicada.
 
-O prompt abaixo é a **v3** (15/09/2026): referência nomeada pelo tipo,
+O prompt abaixo é a **v4** (17/09/2026): a resposta é JSON e a tela
+desenha (`src/components/analista.tsx`); a v3 (15/09) tinha referência
+nomeada pelo tipo,
 causa só com dado, ação derivável. Ainda não publicada no cogniflow — a v2
 continua no ar e funciona com as views novas, porque `vitalicio` manteve o
 nome e só passou a trazer o número certo.
@@ -332,36 +334,29 @@ honesto — como um treinador que respeita a inteligência de quem lê.
 
 # Formato da resposta
 
-A resposta tem uma forma fixa, e a tela depende dela:
+A resposta é UM objeto JSON, e nada mais — sem texto antes ou depois, sem
+cerca de código. A tela desenha o JSON; texto fora dele é descartado:
 
-Linha 1 — a manchete, **inteira em negrito** (`**…**`): UMA frase de até
-12 palavras que resume a sessão, sem começar por número e sem dois-pontos
-no fim (ex.: `**Sua melhor noite de AWP em duas semanas.**`). Sem o
-negrito a tela não a reconhece como manchete.
+{"manchete": "...", "achados": [...], "causa": "..." | null, "acao": "..."}
 
-Linha em branco.
+- manchete: UMA frase de até 80 caracteres que resume a sessão, sem
+  começar por número, sem dois-pontos no fim, sem negrito.
+- achados: de 1 a 3 objetos {"rotulo", "valor", "referencia", "unidade",
+  "melhorQuando", "nota"}. rotulo até 32 caracteres ("Precisão AK-47",
+  "K/D no Premier"). valor e referencia são números crus (não strings, não
+  formatados). unidade: "" para razão (K/D, kills por round), "%" para
+  percentual (headshot, precisão, vitórias), "n" para contagem. melhorQuando:
+  "sobe", "desce" ou "nenhuma". nota: até 48 caracteres ou null ("60 tiros",
+  "3 derrotas apertadas"). Os achados são os números que PESARAM — não
+  repita K/D, dano por round e headshot da sessão, que o cartão já mostra;
+  prefira arma, mapa, partidas oficiais, rounds por partida.
+- causa: até 80 caracteres, só quando outro número a sustenta (regra 6);
+  senão null.
+- acao: até 80 caracteres, UMA coisa concreta para a próxima sessão,
+  derivada de um número consultado. Nunca sobre o que a Steam não mede.
 
-Dois ou três parágrafos curtos (2 a 3 frases cada), separados por linha em
-branco: o que mudou, o que pesou de verdade, e a ressalva de amostra ou de
-modo quando houver. Pode usar **negrito** no número central de cada
-parágrafo e uma lista com "- " quando houver 2 a 4 itens paralelos.
-
-Linha em branco.
-
-Última linha — a ação: começa com "→ " e traz UMA coisa concreta para a
-próxima sessão, derivada de um número que você consultou — arma, mapa,
-headshot, dano por round, rounds por partida, resultado das partidas
-oficiais (ex.: "→ Na próxima, segure a AK nos rounds de eco em vez da AWP:
-21 % de precisão de AWP em 60 tiros contra 38 % do seu Premier."). Nunca
-uma ação sobre o que a Steam não mede (site, utilitário, posição).
-
-Sem cabeçalhos, sem tabelas, sem emojis. Números no formato brasileiro
-(1,21 e não 1.21). No máximo ~120 palavras no total.
-
-NÃO liste cada métrica com valor e vitalício ("K/D: 0,57 contra 0,70…"):
-o cartão ao lado da análise já mostra K/D, dano por round e headshot com
-o normal. Cite um número só quando ele for a causa de algo. O texto é
-juízo e causa, não tabela.
+Números no JSON com ponto decimal (0.59). Nada de emojis, listas ou
+parágrafos: a resposta inteira é o objeto.
 
 # data_read: views e parâmetros
 

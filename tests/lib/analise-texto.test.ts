@@ -28,3 +28,23 @@ describe("lerAnalise", () => {
     expect(lida.acao).toBe("Faça isto.");
   });
 });
+
+import { lerAnaliseEstruturada } from "@/lib/analise-texto";
+
+describe("lerAnaliseEstruturada (prompt v4)", () => {
+  it("lê o JSON do agente, com defaults para o que faltar", () => {
+    const r = lerAnaliseEstruturada(
+      '```json\n{"manchete":"Noite de AK, não de AWP.","achados":[{"rotulo":"Precisão AK-47","valor":20.1,"referencia":7.8,"unidade":"%"},{"rotulo":"K/D","valor":0.59,"referencia":0.7}],"causa":"Kills de AK subiram e os de AWP caíram","acao":"Segure a AK nos rounds de eco"}\n```',
+    );
+    expect(r?.manchete).toBe("Noite de AK, não de AWP.");
+    expect(r?.achados).toHaveLength(2);
+    expect(r?.achados[0]).toMatchObject({ rotulo: "Precisão AK-47", valor: 20.1, referencia: 7.8, unidade: "%", melhorQuando: "sobe", nota: null });
+    expect(r?.acao).toBe("Segure a AK nos rounds de eco");
+  });
+
+  it("prosa não é estruturada; JSON com linha longa demais também não", () => {
+    expect(lerAnaliseEstruturada("**Manchete.**\n\nCorpo.")).toBeNull();
+    expect(lerAnaliseEstruturada(JSON.stringify({ manchete: "x".repeat(91) }))).toBeNull();
+    expect(lerAnaliseEstruturada("{oops")).toBeNull();
+  });
+});
