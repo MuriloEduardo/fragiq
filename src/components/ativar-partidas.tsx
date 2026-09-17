@@ -16,7 +16,7 @@ export const PAGINA_STEAM = "https://help.steampowered.com/pt-br/wizard/HelpWith
  * e uma única página da Steam dá os dois. O formulário valida contra a
  * Steam antes de guardar e aponta o campo errado quando erra.
  */
-export function AtivarPartidas({ compacto = false }: { compacto?: boolean }) {
+export function AtivarPartidas({ compacto = false, religar = false }: { compacto?: boolean; religar?: boolean }) {
   const router = useRouter();
   const [authCode, setAuthCode] = useState("");
   const [shareCode, setShareCode] = useState("");
@@ -87,14 +87,14 @@ export function AtivarPartidas({ compacto = false }: { compacto?: boolean }) {
           />
         </label>
         <label className="block">
-          <span className="hud">Share code da última partida</span>
+          <span className="hud">{religar ? "Share code (opcional: em branco, continua de onde parou)" : "Share code da última partida"}</span>
           <input
             value={shareCode}
             onChange={(e) => setShareCode(e.target.value)}
             placeholder="CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"
             autoComplete="off"
             spellCheck={false}
-            required
+            required={!religar}
             className={cn(campo, "mt-1.5", erro?.campo === "share" ? "ring-danger" : "ring-line")}
           />
         </label>

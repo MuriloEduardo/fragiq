@@ -13,7 +13,8 @@ export const maxDuration = 60;
  */
 const schema = z.object({
   authCode: z.string().trim().min(1).max(40),
-  shareCode: z.string().trim().min(1).max(400),
+  /** Opcional quando já há corrente: continua do último share code conhecido. */
+  shareCode: z.string().trim().max(400).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Preencha os dois códigos." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Cole o código de autenticação." }, { status: 400 });
 
   try {
     const novas = await ativarPartidas(session.userId, session.steamId, parsed.data.authCode, parsed.data.shareCode);

@@ -106,10 +106,22 @@ export async function proximoShareCode(steamId: string, authCode: string, conhec
  * antes de guardar qualquer coisa: uma cola errada tem que virar uma frase
  * clara na hora, não uma fila que nunca anda.
  */
-export async function ativarPartidas(userId: string, steamId: string, authCode: string, shareCode: string) {
+/**
+ * Liga a corrente — ou religa. Sem share code, continua do último que
+ * conhecemos: é o caminho de quem só precisa colar o código de
+ * autenticação de novo (a chave que o cifrava mudou em 13/09/2026 e o
+ * erro ficou mudo até 17/09), e recupera as partidas do intervalo, porque
+ * a Steam só anda para a frente a partir de um código conhecido.
+ */
+export async function ativarPartidas(userId: string, steamId: string, authCode: string, shareCode: string | null | undefined) {
   await registrar("corrente.ativada", { userId });
-  const share = normalizarShareCode(shareCode);
   if (!authCodeValido(authCode)) throw new CodigoInvalido("auth", "O código de autenticação tem o formato XXXX-XXXXX-XXXX.");
+  let share = shareCode?.trim() ? normalizarShareCode(shareCode) : null;
+  if (!share) {
+    const atual = await prisma.user.findUnique({ where: { id: userId }, select: { shareCodeAtual: true } });
+    share = atual?.shareCodeAtual ?? null;
+    if (!share) throw new CodigoInvalido("share", "Cole também o share code da sua última partida: ainda não temos nenhum seu.");
+  }
   if (!shareCodeValido(share)) throw new CodigoInvalido("share", "O share code tem o formato CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx (pode colar o link inteiro).");
 
   await proximoShareCode(steamId, authCode, share);
@@ -158,7 +170,18 @@ export async function descobrirPartidas(userId: string): Promise<number> {
   });
   if (!user?.steamAuthCode || !user.shareCodeAtual) return 0;
 
-  const authCode = await decifrar(user.steamAuthCode);
+  let authCode: string;
+  try {
+    authCode = await decifrar(user.steamAuthCode);
+  } catch {
+    // A chave de cifra mudou (Secrets Manager, 13/09/2026): o código gravado
+    // não abre mais. Não é a Steam nem a pessoa; é nosso, e precisa de uma
+    // ação dela — colar o código de autenticação de novo. Grava uma vez.
+    const mensagem = "Precisamos que você cole o código de autenticação de novo: a chave que o guardava mudou. O share code pode ficar em branco — continuamos de onde parou.";
+    await prisma.user.update({ where: { id: userId }, data: { partidasErro: mensagem } });
+    await registrar("corrente.parou", { userId, dados: { campo: "chave" } });
+    return 0;
+  }
   let atual = user.shareCodeAtual;
   let novas = 0;
   try {
@@ -175,6 +198,8 @@ export async function descobrirPartidas(userId: string): Promise<number> {
       await prisma.user.update({ where: { id: userId }, data: { partidasErro: err.message } });
       await registrar("corrente.parou", { userId, dados: { campo: err.campo } });
     } else {
+      // Inclusive o transitório (429, cogniflow fora): vai para o diário. Um
+      // erro que só aparece no console é um erro que ninguém vê.
       await reportarErro("partidas.corrente", err, userId);
     }
   }
