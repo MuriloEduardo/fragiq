@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { segredoOpcional } from "@/lib/segredos";
 import { processarCapturasDevidas } from "@/lib/capturas";
 import { atualizarUmPreco } from "@/lib/precos";
+import { reportarErro } from "@/lib/eventos";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
     await prisma.botStatus.upsert({ where: { id: "bot" }, create: { id: "bot", ...dados }, update: dados });
   }
   // O mesmo relógio renova um preço do Mercado por tick (docs em precos.ts).
-  const [capturas] = await Promise.all([processarCapturasDevidas(), atualizarUmPreco().catch(() => null)]);
+  // Um preço que falha não pode segurar as capturas — mas também não some: vai para o diário.
+  const [capturas] = await Promise.all([processarCapturasDevidas(), atualizarUmPreco().catch((e) => reportarErro("precos.tick", e))]);
   return NextResponse.json(capturas);
 }
