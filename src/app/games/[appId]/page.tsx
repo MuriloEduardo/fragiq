@@ -18,6 +18,9 @@ import { botEhAmigo } from "@/lib/bot";
 import { prisma } from "@/lib/prisma";
 import { filtroDoModo, rotuloDoModo, TUDO } from "@/lib/modo";
 import { abasDoUsuario, modoDaRequisicao, type SearchParams } from "@/lib/modo-servidor";
+import { insightsDaUltimaSessao, insightsDoModo } from "@/lib/insights/ler";
+import { Insight } from "@/components/insight";
+import { formatarQuando } from "@/lib/sessoes";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +54,8 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
       : true;
   const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true || !partidasAtivas);
   const notas = lerSerie(rows, filtroDoModo(modo)).filter((l) => l.id === "amostra" || l.id === "mapas");
+  const [daSessao, doModo] =
+    appId === 730 ? await Promise.all([insightsDaUltimaSessao(session.userId, lente), insightsDoModo(session.userId, lente)]) : [null, []];
   const analista =
     (await cogniflow()) && rows.length >= 2
       ? await Promise.all([listarAnalises(session.userId, appId, { modo, rows }), sessaoSemAnalise(session.userId, appId)])
@@ -71,6 +76,25 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
       ) : rows.length === 1 ? (
         <Estado titulo="Primeira coleta gravada" texto="A próxima partida vira a primeira sessão." />
       ) : null}
+
+      {(daSessao || doModo.length > 0) && (
+        <Secao titulo="Insights">
+          <div className="grid gap-2 md:grid-cols-2">
+            {daSessao && (
+              <div className="space-y-2">
+                <p className="hud text-xs text-ink-faint" suppressHydrationWarning>última sessão · {formatarQuando(daSessao.ate)}</p>
+                {daSessao.insights.map((i) => <Insight key={i.id} insight={i} />)}
+              </div>
+            )}
+            {doModo.length > 0 && (
+              <div className="space-y-2">
+                <p className="hud text-xs text-ink-faint">{lente ? rotuloDoModo(modo) : "tudo"} · forma e tendência</p>
+                {doModo.map((i) => <Insight key={i.id} insight={i} />)}
+              </div>
+            )}
+          </div>
+        </Secao>
+      )}
 
       {analista && (
         <Secao titulo="Análise" href={`/games/${appId}/analista`} acao="histórico">

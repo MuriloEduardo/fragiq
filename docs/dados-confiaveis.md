@@ -95,14 +95,15 @@ Recomputação: `npm run recompute:sessions` apaga e recria as sessões de um
 usuário (ou todos) a partir dos fatos — é o que roda quando `regraVersao`
 sobe. Idempotente por `(ateSnapshotId)`.
 
-### 3.3 Camada 2 — `Reference` e `Insight`, materializados
+### 3.3 Camada 2 — `Insight`, materializado (com a referência embutida)
 
-- `Reference`: o "normal" de um jogador por `(appId, modo|null, métrica)`,
-  com `tipo` (`modo` | `vitalicio` | `vitalicio-fraco` | `sem-base`),
-  `valor`, `sessoes`, `rounds`, `calculadoEm`, `regraVersao`. Recalculada
-  quando uma sessão nova fecha; a sessão guarda o `referenceId` que usou,
-  então a leitura de uma sessão antiga **não muda** quando entram sessões
-  novas (hoje muda).
+- **Decisão de 17/09 (implementação):** não há tabela `Reference`. A
+  referência de um insight de sessão é o **normal na hora** — o acumulado
+  das sessões provadas do mesmo modo *anteriores* à sessão lida (≥ 5
+  sessões, ≥ 150 rounds), senão o vitalício da coleta que a fechou — e fica
+  embutida no próprio insight (`referencia`, `referenciaTipo`). É mais
+  estável e mais honesta que o leave-one-out sobre o futuro: a leitura de
+  uma sessão antiga **não muda** quando entram sessões novas.
 - `Insight`: `escopo` (`sessao` | `periodo` | `modo`), `escopoId`, `regra`
   (id estável, ex. `kd.vs.normal`, `hs.tendencia.5`, `mapa.melhor`),
   `regraVersao`, `entradasHash`, `valor`, `referencia`, `delta`, `tom`,
@@ -126,7 +127,15 @@ Catálogo inicial de regras (todas determinísticas, todas de uma linha):
 | `consistencia` | modo | faixa | `Variação de K/D entre sessões: baixa` |
 | `cobertura.modo` | período | anel | `72 % dos rounds com modo conhecido` |
 
-Cada regra vive em `src/lib/insights/<regra>.ts`, com `versao`, `calcular(entradas)` pura e teste com fixture. `entradasHash` = sha256 das entradas serializadas.
+As regras vivem em `src/lib/insights/regras.ts` (puras, versionadas, com
+teste em `tests/lib/insights.test.ts`); `materializar.ts` grava ao fechar a
+sessão e no `recompute:insights`; `ler.ts` é o que a tela consulta;
+`components/insight.tsx` desenha pelo `visual`. `entradasHash` = sha256
+das entradas serializadas. Implementadas em 17/09: os 4 de sessão
+(`kd|adr|hs.vs.normal`, `sessao.classificacao`) e 5 de modo
+(`tendencia.kd.5`, `forma.vs.vitalicio`, `mapa.ranking`, `consistencia`,
+`cobertura.modo`); `arma.destaque` fica para quando as sessões guardarem
+deltas por arma.
 
 ### 3.4 Camada 3 — operação, auditoria, tracing
 

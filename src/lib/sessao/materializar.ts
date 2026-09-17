@@ -3,6 +3,7 @@ import { prisma } from "../prisma";
 import { coerce } from "../fonte";
 import { REGRA_VERSAO, type Evidencia } from "./atribuir";
 import { montarSessao, type PontoDaSessao, type SessaoMontada } from "./montar";
+import { gerarInsightsDaSessao, gerarInsightsDoJogador } from "../insights/materializar";
 
 /**
  * Fechar uma sessão: da coleta que acabou de ser gravada até a anterior.
@@ -92,7 +93,12 @@ export async function fecharSessao(ateSnapshotId: string): Promise<SessaoMontada
   const montada = montarSessao(ponto(prev), ponto(curr), evidencias);
 
   if (!montada) {
+    const apagadas = await prisma.session.findMany({ where: { ateSnapshotId }, select: { id: true } });
     await prisma.session.deleteMany({ where: { ateSnapshotId } });
+    if (apagadas.length) {
+      await prisma.insight.deleteMany({ where: { escopo: "SESSAO", escopoId: { in: apagadas.map((a) => a.id) } } });
+      await gerarInsightsDoJogador(userId);
+    }
     return null;
   }
   const dados = {
@@ -104,7 +110,9 @@ export async function fecharSessao(ateSnapshotId: string): Promise<SessaoMontada
     regraVersao: REGRA_VERSAO,
     traceId: curr.traceId,
   };
-  await prisma.session.upsert({ where: { ateSnapshotId }, create: { ateSnapshotId, ...dados }, update: dados });
+  const gravada = await prisma.session.upsert({ where: { ateSnapshotId }, create: { ateSnapshotId, ...dados }, update: dados, select: { id: true } });
+  // Os insights nascem junto com a sessão — a tela nunca calcula.
+  await gerarInsightsDaSessao(gravada.id);
   return montada;
 }
 

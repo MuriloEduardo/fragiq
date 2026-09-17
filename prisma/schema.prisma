@@ -65,6 +65,7 @@ model User {
 
   partidas    MatchPlayer[]
   sessoes     Session[]
+  insights    Insight[]
   captura     PendingCapture?
   games       UserGame[]
   syncRuns    SyncRun[]
@@ -622,6 +623,76 @@ enum ModoConfianca {
   INFERIDA
   /// Sem prova suficiente. Nunca entra numa aba nem num normal de modo.
   MISTA
+}
+
+/// Um insight materializado: uma regra determinística, versionada, sobre
+/// uma sessão, um modo ou o período — com o valor, a referência contra a
+/// qual foi lido, o delta julgado, a base e a confiança, e os dados do
+/// visual que o desenha. A tela só lê (docs/dados-confiaveis.md §3.3).
+///
+/// A referência de uma sessão é o normal **na hora**: o acumulado das
+/// sessões provadas do mesmo modo que vieram antes dela. Fica embutida
+/// aqui, então a leitura de uma sessão antiga não muda quando entra sessão
+/// nova — o que a regra leave-one-out da tela fazia.
+model Insight {
+  id String @id @default(cuid())
+
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameAppId Int
+
+  escopo   InsightEscopo
+  /// `SESSAO`: id da sessão; `MODO`/`PERIODO`: o modo (ou "tudo").
+  escopoId String
+  regra    String
+  regraVersao Int
+  /// sha256 das entradas serializadas: prova de reprodutibilidade.
+  entradasHash String
+
+  valor          Float?
+  referencia     Float?
+  /// vitalicio | modo | vitalicio-fraco | nenhum
+  referenciaTipo String?
+  delta          Float?
+  deltaUnidade   String?
+  tom            InsightTom
+  confianca      ModoConfianca?
+  /// { rounds, sessoes, partidas } — sobre o que o número se apoia.
+  base   Json
+  visual InsightVisual
+  /// O que o visual precisa (pontos, ranking, progresso), pronto para desenhar.
+  dados  Json
+  /// A única linha de texto que a tela mostra.
+  linha  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([escopo, escopoId, regra, regraVersao])
+  @@index([userId, gameAppId, escopo, escopoId])
+  @@map("insights")
+}
+
+enum InsightEscopo {
+  SESSAO
+  MODO
+  PERIODO
+}
+
+enum InsightTom {
+  BOM
+  RUIM
+  NEUTRO
+  AVISO
+}
+
+enum InsightVisual {
+  CHIP
+  SELO
+  BARRA
+  SPARKLINE
+  RANK
+  ANEL
 }
 
 /// O que o bot de presença viu, antes de qualquer coleta.
