@@ -9,6 +9,7 @@ import { formatPlaytime } from "@/lib/stats";
 import { isAdmin, seloDe } from "@/lib/admin";
 import { SiteHeader } from "@/components/site-header";
 import { NavJogo } from "@/components/nav-jogo";
+import { botEhAmigo } from "@/lib/bot";
 import { COOKIE_MODO } from "@/lib/modo";
 import { lenteDoUsuario } from "@/lib/modo-servidor";
 
@@ -89,7 +90,7 @@ export default async function GameLayout({
               </div>
               <div className="mt-4">
                 <Suspense>
-                  <NavJogo appId={appId} abas={lente.abas} cobertura={lente.cobertura} doCookie={jar.get(COOKIE_MODO)?.value} />
+                  <NavJogo appId={appId} abas={lente.abas} cobertura={lente.cobertura} doCookie={jar.get(COOKIE_MODO)?.value} botAmigo={appId === 730 ? await botEhAmigo(session.steamId) : true} />
                 </Suspense>
               </div>
             </div>

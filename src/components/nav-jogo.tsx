@@ -30,7 +30,7 @@ const ABAS = [
   { seg: "analista", rotulo: "Análises" },
 ] as const;
 
-export function NavJogo({ appId, abas, cobertura, doCookie }: { appId: number; abas: AbaDeModo[]; cobertura: Cobertura; doCookie?: string }) {
+export function NavJogo({ appId, abas, cobertura, doCookie, botAmigo = null }: { appId: number; abas: AbaDeModo[]; cobertura: Cobertura; doCookie?: string; botAmigo?: boolean | null }) {
   const pathname = usePathname();
   const daUrl = useSearchParams().get("modo") ?? undefined;
   const modo = resolverModo(daUrl, doCookie, abas);
@@ -96,9 +96,17 @@ export function NavJogo({ appId, abas, cobertura, doCookie }: { appId: number; a
             {cobertura.comModo} de {cobertura.total} {cobertura.total === 1 ? "sessão" : "sessões"} com modo
           </span>
           <span aria-hidden className="text-ink-faint/60">·</span>
-          <Link href={`${base}#bot`} className="text-accent hover:underline">
-            Adicionar o bot
-          </Link>
+          {botAmigo === true ? (
+            // Já é amigo: o que falta de modo é histórico (cron, bot fora) ou
+            // partida sem share code. A explicação por sessão vem na aba.
+            <Link href={`${base}/sessoes`} className="text-ink-muted hover:text-ink hover:underline">
+              o bot marca as próximas
+            </Link>
+          ) : (
+            <Link href="/seguranca#bot" className="text-accent hover:underline">
+              Adicionar o bot
+            </Link>
+          )}
         </p>
       )}
     </div>

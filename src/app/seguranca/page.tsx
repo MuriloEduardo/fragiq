@@ -97,7 +97,7 @@ export default async function SegurancaPage() {
           </Bloco>
         </div>
 
-        <section className="mt-10">
+        <section className="mt-10 scroll-mt-24" id="bot">
           <h2 className="hud mb-3">O bot de presença</h2>
           <BotAmigo amigo={amigo} />
         </section>
