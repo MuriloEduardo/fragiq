@@ -14,6 +14,11 @@ npm run dev
 npm test                      # vitest: series, leituras, analista, delta, analise-texto
 ```
 
+Onde os números nascem, como são guardados e como aparecem está decidido em
+[docs/dados-confiaveis.md](docs/dados-confiaveis.md) (fatos imutáveis com
+proveniência, sessões e insights materializados e versionados, modo só com
+prova, UI de uma linha).
+
 Para avaliar a interface sem o cogniflow (e portanto sem Steam):
 
 ```bash
