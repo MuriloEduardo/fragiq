@@ -16,6 +16,8 @@ import { listarSessoes, formatarQuando } from "@/lib/sessoes";
 import { estadoDeSeguir, type EstadoSeguir } from "@/lib/social";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
+import { listarInventario } from "@/lib/inventario";
+import { InventarioGrade } from "@/components/inventario-grade";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,11 @@ export default async function PerfilPublicoPage({
   // O scoreboard de partida é público na Steam ("Suas partidas" de cada um
   // dos dez); mostramos o que já temos gravado deste SteamID.
   const partidas = perfil.estado === "ok" ? await listarPartidas(entrada, 10) : [];
+  // O inventário é público na Steam por escolha da pessoa; mostramos o que
+  // já lemos dele (os mais raros), nunca lendo a Steam por causa de um
+  // visitante.
+  const inventario = alvo ? await listarInventario(alvo.id) : null;
+  const vitrine = inventario?.publico ? inventario.itens.slice(0, 10) : [];
 
   return (
     <div className="min-h-dvh">
@@ -218,6 +225,18 @@ export default async function PerfilPublicoPage({
                 </p>
               </section>
             </div>
+
+            {vitrine.length > 0 && (
+              <section className="mt-10">
+                <div className="flex items-baseline justify-between">
+                  <h2 className="hud">Inventário</h2>
+                  <p className="num text-xs text-ink-faint">{inventario!.itens.length} itens · os {vitrine.length} mais raros</p>
+                </div>
+                <div className="mt-3">
+                  <InventarioGrade itens={vitrine} />
+                </div>
+              </section>
+            )}
 
             {partidas.length > 0 && (
               <section className="mt-10">

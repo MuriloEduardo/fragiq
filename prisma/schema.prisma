@@ -66,6 +66,11 @@ model User {
   partidas    MatchPlayer[]
   sessoes     Session[]
   insights    Insight[]
+  inventario  InventoryItem[]
+
+  /// Inventário: se a última leitura o achou público, e quando foi.
+  inventarioPublico   Boolean?
+  inventarioLidoEm    DateTime?
   captura     PendingCapture?
   games       UserGame[]
   syncRuns    SyncRun[]
@@ -693,6 +698,44 @@ enum InsightVisual {
   SPARKLINE
   RANK
   ANEL
+}
+
+/// Um item do inventário de CS2 de um jogador, como fato com história:
+/// `primeiraVezEm` quando apareceu, `ultimaVezEm` a última leitura em que
+/// estava, `saiuEm` quando deixou de estar. Nada se apaga — o que entrou e
+/// saiu é dado (docs/dados-confiaveis.md §2). Sem preço: é outra fonte.
+model InventoryItem {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assetId        String
+  classId        String
+  amount         Int     @default(1)
+  name           String
+  marketHashName String?
+  type           String?
+  imageUrl       String?
+  rarity         String?
+  rarityKey      String?
+  rarityColor    String?
+  exterior       String?
+  exteriorKey    String?
+  weapon         String?
+  category       String?
+  stattrak       Boolean @default(false)
+  souvenir       Boolean @default(false)
+  tradable       Boolean @default(false)
+  marketable     Boolean @default(false)
+
+  primeiraVezEm DateTime  @default(now())
+  ultimaVezEm   DateTime  @default(now())
+  saiuEm        DateTime?
+
+  @@unique([userId, assetId])
+  @@index([userId, saiuEm])
+  @@map("inventory_items")
 }
 
 /// O que o bot de presença viu, antes de qualquer coleta.

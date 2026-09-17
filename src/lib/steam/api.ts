@@ -187,3 +187,29 @@ export async function getFriendIds(steamId: string): Promise<string[]> {
   const { steam_ids } = await capability<{ steam_ids: string[] }>("steam.friends.read", { steam_id: steamId });
   return steam_ids;
 }
+
+export type InventoryItemRead = {
+  asset_id: string;
+  class_id: string;
+  amount: number;
+  name: string | null;
+  market_hash_name: string | null;
+  type: string | null;
+  image: string | null;
+  rarity: string | null;
+  rarity_key: string | null;
+  rarity_color: string | null;
+  exterior: string | null;
+  exterior_key: string | null;
+  weapon: string | null;
+  category: string | null;
+  stattrak: boolean;
+  souvenir: boolean;
+  tradable: boolean;
+  marketable: boolean;
+};
+
+/** O inventário público de CS2; `public: false` é escolha da pessoa, não erro. */
+export async function getInventory(steamId: string): Promise<{ public: boolean; total: number; items: InventoryItemRead[] }> {
+  return capability("steam.inventory.read", { steam_id: steamId, app_id: 730 });
+}

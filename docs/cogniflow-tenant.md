@@ -159,7 +159,7 @@ curl -X POST https://<dominio-do-admin>/admin/agents/fragiq/analista/versions \
         "messaging.send", "data.read",
         "steam.player.read", "steam.library.read", "steam.stats.read",
         "steam.stats.schema.read", "steam.friends.read", "steam.vanity.resolve",
-        "steam.match.code.next"]}'
+        "steam.match.code.next", "steam.inventory.read"]}'
 ```
 
 Sem sessão no painel, o mesmo pelo CLI, como task avulsa do ECS (é como a
@@ -176,9 +176,14 @@ aws ecs run-task --cluster cogniflow --launch-type FARGATE \
     "--capability","steam.player.read","--capability","steam.library.read",
     "--capability","steam.stats.read","--capability","steam.stats.schema.read",
     "--capability","steam.friends.read","--capability","steam.vanity.resolve",
-    "--capability","steam.match.code.next",
-    "--prompt","<o prompt da seção abaixo>","--publish","--notes","grants steam.* e formato fixo"]}]}'
+    "--capability","steam.match.code.next","--capability","steam.inventory.read",
+    "--publish","--notes","grants steam.* (+inventário)"]}]}'
 ```
+
+`steam.inventory.read` (17/09/2026) alimenta `/games/730/inventario` e a
+vitrine do perfil público: `src/lib/inventario.ts` guarda cada item como
+fato com história (entrou/saiu), lê a Steam no máximo a cada 6 h por
+jogador, e um inventário privado é registrado como tal.
 
 A lista substitui a anterior (o que ela omite cai; a config de
 `messaging.send` sobrevive). O prompt e o graph são copiados quando não
