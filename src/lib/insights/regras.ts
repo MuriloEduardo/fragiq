@@ -128,7 +128,7 @@ function fmtDelta(d: Delta): string {
 
 /* ----------------------------- regras: sessão ----------------------------- */
 
-const VERSAO_SESSAO = 1;
+export const VERSAO_SESSAO = 1;
 
 /** `kd.vs.normal`, `adr.vs.normal`, `hs.vs.normal` — um chip por métrica. */
 export function metricaVsNormal(m: Metrica, sessao: SessaoFato, anteriores: SessaoFato[]): InsightCalculado {
@@ -198,7 +198,7 @@ export function insightsDaSessao(sessao: SessaoFato, anteriores: SessaoFato[]): 
 
 /* ------------------------------ regras: modo ------------------------------ */
 
-const VERSAO_MODO = 1;
+export const VERSAO_MODO = 1;
 const JANELA = 5;
 
 /** As sessões que uma lente enxerga: provadas do modo, ou todas para "tudo". */
@@ -364,3 +364,9 @@ export function insightsDoModo(sessoes: SessaoFato[], modo: string | null): Insi
   if (modo === null) lista.push(coberturaDeModo(sessoes));
   return lista;
 }
+
+/** As regras em vigor, com a versão de cada uma — o que o painel de dados confere contra o banco. */
+export const REGRAS_EM_VIGOR: { regra: string; versao: number; escopo: "SESSAO" | "MODO" }[] = [
+  ...["kd.vs.normal", "adr.vs.normal", "hs.vs.normal", "sessao.classificacao"].map((regra) => ({ regra, versao: VERSAO_SESSAO, escopo: "SESSAO" as const })),
+  ...["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "consistencia", "cobertura.modo"].map((regra) => ({ regra, versao: VERSAO_MODO, escopo: "MODO" as const })),
+];

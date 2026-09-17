@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
@@ -41,7 +42,10 @@ export default async function AdminPage() {
     <>
       <SiteHeader {...user} admin />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Painel</h1>
+        <div className="flex items-baseline justify-between">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Painel</h1>
+          <Link href="/admin/dados" className="text-sm text-accent hover:underline">Dados →</Link>
+        </div>
         <p className="mt-1 text-sm text-ink-muted">
           Quem entrou, o que aconteceu e se a coleta está saudável. Horários em Brasília.
         </p>
@@ -227,7 +231,7 @@ export default async function AdminPage() {
               <span key="k" className="font-mono text-xs">{o.kind === "MATCH_ENDED" ? "fim de partida" : "saiu do jogo"}</span>,
               <span key="c" className="text-xs">{[o.mode, o.map, o.score].filter(Boolean).join(" · ") || "—"}</span>,
               <span key="v" className={cn("text-xs", o.virouPonto ? "text-good" : "text-ink-faint")}>{o.virouPonto ? "gravado" : "ainda não"}</span>,
-              <span key="t" className="font-mono text-[10px] text-ink-faint">{o.traceId.slice(0, 8)}</span>,
+              <Link key="t" href={`/admin/trace/${o.traceId}`} className="font-mono text-[10px] text-accent hover:underline">{o.traceId.slice(0, 8)}</Link>,
             ])}
           />
           <h3 className="mt-6 mb-2 text-xs font-semibold text-ink-muted">Log</h3>
@@ -239,7 +243,7 @@ export default async function AdminPage() {
               <span key="n" className={cn("font-mono text-xs", l.nivel === "ERROR" && "text-danger", l.nivel === "WARN" && "text-warn")}>{l.nivel}</span>,
               <span key="s" className="font-mono text-[10px] text-ink-faint">{l.steamId ? l.steamId.slice(-6) : "—"}</span>,
               <span key="m" className="block max-w-lg truncate text-xs" title={l.mensagem}>{l.mensagem}</span>,
-              <span key="t" className="font-mono text-[10px] text-ink-faint">{l.traceId ? l.traceId.slice(0, 8) : ""}</span>,
+              l.traceId ? <Link key="t" href={`/admin/trace/${l.traceId}`} className="font-mono text-[10px] text-accent hover:underline">{l.traceId.slice(0, 8)}</Link> : <span key="t" />,
             ])}
           />
         </Secao>
