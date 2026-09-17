@@ -8,12 +8,15 @@ import { logar } from "./logs.js";
  * este host — medido em 17/09/2026. O site decide o que venceu
  * (`GET /api/bot/precos`), este loop lê um nome por vez com 4 s entre
  * chamadas (a Steam tolera ~20/min por IP e a fila não tem pressa) e
- * devolve (`POST /api/bot/precos`). Um 429 encerra a rodada e a próxima
- * espera o dobro; nada é retentado na hora.
+ * devolve (`POST /api/bot/precos`). Um 429 encerra a rodada; a próxima
+ * espera 5 min (depois 10, 15 no máximo) e volta a 1 min quando passa.
  */
 
-const ESPACO_MS = 4_000;
+const ESPACO_MS = 6_000;
 const RODADA_MS = 60_000;
+/** Depois de um 429: medido em 17/09, 5 leituras passam e a sexta leva 429; 5 min bastam para a Steam esquecer. */
+const CALMA_MS = 5 * 60_000;
+const CALMA_MAX_MS = 15 * 60_000;
 
 type Resultado = { marketHashName: string; listado: boolean; menorCents: number | null; medianaCents: number | null; volume: number | null };
 
@@ -68,7 +71,7 @@ export function ligarPrecos(clientLogado: () => boolean) {
       for (const nome of nomes) {
         const r = await ler(nome);
         if (r === "calma") {
-          espera = Math.min(espera * 2, 30 * RODADA_MS);
+          espera = Math.min(espera >= CALMA_MS ? espera * 2 : CALMA_MS, CALMA_MAX_MS);
           logar("WARN", `mercado pediu calma (429); próxima rodada em ${Math.round(espera / 1000)} s`);
           return;
         }
