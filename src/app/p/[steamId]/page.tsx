@@ -5,6 +5,7 @@ import { ArrowRight, Lock } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { listarPartidas } from "@/lib/partidas";
 import { PartidasTabela } from "@/components/partidas-tabela";
+import { PartidasAgregado } from "@/components/partidas-agregado";
 import { carregarPerfilPublico, pareceSteamId, resolverEntrada } from "@/lib/perfil-publico";
 import { SteamMark } from "@/components/steam-mark";
 import { Selo } from "@/components/selo";
@@ -59,7 +60,9 @@ export default async function PerfilPublicoPage({
   const curva = estado === "seguindo" && alvo ? await carregarFonte(alvo.id, 730) : null;
   // O scoreboard de partida é público na Steam ("Suas partidas" de cada um
   // dos dez); mostramos o que já temos gravado deste SteamID.
-  const partidas = perfil.estado === "ok" ? await listarPartidas(entrada, 10) : [];
+  // O scoreboard do GC existe para os dez de cada partida, privados ou não:
+  // é o que resta para quem a Steam esconde, e por isso vem antes do estado.
+  const partidas = perfil.estado === "ok" || perfil.estado === "privado" || perfil.estado === "sem-cs2" ? await listarPartidas(entrada, 30) : [];
   // O inventário é público na Steam por escolha da pessoa; mostramos o que
   // já lemos dele (os mais raros), nunca lendo a Steam por causa de um
   // visitante.
@@ -100,6 +103,17 @@ export default async function PerfilPublicoPage({
             titulo={perfil.jogador.personaname}
             texto='Sem estatísticas de CS2 visíveis — ou não jogou, ou "Detalhes do jogo" está privado.'
           />
+        )}
+        {(perfil.estado === "privado" || perfil.estado === "sem-cs2") && partidas.length > 0 && (
+          <div className="mt-8 space-y-8">
+            <PartidasAgregado partidas={partidas} />
+            <section>
+              <h2 className="hud">Partidas oficiais com gente do FragIQ</h2>
+              <div className="mt-3">
+                <PartidasTabela partidas={partidas.slice(0, 10)} publica />
+              </div>
+            </section>
+          </div>
         )}
 
         {perfil.estado === "ok" && (
@@ -239,12 +253,15 @@ export default async function PerfilPublicoPage({
             )}
 
             {partidas.length > 0 && (
-              <section className="mt-10">
-                <h2 className="hud">Últimas partidas oficiais</h2>
-                <div className="mt-3">
-                  <PartidasTabela partidas={partidas} publica />
-                </div>
-              </section>
+              <>
+                <div className="mt-10"><PartidasAgregado partidas={partidas} /></div>
+                <section className="mt-6">
+                  <h2 className="hud">Últimas partidas oficiais</h2>
+                  <div className="mt-3">
+                    <PartidasTabela partidas={partidas.slice(0, 10)} publica />
+                  </div>
+                </section>
+              </>
             )}
 
             {!perfil.usuarioDoFragiq && !session && (

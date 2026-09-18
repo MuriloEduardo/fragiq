@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { PartidasCodigos } from "./partidas-codigos";
 
 /** Desliga a corrente e apaga o código de autenticação. As partidas já gravadas ficam. */
 export function PartidasRevogar({ ativo, desde }: { ativo: boolean; desde: Date | null }) {
@@ -25,9 +26,10 @@ export function PartidasRevogar({ ativo, desde }: { ativo: boolean; desde: Date 
         <p className="text-sm font-medium">Histórico de partidas oficiais</p>
         <p className="mt-0.5 text-xs text-ink-faint">
           {ativo
-            ? `Ligado${desde ? ` desde ${desde.toLocaleDateString("pt-BR")}` : ""}. O código de autenticação fica cifrado e só serve para pedir o próximo share code à Steam. Revogar apaga o código aqui; as partidas já gravadas continuam.`
+            ? `Ligado${desde ? ` desde ${desde.toLocaleDateString("pt-BR")}` : ""} · o código só serve para pedir o próximo share code; revogar apaga só ele.`
             : "Desligado. Ligue na aba Partidas do CS2: dois códigos de uma página da Steam, uma vez."}
         </p>
+        {ativo && <PartidasCodigos />}
       </div>
       {ativo ? (
         <button
