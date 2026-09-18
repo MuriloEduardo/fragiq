@@ -129,8 +129,9 @@ leituras, as views do analista): `referenciaDe` aplica a mesma regra com a
 amostra padrão de 10 rounds, e `nomeDaReferencia` devolve o nome dentro de
 uma frase ("do seu Premier (7 sessões)", "de vitalício").
 
-**O delta** (`calcularDelta`) é um cálculo só, para o hero, o cartão, a
-tabela de sessões e a página da estatística:
+**O delta** (`calcularDelta`) é um cálculo só, para o hero, o cartão e a
+página da estatística — e, dentro das regras de `insights/`, para os chips
+que a tabela de sessões passou a ler prontos (§4.3):
 
 - estatísticas com `unit: "%"` comparam em **pontos percentuais**
   (`▲ 17 pp`), as outras em **razão relativa** (`▼ 19%`);
@@ -285,7 +286,9 @@ O contrato tem dois lados, e a diferença entre eles é o ponto:
 - **Listas** (Sessões, Partidas, Análises) são naturalmente filtráveis. Em
   Sessões a lente não esconde: as linhas fora do modo ficam na tabela em
   `ink-faint` e um rótulo diz `2 de 7 sessões em Competitivo` — sete linhas
-  cabem na tela, esconder cinco não ajuda ninguém. Em Partidas e Análises a
+  cabem na tela, esconder cinco não ajuda ninguém. E a lente não muda mais o
+  **número** de nenhuma linha: o chip de K/D é o insight materializado da
+  sessão (§4.3), a mesma leitura em qualquer aba. Em Partidas e Análises a
   lente filtra de verdade, com o estado vazio nomeando o corte.
 - **Números e gráficos** nunca perdem pontos. Com lente ativa, um
   cartão/hero/gráfico mostra a série inteira com os pontos do modo em
@@ -361,11 +364,24 @@ coluna em Sessões e dimensão de partida em Partidas.
 
 Cada sessão como uma linha, comparável com o normal: `quando · modo · mapa ·
 placar · partidas · rounds · K/D (+chip) · dano/round · HS · min`. Kills,
-deaths e MVP ficam no `title` da linha. O chip de delta do K/D usa o normal
-da lente — é o que torna a tabela a resposta para "em qual noite eu estive
-acima do meu normal". Sessão sem modo tem o chip `modo? ▾`
+deaths e MVP ficam no `title` da linha. Sessão sem modo tem o chip `modo? ▾`
 (`marcar-modo.tsx`): é aqui que a marcação em massa acontece. No mobile,
 cada linha vira um cartão de duas linhas.
+
+O chip do K/D é **lido**, não calculado: vem do insight `kd.vs.normal` da
+sessão (`chipsDeSessao`, casado por `Session.ateSnapshotId`, que é o
+`snapshotId` da linha). A página não chama `calcularDelta` nem
+`normaisDoHero`. Isso trocou a referência do chip, e a troca é o ganho: era
+o normal **da lente** — na aba "tudo", o vitalício da última coleta, o mesmo
+número para todas as linhas, que se movia quando entravam coletas novas — e
+passou a ser o normal do **modo da própria sessão** na hora em que ela
+fechou (`normalNaHora`, §3.3 de `dados-confiaveis.md`), ou o vitalício
+daquela coleta enquanto não há base. Duas consequências na tela: uma legenda
+de uma linha diz `chip de K/D: cada sessão contra o normal do modo dela
+(vitalício enquanto não há base) — não muda com a aba`, e a linha fora do
+modo também tem chip, porque a comparação dela não depende mais da aba. A
+linha inteira do insight vai no `title` da célula. Sessão sem insight
+materializado fica sem chip (§4.4: vazio é vazio).
 
 ### 4.4 Partidas — `partidas/page.tsx`
 

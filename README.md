@@ -184,6 +184,13 @@ excluindo a sessão lida; abaixo disso a referência é o vitalício, rotulado
 mostra os modos lado a lado, sem filtrar — é onde "não misturar" acontece
 sem esvaziar a tela.
 
+Uma exceção, desde 18/09: o chip de K/D da tabela de **Sessões** não sai da
+lente. Ele é o insight `kd.vs.normal` já materializado da sessão, lido por
+`chipsDeSessao` e casado com a linha por `Session.ateSnapshotId`, e a
+referência dele é o normal do modo daquela sessão na hora em que ela fechou
+(ou o vitalício daquela coleta, enquanto não há base). Trocar de aba não
+muda o chip de uma linha, e a legenda da página diz isso.
+
 De onde vem o modo de cada coisa: sessão = rich presence que o bot observou
 (`StatSnapshot.matchMode`) ou marcação à mão (chip `modo? ▾`); partida
 oficial = `Match.modo` (pelo `gameType` do GC — 8 competitivo, 264 Wingman;

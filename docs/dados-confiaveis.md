@@ -140,12 +140,25 @@ Catálogo inicial de regras (todas determinísticas, todas de uma linha):
 
 As regras vivem em `src/lib/insights/regras.ts` (puras, versionadas, com
 teste em `tests/lib/insights.test.ts`); `materializar.ts` grava ao fechar a
-sessão e no `recompute:insights`; `ler.ts` é o que a tela consulta;
-`components/insight.tsx` desenha pelo `visual`. `entradasHash` = sha256
-das entradas serializadas. Implementadas em 17/09: os 4 de sessão
-(`kd|adr|hs.vs.normal`, `sessao.classificacao`) e 7 de modo
-(`tendencia.kd.5`, `forma.vs.vitalicio`, `mapa.ranking`, `arma.destaque`,
-`arma.precisao`, `consistencia`, `cobertura.modo`).
+sessão e no `recompute:insights`; `ler.ts` é o que a tela consulta (com
+teste em `tests/lib/insights-ler.test.ts`); `components/insight.tsx` desenha
+pelo `visual`. `entradasHash` = sha256 das entradas serializadas.
+Implementadas em 17/09: os 4 de sessão (`kd|adr|hs.vs.normal`,
+`sessao.classificacao`) e 7 de modo (`tendencia.kd.5`,
+`forma.vs.vitalicio`, `mapa.ranking`, `arma.destaque`, `arma.precisao`,
+`consistencia`, `cobertura.modo`).
+
+Quem lê o quê (18/09): o Resumo lê `insightsDaUltimaSessao` +
+`insightsDoModo`, a aba Estatísticas lê `insightsDeArma`, e a **tabela de
+Sessões** lê `chipsDeSessao` — só `kd.vs.normal`, um por linha, casado pela
+coleta que fechou a sessão (`Session.ateSnapshotId`, que é o `snapshotId`
+que a linha da tabela tem em mãos). Com isso a tabela deixou de chamar
+`calcularDelta` e `normaisDoHero`, e o chip de cada linha deixou de ser
+relativo à lente: na aba "tudo" ele comparava com o vitalício da **última**
+coleta — o mesmo número para todas as linhas, que se mexia quando entrava
+coleta nova — e passou a comparar com o normal na hora da própria sessão.
+É a promessa desta seção aplicada à tela: a leitura de uma sessão antiga
+não muda quando entram sessões novas.
 
 `arma.destaque` compara a **fatia dos abates** de cada arma nas últimas 5
 sessões da lente com a fatia nas sessões anteriores a essa janela (mín. 15

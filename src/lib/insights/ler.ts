@@ -43,6 +43,39 @@ export async function insightsDaUltimaSessao(userId: string, modo: string | null
 }
 
 /**
+ * O chip de K/D de cada sessão — o que a tabela de Sessões desenha por linha.
+ *
+ * A chave é `Session.ateSnapshotId`, a coleta que fechou a sessão, porque é
+ * ela que a linha da tabela tem em mãos (`Sessao.snapshotId`, montada dos
+ * snapshots em `listarSessoes`). Só `kd.vs.normal`: é o único insight de
+ * sessão que a tabela mostra, e pedir os quatro seria trazer três por linha
+ * para jogar fora.
+ *
+ * A referência não depende da lente — é o normal do modo da própria sessão,
+ * ou o vitalício da coleta que a fechou quando não há base (`normalNaHora`).
+ * Trocar de aba não muda mais o chip de uma linha, e a linha de legenda da
+ * página diz isso.
+ */
+export async function chipsDeSessao(userId: string, appId: number): Promise<Map<string, InsightLinha>> {
+  const sessoes = await prisma.session.findMany({ where: { userId, gameAppId: appId }, select: { id: true, ateSnapshotId: true } });
+  if (sessoes.length === 0) return new Map();
+  const linhas = await prisma.insight.findMany({
+    where: { escopo: "SESSAO", escopoId: { in: sessoes.map((s) => s.id) }, regra: "kd.vs.normal" },
+    orderBy: { regraVersao: "desc" },
+  });
+  // Mesmo cuidado de `insightsDaUltimaSessao`: durante um recompute uma regra
+  // pode ter duas versões no banco, e a mais nova vence.
+  const porSessao = new Map<string, (typeof linhas)[number]>();
+  for (const l of linhas) if (!porSessao.has(l.escopoId)) porSessao.set(l.escopoId, l);
+  const porColeta = new Map<string, InsightLinha>();
+  for (const s of sessoes) {
+    const l = porSessao.get(s.id);
+    if (l) porColeta.set(s.ateSnapshotId, paraLinha(l));
+  }
+  return porColeta;
+}
+
+/**
  * Os insights por arma — o que a aba Estatísticas mostra em Destaques.
  *
  * É a mesma consulta do Resumo, recortada: arma é assunto da aba de
