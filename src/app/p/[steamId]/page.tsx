@@ -19,6 +19,8 @@ import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 import { listarInventario } from "@/lib/inventario";
 import { InventarioGrade } from "@/components/inventario-grade";
+import { carregarPerfilCS } from "@/lib/perfil-cs";
+import { DemoPublicaBloco } from "@/components/demo-publica";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +28,13 @@ export const dynamic = "force-dynamic";
  * A página pública de um jogador.
  *
  * Só o que a Steam já mostra a quem tem o SteamID — números vitalícios, por
- * arma, por mapa. Nada de curva nem leitura: isso é do dono. Quem tem conta
- * no FragIQ ganha o selo e um aviso de que a curva existe; quem não tem, um
- * convite para começar a gravar a dele.
+ * arma, por mapa — **mais o que o CS2 já mostra a qualquer um dos dez de
+ * cada partida**: o scoreboard do GC, a demo (ADR, KAST, CS Rating), o
+ * inventário aberto, a última partida que o bot viu. Privacidade da Steam
+ * esconde os contadores; não esconde o resto, e a página mostra o máximo
+ * em qualquer estado. Nada de curva nem leitura: isso é do dono. Quem tem
+ * conta no FragIQ ganha o selo e um aviso de que a curva existe; quem não
+ * tem, um convite para começar a gravar a dele.
  */
 export default async function PerfilPublicoPage({
   params,
@@ -50,11 +56,12 @@ export default async function PerfilPublicoPage({
   const [perfil, session] = await Promise.all([carregarPerfilPublico(entrada), getSession()]);
   const souEu = session?.steamId === entrada;
 
+  const comJogador = perfil.estado === "ok" || perfil.estado === "privado" || perfil.estado === "sem-cs2";
   // Seguir só existe entre contas: quem vê e quem é visto precisam estar no
-  // FragIQ. E a curva só aparece depois de aceito.
-  const alvo = perfil.estado === "ok" && perfil.usuarioDoFragiq
-    ? await prisma.user.findUnique({ where: { steamId: entrada }, select: { id: true } })
-    : null;
+  // FragIQ. E a curva só aparece depois de aceito. A conta existe em
+  // qualquer estado da Steam — quem esconde os contadores continua tendo
+  // inventário lido, selo e curva.
+  const alvo = comJogador ? await prisma.user.findUnique({ where: { steamId: entrada }, select: { id: true, createdAt: true } }) : null;
   const estado: EstadoSeguir | null =
     session && alvo && !souEu ? await estadoDeSeguir(session.userId, alvo.id) : null;
   const curva = estado === "seguindo" && alvo ? await carregarFonte(alvo.id, 730) : null;
@@ -62,12 +69,30 @@ export default async function PerfilPublicoPage({
   // dos dez); mostramos o que já temos gravado deste SteamID.
   // O scoreboard do GC existe para os dez de cada partida, privados ou não:
   // é o que resta para quem a Steam esconde, e por isso vem antes do estado.
-  const partidas = perfil.estado === "ok" || perfil.estado === "privado" || perfil.estado === "sem-cs2" ? await listarPartidas(entrada, 30) : [];
-  // O inventário é público na Steam por escolha da pessoa; mostramos o que
-  // já lemos dele (os mais raros), nunca lendo a Steam por causa de um
-  // visitante.
-  const inventario = alvo ? await listarInventario(alvo.id) : null;
-  const vitrine = inventario?.publico ? inventario.itens.slice(0, 10) : [];
+  const [partidas, cs] = comJogador
+    ? await Promise.all([
+        listarPartidas(entrada, 30),
+        carregarPerfilCS(entrada, {
+          userId: alvo?.id ?? null,
+          horasConhecidas: perfil.estado === "ok",
+          // Quem tem conta já tem o inventário lido pela coleta; quem não tem
+          // é lido aqui, uma vez a cada 6 h, e só se o perfil não for privado.
+          lerInventario: !alvo && perfil.estado !== "privado",
+        }),
+      ])
+    : [[], null];
+  // O inventário é público na Steam por escolha da pessoa. Sem preço: a
+  // vitrine é o item, como no perfil da Steam.
+  const inventarioDeConta = alvo ? await listarInventario(alvo.id) : null;
+  const inventario = inventarioDeConta?.publico
+    ? { total: inventarioDeConta.itens.length, itens: inventarioDeConta.itens.map((i) => ({ ...i, precoCents: null })) }
+    : cs?.inventario?.publico
+      ? { total: cs.inventario.total, itens: cs.inventario.itens }
+      : null;
+  const vitrine = inventario?.itens.slice(0, 40) ?? [];
+  const jogador = comJogador ? perfil.jogador : null;
+  const usuarioDoFragiq = alvo ? { desde: alvo.createdAt } : null;
+  const horas = perfil.estado === "ok" ? perfil.horas : (cs?.horasBiblioteca ?? null);
 
   return (
     <div className="min-h-dvh">
@@ -92,48 +117,44 @@ export default async function PerfilPublicoPage({
       <main className="mx-auto max-w-6xl px-6 py-10">
         {perfil.estado === "oculto" && <Estado titulo="Perfil oculto" texto="Esta pessoa escolheu não ter página pública no FragIQ." />}
         {perfil.estado === "inexistente" && <Estado titulo="Perfil não encontrado" texto="A Steam não conhece esse SteamID." />}
-        {perfil.estado === "privado" && (
-          <Estado
-            titulo={perfil.jogador.personaname}
-            texto="Perfil privado na Steam. Só o dono pode mudar isso, em Editar perfil → Privacidade."
-          />
-        )}
-        {perfil.estado === "sem-cs2" && (
-          <Estado
-            titulo={perfil.jogador.personaname}
-            texto='Sem estatísticas de CS2 visíveis — ou não jogou, ou "Detalhes do jogo" está privado.'
-          />
-        )}
-        {(perfil.estado === "privado" || perfil.estado === "sem-cs2") && partidas.length > 0 && (
-          <div className="mt-8 space-y-8">
-            <PartidasAgregado partidas={partidas} />
-            <section>
-              <h2 className="hud">Partidas oficiais com gente do FragIQ</h2>
-              <div className="mt-3">
-                <PartidasTabela partidas={partidas.slice(0, 10)} publica />
-              </div>
-            </section>
-          </div>
-        )}
-
-        {perfil.estado === "ok" && (
+        {jogador && (
           <>
             <section className="flex flex-wrap items-center gap-5">
-              {perfil.jogador.avatarfull && (
-                <Image src={perfil.jogador.avatarfull} alt="" width={72} height={72} className="size-18 rounded-2xl ring-1 ring-line" unoptimized />
+              {jogador.avatarfull && (
+                <Image src={jogador.avatarfull} alt="" width={72} height={72} className="size-18 rounded-2xl ring-1 ring-line" unoptimized />
               )}
               <div className="min-w-0 flex-1">
                 <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight">
-                  {perfil.jogador.personaname}
-                  {perfil.usuarioDoFragiq && <Selo tipo="beta" />}
+                  {jogador.personaname}
+                  {usuarioDoFragiq && <Selo tipo="beta" />}
                 </h1>
                 <p className="tnum mt-1 text-sm text-ink-muted">
-                  {perfil.horas.toLocaleString("pt-BR")} h em partida
-                  {perfil.jogador.loccountrycode ? ` · ${perfil.jogador.loccountrycode}` : ""}
-                  {perfil.usuarioDoFragiq
-                    ? ` · no FragIQ desde ${perfil.usuarioDoFragiq.desde.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(".", "")}`
-                    : ""}
+                  {[
+                    horas !== null ? `${horas.toLocaleString("pt-BR")} h ${perfil.estado === "ok" ? "em partida" : "de CS2"}` : null,
+                    jogador.loccountrycode ?? null,
+                    usuarioDoFragiq
+                      ? `no FragIQ desde ${usuarioDoFragiq.desde.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(".", "")}`
+                      : null,
+                    cs?.demo?.rating ? `CS Rating ${cs.demo.rating.atual.toLocaleString("pt-BR")}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  {jogador.profileurl && (
+                    <>
+                      {" · "}
+                      <a href={jogador.profileurl} target="_blank" rel="noreferrer" className="underline decoration-line hover:text-ink">
+                        Steam
+                      </a>
+                    </>
+                  )}
                 </p>
+                {perfil.estado !== "ok" && (
+                  <p className="mt-1 text-xs text-ink-faint">
+                    {perfil.estado === "privado"
+                      ? "Perfil privado na Steam: os contadores não aparecem. O que está abaixo é o que o CS2 já mostra a qualquer um dos dez de cada partida."
+                      : "Contadores de CS2 escondidos (\u201cDetalhes do jogo\u201d privado, ou nunca jogou). O que está abaixo é o que o CS2 já mostra a qualquer um dos dez de cada partida."}
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {session && !souEu && (
@@ -154,7 +175,7 @@ export default async function PerfilPublicoPage({
                   <SeguirBotao steamId={entrada} acao="cancelar" rotulo="Pedido enviado · cancelar" />
                 ) : estado === "seguindo" ? (
                   <SeguirBotao steamId={entrada} acao="cancelar" rotulo="Deixar de seguir" />
-                ) : perfil.usuarioDoFragiq ? (
+                ) : usuarioDoFragiq ? (
                   <p className="flex items-center gap-1.5 text-xs text-ink-faint">
                     <Lock className="size-3" /> a curva é só do dono — entre e peça
                   </p>
@@ -201,6 +222,22 @@ export default async function PerfilPublicoPage({
               </section>
             )}
 
+            {cs?.demo && (
+              <section className="mt-8">
+                <DemoPublicaBloco demo={cs.demo} />
+              </section>
+            )}
+            {cs?.presenca && (
+              <p className="mt-4 text-sm text-ink-muted">
+                <span className="hud">última partida vista</span>{" "}
+                <span suppressHydrationWarning>{formatarQuando(cs.presenca.quando)}</span>
+                {[cs.presenca.modo, cs.presenca.mapa].filter(Boolean).length > 0 && ` · ${[cs.presenca.modo, cs.presenca.mapa].filter(Boolean).join(" · ")}`}
+                {cs.presenca.placar && <span className="num"> · {cs.presenca.placar}</span>}
+              </p>
+            )}
+
+            {perfil.estado === "ok" && (
+              <>
             <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {perfil.resumo.map((r) => (
                 <div key={r.rotulo} className="rounded-2xl bg-surface p-4 ring-1 ring-line">
@@ -239,12 +276,16 @@ export default async function PerfilPublicoPage({
                 </p>
               </section>
             </div>
+              </>
+            )}
 
             {vitrine.length > 0 && (
               <section className="mt-10">
                 <div className="flex items-baseline justify-between">
                   <h2 className="hud">Inventário</h2>
-                  <p className="num text-xs text-ink-faint">{inventario!.itens.length} itens · os {vitrine.length} mais raros</p>
+                  <p className="num text-xs text-ink-faint">
+                    {inventario!.total} itens{inventario!.total > vitrine.length ? ` · os ${vitrine.length} mais raros` : ""}
+                  </p>
                 </div>
                 <div className="mt-3">
                   <InventarioGrade itens={vitrine} />
@@ -264,7 +305,7 @@ export default async function PerfilPublicoPage({
               </>
             )}
 
-            {!perfil.usuarioDoFragiq && !session && (
+            {!usuarioDoFragiq && !session && (
               <section className="mt-12 rounded-2xl bg-surface p-6 ring-1 ring-line">
                 <p className="text-lg font-semibold tracking-tight">É você?</p>
                 <p className="mt-1 max-w-lg text-sm text-ink-muted">

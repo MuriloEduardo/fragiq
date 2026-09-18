@@ -881,6 +881,21 @@ model ItemPrice {
 /// registro de "houve uma partida de Premier em Mirage às 22:02", e é o que
 /// permite dar modo a uma sessão com prova, não por proximidade
 /// (docs/dados-confiaveis.md §3.1–3.2).
+/// O inventário público de quem não tem conta aqui, lido quando alguém
+/// abre o perfil e guardado por 6 h (a Steam limita o endpoint por IP com
+/// força). Só os itens, sem preço: a vitrine é o que a Steam já mostra a
+/// qualquer um no perfil da pessoa. Quem tem conta usa `InventoryItem`.
+model InventarioPublico {
+  steamId String  @id
+  publico Boolean
+  total   Int     @default(0)
+  /// Até 40 itens, do mais raro ao comum: nome, imagem, raridade, exterior, arma, categoria, selos.
+  itens   Json
+  lidoEm  DateTime
+
+  @@map("inventarios_publicos")
+}
+
 model BotObservation {
   id String @id @default(cuid())
 

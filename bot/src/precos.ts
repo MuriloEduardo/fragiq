@@ -60,6 +60,7 @@ async function ler(nome: string): Promise<Resultado | "calma"> {
 export function ligarPrecos(clientLogado: () => boolean) {
   let rodando = false;
   let espera = RODADA_MS;
+  if (!config.precos) return { parar() {} };
 
   async function rodada() {
     if (rodando || !clientLogado()) return;

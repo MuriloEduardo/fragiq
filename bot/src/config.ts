@@ -68,6 +68,12 @@ export const config = {
   /** Intervalo entre buscas na fila de mensagens. */
   outboxPollMs: Number(process.env.BOT_OUTBOX_POLL_MS ?? 20_000),
 
+  /**
+   * Ler preços do Mercado. Desligado por padrão desde 18/09/2026: o Mercado
+   * respondia 429 a cada rodada e o produto não precisa de preço de skin —
+   * a vitrine é o item, não o valor. `BOT_PRECOS=true` religa.
+   */
+  precos: process.env.BOT_PRECOS === "true",
   /** Aceitar pedidos de amizade automaticamente. */
   autoAccept: process.env.BOT_AUTO_ACCEPT !== "false",
 } as const;
