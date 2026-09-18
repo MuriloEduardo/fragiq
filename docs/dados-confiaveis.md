@@ -134,6 +134,7 @@ Catálogo inicial de regras (todas determinísticas, todas de uma linha):
 | `forma.vs.vitalicio` | modo | barra dupla | `Forma atual 1,21 · vitalício 1,08` |
 | `mapa.melhor` / `mapa.pior` | modo | rank | `Mirage +14 % · Inferno −9 %` (só EXATA/INFERIDA, mín. rounds) |
 | `arma.destaque` | modo | barra | `AK-47 38% dos abates · normal 31% (+7 pp)` |
+| `arma.precisao` | modo | rank | `AK-47 15% de acerto (+1 pp) · M4A1 11% (−7 pp)` |
 | `consistencia` | modo | faixa | `Variação de K/D entre sessões: baixa` |
 | `cobertura.modo` | período | anel | `72 % dos rounds com modo conhecido` |
 
@@ -142,9 +143,9 @@ teste em `tests/lib/insights.test.ts`); `materializar.ts` grava ao fechar a
 sessão e no `recompute:insights`; `ler.ts` é o que a tela consulta;
 `components/insight.tsx` desenha pelo `visual`. `entradasHash` = sha256
 das entradas serializadas. Implementadas em 17/09: os 4 de sessão
-(`kd|adr|hs.vs.normal`, `sessao.classificacao`) e 6 de modo
+(`kd|adr|hs.vs.normal`, `sessao.classificacao`) e 7 de modo
 (`tendencia.kd.5`, `forma.vs.vitalicio`, `mapa.ranking`, `arma.destaque`,
-`consistencia`, `cobertura.modo`).
+`arma.precisao`, `consistencia`, `cobertura.modo`).
 
 `arma.destaque` compara a **fatia dos abates** de cada arma nas últimas 5
 sessões da lente com a fatia nas sessões anteriores a essa janela (mín. 15
@@ -156,6 +157,20 @@ Sem direção boa ou ruim (§4.5): usar mais AWP não é melhor nem pior, o tom
 é NEUTRO. Sessão sem `armas` registrada fica de fora inteira — entrar só
 no denominador encolheria a fatia de todas as armas por um dado que não
 existe.
+
+`arma.precisao` (17/09) usa a outra metade de `Session.armas`, o par
+tiros/acertos, e responde "com qual arma eu estou acertando mais do que
+costumava": a precisão da mesma janela de 5 sessões contra a das sessões
+anteriores a ela, arma por arma. Os mínimos são de **tiros** — 200 na
+janela, 400 na base — porque é o tiro que é o denominador; a 200 tiros uma
+precisão perto de 25 % ainda carrega ~3 pp de ruído amostral, então a
+janela abaixo de 400 tiros fica marcada como fraca (`dados.fraco`).
+Diferente do destaque, esta regra tem direção (acertar mais é melhor) e o
+tom vem da valência do `delta.ts` — exceto quando a melhor e a pior arma
+andaram para lados opostos, caso em que a linha tem dois sujeitos e
+nenhuma direção única, e o tom é NEUTRO. É a regra que substituiu as duas
+leituras de arma que a aba Estatísticas montava por request contra o
+vitalício misturado da Steam.
 
 ### 3.4 Camada 3 — operação, auditoria, tracing
 

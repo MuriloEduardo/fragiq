@@ -412,6 +412,98 @@ export function armaDestaque(sessoes: SessaoFato[], modo: string | null): Insigh
   };
 }
 
+/**
+ * `arma.precisao` — a precisão por arma (acertos ÷ tiros), janela contra base.
+ *
+ * O par tiros/acertos entrou na `Session` com a Fase 3c e ninguém lia. É a
+ * única leitura de precisão por arma que não depende do vitalício: o
+ * contador da Steam soma todos os modos para sempre, e era contra ele que a
+ * aba Estatísticas comparava — recalculando a cada request, com 25 tiros de
+ * mínimo. Aqui os dois lados da conta são intervalos que a sessão sabe
+ * atribuir a um modo: as últimas 5 sessões com contador de arma contra as
+ * anteriores a essa janela.
+ *
+ * Diferente de `arma.destaque`, esta regra **tem direção**: acertar mais é
+ * melhor, então o tom vem da valência de `delta.ts`. Quando a melhor e a
+ * pior arma andaram para lados opostos, a linha tem dois sujeitos e nenhuma
+ * direção única — aí o tom é NEUTRO (docs/dados-confiaveis.md §4.5).
+ *
+ * Os mínimos são de tiros, não de abates, porque é o tiro que é o
+ * denominador: a 200 tiros, uma precisão perto de 25 % ainda carrega ~3 pp
+ * de ruído amostral, bem acima do piso de 1 pp do `delta.ts`. Por isso a
+ * janela abaixo de 400 tiros sai marcada como fraca no próprio insight
+ * (`dados.fraco`, `delta.fraco`): é o que separa uma diferença medida de
+ * uma diferença ainda amostral para quem audita a regra.
+ */
+const MIN_TIROS_JANELA = 200;
+const MIN_TIROS_BASE = 400;
+const TIROS_AMOSTRA_FIRME = 400;
+
+function precisao(sessoes: SessaoFato[], arma: string): { pct: number; tiros: number; acertos: number } | null {
+  const tiros = sessoes.reduce((a, s) => a + (s.armas[arma]?.tiros ?? 0), 0);
+  if (!tiros) return null;
+  const acertos = sessoes.reduce((a, s) => a + (s.armas[arma]?.acertos ?? 0), 0);
+  return { pct: (acertos / tiros) * 100, tiros, acertos };
+}
+
+export function precisaoPorArma(sessoes: SessaoFato[], modo: string | null): InsightCalculado {
+  const comArmas = sessoesDaLente(sessoes, modo)
+    .filter((s) => Object.keys(s.armas).length > 0)
+    .sort((a, b) => a.ate.getTime() - b.ate.getTime());
+  const janela = comArmas.slice(-JANELA);
+  const antes = comArmas.slice(0, -JANELA);
+  const nomes = [...new Set(janela.flatMap((s) => Object.keys(s.armas)))];
+
+  const linhas = nomes
+    .map((arma) => ({ arma, rotulo: rotularArma(arma), atual: precisao(janela, arma), normal: precisao(antes, arma) }))
+    .filter((l) => l.atual !== null && l.normal !== null && l.atual.tiros >= MIN_TIROS_JANELA && l.normal.tiros >= MIN_TIROS_BASE)
+    .map((l) => ({ ...l, delta: l.atual!.pct - l.normal!.pct }))
+    .sort((a, b) => b.delta - a.delta);
+
+  const melhor = linhas[0];
+  const pior = linhas[linhas.length - 1];
+  const fraco = melhor ? melhor.atual!.tiros < TIROS_AMOSTRA_FIRME : false;
+  const normal: Normal = melhor
+    ? { tipo: "modo", valor: melhor.normal!.pct, rotulo: `normal · ${melhor.rotulo}`, sessoes: antes.length }
+    : { tipo: "nenhum", motivo: "sem-sessoes" };
+  const delta = calcularDelta({ unit: "%", melhorQuando: "sobe" }, melhor?.atual?.pct ?? null, normal, fraco);
+  // Dois sujeitos com sinais opostos não têm direção única: a cor sairia da
+  // metade da frase que veio primeiro.
+  const opostos = linhas.length > 1 && melhor.delta > 0 !== pior.delta > 0;
+  const pp = (v: number) => `${v > 0 ? "+" : "−"}${formatarPp(v)}`;
+
+  const linha = !melhor
+    ? nomes.length === 0
+      ? "Precisão por arma — sem sessões com contador de arma ainda"
+      : `Precisão por arma — faltam tiros para comparar (${MIN_TIROS_JANELA} na janela, ${MIN_TIROS_BASE} de base)`
+    : linhas.length === 1
+      ? `${melhor.rotulo} ${formatarPct(melhor.atual!.pct)} de acerto · normal ${formatarPct(melhor.normal!.pct)} (${pp(melhor.delta)})`
+      : `${melhor.rotulo} ${formatarPct(melhor.atual!.pct)} de acerto (${pp(melhor.delta)}) · ${pior.rotulo} ${formatarPct(pior.atual!.pct)} (${pp(pior.delta)})`;
+
+  return {
+    regra: "arma.precisao",
+    regraVersao: VERSAO_MODO,
+    valor: melhor?.atual?.pct ?? null,
+    referencia: melhor?.normal?.pct ?? null,
+    referenciaTipo: melhor ? "modo" : null,
+    delta: delta.estado === "ok" ? delta.valor : null,
+    deltaUnidade: delta.estado === "ok" ? delta.unidade : null,
+    tom: !melhor ? "AVISO" : opostos ? "NEUTRO" : tomDe(delta),
+    confianca: modo ? "INFERIDA" : null,
+    base: { rounds: janela.reduce((a, s) => a + s.rounds, 0), sessoes: janela.length },
+    visual: "RANK",
+    dados: {
+      linhas: linhas.slice(0, 6).map((l) => ({ rotulo: l.rotulo, delta: l.delta, pct: l.atual!.pct, tiros: l.atual!.tiros })),
+      arma: melhor?.arma ?? null,
+      tiros: melhor?.atual?.tiros ?? null,
+      fraco,
+      janela: JANELA,
+      minimos: { janela: MIN_TIROS_JANELA, base: MIN_TIROS_BASE },
+    },
+    linha,
+  };
+}
+
 /** `cobertura.modo` — quantos rounds do período têm modo provado; o anel. */
 export function coberturaDeModo(sessoes: SessaoFato[]): InsightCalculado {
   const total = sessoes.reduce((a, s) => a + s.rounds, 0);
@@ -436,7 +528,7 @@ export function coberturaDeModo(sessoes: SessaoFato[]): InsightCalculado {
 }
 
 export function insightsDoModo(sessoes: SessaoFato[], modo: string | null): InsightCalculado[] {
-  const lista = [tendenciaKd(sessoes, modo), formaVsVitalicio(sessoes, modo), rankingDeMapas(sessoes, modo), armaDestaque(sessoes, modo), consistencia(sessoes, modo)];
+  const lista = [tendenciaKd(sessoes, modo), formaVsVitalicio(sessoes, modo), rankingDeMapas(sessoes, modo), armaDestaque(sessoes, modo), precisaoPorArma(sessoes, modo), consistencia(sessoes, modo)];
   if (modo === null) lista.push(coberturaDeModo(sessoes));
   return lista;
 }
@@ -444,5 +536,5 @@ export function insightsDoModo(sessoes: SessaoFato[], modo: string | null): Insi
 /** As regras em vigor, com a versão de cada uma — o que o painel de dados confere contra o banco. */
 export const REGRAS_EM_VIGOR: { regra: string; versao: number; escopo: "SESSAO" | "MODO" }[] = [
   ...["kd.vs.normal", "adr.vs.normal", "hs.vs.normal", "sessao.classificacao"].map((regra) => ({ regra, versao: VERSAO_SESSAO, escopo: "SESSAO" as const })),
-  ...["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "arma.destaque", "consistencia", "cobertura.modo"].map((regra) => ({ regra, versao: VERSAO_MODO, escopo: "MODO" as const })),
+  ...["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "arma.destaque", "arma.precisao", "consistencia", "cobertura.modo"].map((regra) => ({ regra, versao: VERSAO_MODO, escopo: "MODO" as const })),
 ];

@@ -333,16 +333,19 @@ falta**. Largura `max-w-6xl`.
 5. **Por modo** (3).
 
 As leituras de K/D, headshot e modo saíram do Resumo: eram o hero em prosa.
-`lerSerie` continua produzindo `amostra` e `mapas` (viram os chips-nota) e
-`arma-melhor`/`arma-pior`, que vivem em Estatísticas.
+Na tela, `lerSerie` só alimenta os chips-nota do hero (`amostra`, `mapas`);
+`arma-melhor`/`arma-pior` saíram de Estatísticas em 17/09, substituídas
+pelos insights materializados por arma, e sobrevivem apenas nas views do
+analista, que ainda leem a série.
 
 ### 4.2 Estatísticas — `estatisticas/page.tsx`
 
 "Como estou, estatística por estatística", com a série inteira sempre à
 vista.
 
-1. **Destaques**: as duas leituras de arma, no formato
-   `8,8% · Precisão AK-47 · contra 7,7% de vitalício · 331 tiros`;
+1. **Destaques**: os insights por arma lidos do banco (`arma.precisao`,
+   `arma.destaque`), um `Insight` cada — visual à esquerda, uma linha de
+   texto, marca de confiança à direita;
 2. os **doze cartões** na lente;
 3. **Sobre estes contadores** (`counter-scope.tsx`): `details` colapsado com
    quatro linhas — somam todos os modos, só o pool antigo de mapas, última

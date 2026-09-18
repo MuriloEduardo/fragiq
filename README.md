@@ -137,8 +137,10 @@ A primeira ressalva tem saída, e é a razão de a sessão existir
 materializada: o vitalício por arma mistura modos para sempre, mas o que o
 contador andou **entre duas coletas** pertence ao que foi jogado nesse
 intervalo. `Session.armas` guarda esse delta (kills/tiros/acertos por arma)
-e a sessão já sabe, com prova, qual foi o modo — então `arma.destaque` é um
-número por arma de um modo só.
+e a sessão já sabe, com prova, qual foi o modo — então `arma.destaque`
+(fatia dos abates) e `arma.precisao` (acertos ÷ tiros) são números por arma
+de um modo só, e não do vitalício misturado. Os dois são insights
+materializados e aparecem em **Destaques**, na aba Estatísticas.
 
 ### Nem todo contador é cumulativo
 

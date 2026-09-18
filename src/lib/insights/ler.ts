@@ -8,7 +8,7 @@ import type { InsightLinha } from "@/components/insight";
 const CS2_APPID = 730;
 
 const ORDEM_SESSAO = ["sessao.classificacao", "kd.vs.normal", "adr.vs.normal", "hs.vs.normal"];
-const ORDEM_MODO = ["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "arma.destaque", "consistencia", "cobertura.modo"];
+const ORDEM_MODO = ["tendencia.kd.5", "forma.vs.vitalicio", "mapa.ranking", "arma.destaque", "arma.precisao", "consistencia", "cobertura.modo"];
 
 function paraLinha(i: {
   id: string;
@@ -40,6 +40,16 @@ export async function insightsDaUltimaSessao(userId: string, modo: string | null
   const porRegra = new Map<string, (typeof linhas)[number]>();
   for (const l of linhas) if (!porRegra.has(l.regra)) porRegra.set(l.regra, l);
   return { sessaoId: sessao.id, ate: sessao.ate, insights: [...porRegra.values()].map(paraLinha).sort(ordenar(ORDEM_SESSAO)) };
+}
+
+/**
+ * Os insights por arma — o que a aba Estatísticas mostra em Destaques.
+ *
+ * É a mesma consulta do Resumo, recortada: arma é assunto da aba de
+ * estatísticas, e o Resumo já repete de lá o painel de seis cartões.
+ */
+export async function insightsDeArma(userId: string, modo: string | null): Promise<InsightLinha[]> {
+  return (await insightsDoModo(userId, modo)).filter((i) => i.regra.startsWith("arma."));
 }
 
 /** Os insights do modo (ou de "tudo"). */

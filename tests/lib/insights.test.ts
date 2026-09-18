@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { armaDestaque, classificacaoDaSessao, coberturaDeModo, formaVsVitalicio, insightsDaSessao, metricaVsNormal, normalNaHora, rankingDeMapas, tendenciaKd, type SessaoFato } from "@/lib/insights/regras";
+import { armaDestaque, classificacaoDaSessao, coberturaDeModo, formaVsVitalicio, insightsDaSessao, metricaVsNormal, normalNaHora, precisaoPorArma, rankingDeMapas, tendenciaKd, type SessaoFato } from "@/lib/insights/regras";
 
 const dia = (n: number) => new Date(Date.UTC(2026, 8, 1 + n, 20));
 const sessao = (n: number, o: Partial<SessaoFato> = {}): SessaoFato => ({
@@ -20,6 +20,8 @@ const sessao = (n: number, o: Partial<SessaoFato> = {}): SessaoFato => ({
 });
 
 const arma = (kills: number) => ({ kills, tiros: kills * 12, acertos: kills * 3 });
+/** Para a precisão, o que importa é o par tiros/acertos; os abates não entram. */
+const tiro = (tiros: number, acertos: number) => ({ kills: 0, tiros, acertos });
 
 describe("normal na hora", () => {
   it("sem 5 sessões anteriores do modo cai no vitalício da coleta, rotulado como fraco", () => {
@@ -110,6 +112,51 @@ describe("insights de modo", () => {
     expect(a).toMatchObject({ tom: "AVISO", valor: null, referencia: null, delta: null });
     expect(a.linha).toMatch(/faltam abates para comparar/);
     expect(armaDestaque([], null).linha).toMatch(/sem sessões com contador de arma/);
+  });
+  it("precisão por arma: acertos ÷ tiros da janela contra os das sessões anteriores", () => {
+    // Antes: 40 de 200 tiros por sessão (20 %); agora: 50 de 200 (25 %).
+    const antes = [1, 2, 3, 4, 5].map((i) => sessao(i, { armas: { ak47: tiro(200, 40) } }));
+    const agora = [6, 7, 8, 9, 10].map((i) => sessao(i, { armas: { ak47: tiro(200, 50) } }));
+    const p = precisaoPorArma([...antes, ...agora], "premier");
+    expect(p).toMatchObject({ regra: "arma.precisao", visual: "RANK", tom: "BOM", deltaUnidade: "pp", referenciaTipo: "modo" });
+    expect(p.valor).toBeCloseTo(25, 5);
+    expect(p.referencia).toBeCloseTo(20, 5);
+    expect(p.delta).toBeCloseTo(5, 5);
+    expect(p.linha).toBe("AK-47 25% de acerto · normal 20% (+5 pp)");
+    expect(p.dados.fraco).toBe(false);
+  });
+  it("arma sem tiros suficientes na janela, ou sem base, não entra no ranking", () => {
+    // AWP: 30 tiros por sessão na janela (150 < 200) — fica fora mesmo com base.
+    // UMP-45: sobra na janela (500) e falta na base (250 < 400) — também fora,
+    // porque o lado que falta é o que seria chamado de "normal".
+    const antes = [1, 2, 3, 4, 5].map((i) => sessao(i, { armas: { ak47: tiro(200, 40), awp: tiro(100, 30), ump45: tiro(50, 10) } }));
+    const agora = [6, 7, 8, 9, 10].map((i) => sessao(i, { armas: { ak47: tiro(200, 50), awp: tiro(30, 15), ump45: tiro(100, 25) } }));
+    const p = precisaoPorArma([...antes, ...agora], "premier");
+    expect(p.dados.linhas).toEqual([{ rotulo: "AK-47", delta: 5, pct: 25, tiros: 1000 }]);
+  });
+  it("melhor e pior para lados opostos: a linha diz os dois e a cor não escolhe um", () => {
+    const antes = [1, 2, 3, 4, 5].map((i) => sessao(i, { armas: { ak47: tiro(200, 40), ump45: tiro(200, 50) } }));
+    const agora = [6, 7, 8, 9, 10].map((i) => sessao(i, { armas: { ak47: tiro(200, 50), ump45: tiro(200, 30) } }));
+    const p = precisaoPorArma([...antes, ...agora], "premier");
+    expect(p.tom).toBe("NEUTRO");
+    expect(p.linha).toBe("AK-47 25% de acerto (+5 pp) · UMP-45 15% (−10 pp)");
+  });
+  it("janela acima do mínimo mas ainda curta sai marcada como fraca", () => {
+    // A janela é sempre as 5 últimas sessões com contador: 250 tiros passam
+    // do mínimo de 200 e não chegam aos 400 em que a diferença deixa de ser
+    // do tamanho do ruído amostral.
+    const antes = [1, 2].map((i) => sessao(i, { armas: { ak47: tiro(400, 80) } }));
+    const agora = [3, 4, 5, 6, 7].map((i) => sessao(i, { armas: { ak47: tiro(50, 12) } }));
+    const p = precisaoPorArma([...antes, ...agora], "premier");
+    expect(p.dados.fraco).toBe(true);
+    expect(p.valor).toBeCloseTo(24, 5);
+    expect(p.tom).toBe("BOM");
+  });
+  it("sem tiros dos dois lados a regra diz o que falta, e não inventa número", () => {
+    const p = precisaoPorArma([sessao(1, { armas: { ak47: tiro(600, 150) } })], "premier");
+    expect(p).toMatchObject({ tom: "AVISO", valor: null, referencia: null, delta: null });
+    expect(p.linha).toBe("Precisão por arma — faltam tiros para comparar (200 na janela, 400 de base)");
+    expect(precisaoPorArma([], null).linha).toMatch(/sem sessões com contador de arma/);
   });
   it("cobertura conta rounds provados sobre o total", () => {
     const c = coberturaDeModo([...dez.slice(0, 2), sessao(20, { modo: null, confianca: "MISTA", rounds: 48 })]);
