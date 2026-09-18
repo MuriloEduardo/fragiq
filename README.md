@@ -239,7 +239,13 @@ porta, com texto diferente a cada vez e sempre dizendo o mesmo no fundo: é
 seguro, é uma vez só, e é o que toda plataforma (Leetify, csstats, Scope)
 pede. Para quando a pessoa liga, desliga os avisos em /seguranca ou já
 ouviu três vezes (`User.avisoPrivacidadeEm/avisosPrivacidade`,
-`avisoPartidasEm/avisosPartidas`).
+`avisoPartidasEm/avisosPartidas`). Os lembretes das partidas levam o link
+direto da página da Steam que gera o código (`CODIGOS_STEAM`) e o da
+página onde colar. Quem adicionou o bot e **nunca entrou** também é
+convidado (`BotAmigo`, a lista de amigos como fato, com ou sem conta): um
+dia depois da amizade, depois semanal, três no máximo, com o link da
+própria página pública (`/p/<steamId>`) e o do login — remover o bot dos
+amigos encerra. Textos em `src/lib/lembretes-texto.ts`.
 
 ## O explorador
 

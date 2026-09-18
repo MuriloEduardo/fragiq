@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     console.error("[cron] lembretes:", e);
     return null;
   });
-  if (lembretes && (lembretes.stats || lembretes.partidas)) console.log("[cron] lembretes enfileirados:", lembretes);
+  if (lembretes && (lembretes.stats || lembretes.partidas || lembretes.convites)) console.log("[cron] lembretes enfileirados:", lembretes);
 
   const run = await prisma.cronRun.create({
     data: { status: "RUNNING", candidates: users.length },

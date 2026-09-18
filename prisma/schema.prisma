@@ -392,8 +392,9 @@ enum FollowStatus {
 model SteamMessage {
   id String @id @default(cuid())
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Nulo para quem o bot alcança mas ainda não tem conta (convite).
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   steamId String
   texto   String
@@ -894,6 +895,22 @@ model InventarioPublico {
   lidoEm  DateTime
 
   @@map("inventarios_publicos")
+}
+
+/// Cada amigo do bot, tenha conta ou não. É o fato que `User.botAmigoDesde`
+/// resume para quem entrou; para quem não entrou, é a única lista de quem
+/// o bot alcança — e de quem já foi convidado, quantas vezes.
+model BotAmigo {
+  steamId String @id
+  desde   DateTime @default(now())
+  /// Preenchido quando some da lista; volta a nulo se re-adicionar.
+  saiuEm  DateTime?
+  /// Convites para entrar no FragIQ (só para quem não tem conta), com teto.
+  convites        Int       @default(0)
+  ultimoConviteEm DateTime?
+
+  @@index([saiuEm])
+  @@map("bot_amigos")
 }
 
 model BotObservation {

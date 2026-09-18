@@ -1,6 +1,9 @@
 import { prisma } from "./prisma";
 import { appUrl } from "./env";
 import { registrar } from "./eventos";
+import { CONVITES, LEMBRETES_PARTIDAS, LEMBRETES_PRIVACIDADE } from "./lembretes-texto";
+
+export { CODIGOS_STEAM, CONVITES, LEMBRETES_PRIVACIDADE } from "./lembretes-texto";
 
 /**
  * O que a pessoa ainda não compartilhou — e que o site sente falta.
@@ -85,39 +88,6 @@ const MAX_LEMBRETES = 3;
 const INTERVALO_MS = 7 * 86_400_000;
 const CARENCIA_AMIZADE_MS = 2 * 86_400_000;
 
-const LEMBRETES_PARTIDAS = (site: string): string[] => [
-  [
-    "FragIQ · Suas sessões já estão entrando, mas as partidas oficiais (placar, scoreboard dos dez, Premier separado do Competitivo) ainda não — falta o código de histórico de partidas da Steam.",
-    "É seguro: o código só lê o histórico de partidas, não abre inventário, chat, amigos nem senha, e é revogável a qualquer momento. Leetify, csstats e Scope pedem exatamente o mesmo código.",
-    `Ligar (uma vez só): ${site}/games/730/partidas · para não receber mais: ${site}/seguranca`,
-  ].join("\n"),
-  [
-    "FragIQ · Lembrete: sem o código de histórico da Steam, cada partida sua entra aqui só como um total entre coletas — sem mapa, sem placar, sem os outros nove.",
-    "Leva um minuto, é o mesmo código que Leetify e csstats usam, e a Steam gera outro se você quiser revogar.",
-    `${site}/games/730/partidas`,
-  ].join("\n"),
-  [
-    "FragIQ · Último lembrete sobre isto, prometo. Suas partidas oficiais continuam de fora porque o código de histórico não foi ativado.",
-    `Se quiser ligar: ${site}/games/730/partidas. Se não, tudo bem — o resto continua funcionando, e não volto a falar disso.`,
-  ].join("\n"),
-];
-
-export const LEMBRETES_PRIVACIDADE = (site: string): string[] => [
-  [
-    "FragIQ · Vi que você jogou CS2, mas a Steam não deixa o site ler as suas estatísticas: os \"Detalhes do jogo\" do seu perfil estão privados.",
-    "É um clique: https://steamcommunity.com/my/edit/settings → Detalhes do jogo → Público. É o que toda plataforma de estatísticas pede, e não expõe nada além do que o próprio jogo já mostra no seu perfil.",
-    `Passo a passo: ${site}/cs2 · para não receber mais: ${site}/seguranca`,
-  ].join("\n"),
-  [
-    "FragIQ · Lembrete: enquanto os \"Detalhes do jogo\" estiverem privados na Steam, nenhuma partida sua entra — nem K/D, nem dano, nem headshot.",
-    "Privacidade → Detalhes do jogo → Público: https://steamcommunity.com/my/edit/settings. Depois é só clicar em Sincronizar.",
-  ].join("\n"),
-  [
-    "FragIQ · Último lembrete sobre isto. Sem os \"Detalhes do jogo\" públicos o FragIQ não tem o que mostrar para você.",
-    `Quando quiser: https://steamcommunity.com/my/edit/settings. Para não receber mais: ${site}/seguranca`,
-  ].join("\n"),
-];
-
 type Lembrete = {
   id: "stats" | "partidas";
   campoQuando: "avisoPrivacidadeEm" | "avisoPartidasEm";
@@ -135,9 +105,10 @@ const LEMBRETES: Lembrete[] = [
  * Chamado pelo cron diário: enfileira, para cada pessoa que o bot alcança,
  * o próximo lembrete devido. Devolve quantos saíram.
  */
-export async function lembrarPendenciasNoSteam(agora = new Date()): Promise<{ stats: number; partidas: number }> {
+export async function lembrarPendenciasNoSteam(agora = new Date()): Promise<{ stats: number; partidas: number; convites: number }> {
   const site = appUrl();
-  const saida = { stats: 0, partidas: 0 };
+  const saida = { stats: 0, partidas: 0, convites: 0 };
+  saida.convites = await convidarAmigosSemConta(agora, site);
   const candidatos = await prisma.user.findMany({
     where: { avisoSteam: true, botAmigoDesde: { lte: new Date(agora.getTime() - CARENCIA_AMIZADE_MS) } },
     select: {
@@ -174,6 +145,33 @@ export async function lembrarPendenciasNoSteam(agora = new Date()): Promise<{ st
     saida[pendente.id]++;
   }
   return saida;
+}
+
+/** Convites para quem adicionou o bot e nunca entrou: 1 dia de amizade, depois semanal, até `MAX_LEMBRETES`. */
+const CARENCIA_CONVITE_MS = 1 * 86_400_000;
+
+async function convidarAmigosSemConta(agora: Date, site: string): Promise<number> {
+  const amigos = await prisma.botAmigo.findMany({
+    where: { saiuEm: null, convites: { lt: MAX_LEMBRETES }, desde: { lte: new Date(agora.getTime() - CARENCIA_CONVITE_MS) } },
+    select: { steamId: true, convites: true, ultimoConviteEm: true },
+  });
+  if (amigos.length === 0) return 0;
+  const comConta = new Set(
+    (await prisma.user.findMany({ where: { steamId: { in: amigos.map((a) => a.steamId) } }, select: { steamId: true } })).map((u) => u.steamId),
+  );
+  let enviados = 0;
+  for (const a of amigos) {
+    if (comConta.has(a.steamId)) continue;
+    if (a.ultimoConviteEm && agora.getTime() - a.ultimoConviteEm.getTime() < INTERVALO_MS) continue;
+    const texto = CONVITES(site, a.steamId)[Math.min(a.convites, MAX_LEMBRETES - 1)];
+    await prisma.$transaction([
+      prisma.steamMessage.create({ data: { userId: null, steamId: a.steamId, texto } }),
+      prisma.botAmigo.update({ where: { steamId: a.steamId }, data: { convites: { increment: 1 }, ultimoConviteEm: agora } }),
+    ]);
+    await registrar("convite.steam", { dados: { steamId: a.steamId, convite: a.convites + 1 } });
+    enviados++;
+  }
+  return enviados;
 }
 
 /**

@@ -24,6 +24,15 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
 
   const { steamIds } = parsed.data;
+  // A lista inteira como fato, com ou sem conta: é daqui que saem os
+  // convites para quem o bot alcança e ainda não entrou.
+  const agora = new Date();
+  await prisma.$transaction([
+    ...steamIds.map((steamId) =>
+      prisma.botAmigo.upsert({ where: { steamId }, create: { steamId, desde: agora }, update: { saiuEm: null } }),
+    ),
+    prisma.botAmigo.updateMany({ where: { steamId: { notIn: steamIds }, saiuEm: null }, data: { saiuEm: agora } }),
+  ]);
   const novos = await prisma.user.findMany({
     where: { steamId: { in: steamIds }, botAmigoDesde: null },
     select: { id: true },
