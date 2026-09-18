@@ -444,6 +444,11 @@ model Match {
   placarA  Int?
   placarB  Int?
   demoUrl  String?
+  /// A resposta do GC inteira (`CDataGCCStrike15_v2_MatchInfo`: um
+  /// `roundstatsall` por round com kills/deaths/scores acumulados, pings,
+  /// multi-kills, rankings da reserva). O GC esquece em ~30 dias; isto não.
+  /// O que já virou coluna veio daqui; o resto espera a pergunta certa.
+  gc       Json?
 
   /// Quem tinha a corrente de share codes que revelou esta partida. Os
   /// outros nove jogadores a ganham de graça.
@@ -453,11 +458,119 @@ model Match {
   updatedAt DateTime @updatedAt
 
   jogadores MatchPlayer[]
+  demo      MatchDemo?
+  metricas  MatchPlayerDemo[]
 
   @@index([status, createdAt])
   @@index([jogadaEm])
   @@index([modo])
   @@map("matches")
+}
+
+/// A demo da partida, reduzida pelo bot ao que as regras precisam
+/// (`bot/src/demo-parse.ts`, docs/demos.md): rounds, mortes com posição,
+/// dano, cegueiras, granadas, bomba, zona por onde cada um andou, rating.
+/// Os eventos ficam inteiros para as métricas serem recalculadas quando a
+/// regra mudar — a demo na CDN da Valve some em ~30 dias, isto aqui não.
+model MatchDemo {
+  matchId String @id
+  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  status     DemoStatus @default(PENDING)
+  /// Quantas vezes o bot já tentou (download, descompressão ou parser).
+  tentativas Int        @default(0)
+  error      String?
+
+  /// Versão do formato do payload e o parser que o produziu.
+  versao Int?
+  parser String?
+  ticks  Int?
+  /// O payload inteiro (jogadores, rounds, eventos, tiros).
+  dados  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@map("match_demos")
+}
+
+enum DemoStatus {
+  /// A partida tem URL de demo e o bot ainda não a leu.
+  PENDING
+  /// Eventos gravados e métricas calculadas.
+  DONE
+  /// A Valve já apagou a demo (404).
+  EXPIRED
+  /// Desistimos depois de várias tentativas.
+  FAILED
+}
+
+/// As métricas de um jogador numa partida, calculadas dos eventos da demo
+/// por `src/lib/demo/metricas.ts` — o que a Web API não dá (ADR, KAST,
+/// aberturas, trocas, clutches, utilitário) e que as sessões vão ler em
+/// série temporal. Recalculável: `versaoRegras` diz com qual regra.
+model MatchPlayerDemo {
+  id String @id @default(cuid())
+
+  matchId String
+  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  steamId String
+
+  versaoRegras Int
+  /// Rounds em que o jogador esteve (quem saiu no meio conta só até sair).
+  rounds       Int
+
+  kills   Int
+  deaths  Int
+  assists Int
+  hs      Int
+  /// Dano causado a inimigos (limitado à vida que a vítima tinha) e sofrido.
+  dano        Int
+  danoSofrido Int
+  adr         Float
+  /// Fração dos rounds com kill, assist, sobrevivência ou morte trocada.
+  kast        Float
+
+  /// Primeira morte do round: quem matou abriu, quem morreu perdeu a abertura.
+  aberturas         Int
+  aberturasPerdidas Int
+  /// Kill em até 5 s sobre quem acabou de matar um aliado; morte vingada nesse prazo.
+  trocas         Int
+  mortesTrocadas Int
+  multi2 Int
+  multi3 Int
+  multi4 Int
+  multi5 Int
+  /// Vezes que ficou sozinho contra 1+ inimigos vivos, e quantas venceu.
+  clutches       Int
+  clutchesGanhos Int
+
+  /// Inimigos e aliados cegados pelas flashes dele, e por quantos segundos os inimigos.
+  inimigosCegados Int
+  aliadosCegados  Int
+  segundosCegando Float
+  flashAssists    Int
+  /// Dano de HE e molotov em inimigos; granadas lançadas (smoke, flash, HE, molotov, decoy).
+  danoUtil Int
+  granadas Int
+
+  sobreviveu Int
+  /// Segundos de vida depois do freeze, nos rounds em que morreu.
+  vidaMediaS Float?
+  /// Segundos em cada zona do mapa, por lado: `{ "CT": { "BombsiteA": 120 }, "T": {…} }`.
+  zonas Json?
+
+  /// O `rank_update` da demo: tipo 11 é o CS Rating do Premier.
+  ratingTipo     Int?
+  ratingAntes    Int?
+  ratingDepois   Int?
+  ratingMudanca  Int?
+  ratingVitorias Int?
+
+  @@unique([matchId, steamId])
+  @@index([steamId])
+  @@map("match_player_demos")
 }
 
 enum MatchStatus {
@@ -492,6 +605,8 @@ model MatchPlayer {
   mvps    Int
   score   Int
   hs      Int
+  /// Ping médio na partida, do último `roundstats` do GC. Só o GC tem isso.
+  ping    Int?
   /// null em empate.
   venceu  Boolean?
 

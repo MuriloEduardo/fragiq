@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./prisma";
 import { decodificarGameType } from "./game-type";
 import { fecharSessao } from "./sessao/materializar";
@@ -238,7 +239,10 @@ export type PartidaDoGC = {
   mvps: number[];
   scores: number[];
   hs: number[];
+  pings?: number[];
   placar: [number, number];
+  /** A resposta do GC como veio (Longs como string), para nada se perder. */
+  gc?: unknown;
 };
 
 const BASE_STEAMID64 = 76561197960265728n;
@@ -279,6 +283,7 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
       mvps: p.mvps[i] ?? 0,
       score: p.scores[i] ?? 0,
       hs: p.hs[i] ?? 0,
+      ping: p.pings?.[i] ?? null,
       venceu: vencedor === null ? null : vencedor === time,
     };
   });
@@ -307,6 +312,7 @@ export async function gravarPartidaDoGC(shareCode: string, p: PartidaDoGC): Prom
         placarB: b,
         mapa,
         servidor: p.servidor ?? null,
+        ...(p.gc !== undefined ? { gc: p.gc as Prisma.InputJsonValue } : {}),
       },
     }),
     prisma.matchPlayer.deleteMany({ where: { matchId } }),

@@ -18,7 +18,8 @@
     "backfill:modo": "tsx scripts/backfill-modo.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p bot/tsconfig.json",
     "recompute:sessions": "tsx scripts/recompute-sessions.ts",
-    "recompute:insights": "tsx scripts/recompute-insights.ts"
+    "recompute:insights": "tsx scripts/recompute-insights.ts",
+    "recompute:demos": "tsx scripts/recompute-demos.ts"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1131.0",

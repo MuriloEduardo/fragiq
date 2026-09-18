@@ -4,6 +4,9 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# bzip2 descomprime a demo (~100 MB) em segundos; o descompressor em JS é reserva.
+RUN apk add --no-cache bzip2
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 

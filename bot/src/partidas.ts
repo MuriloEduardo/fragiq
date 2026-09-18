@@ -38,9 +38,35 @@ type Resultado = {
     mvps: number[];
     scores: number[];
     hs: number[];
+    pings: number[];
     placar: [number, number];
+    /** A resposta inteira: o site guarda o fato, não só o que já virou coluna. */
+    gc: unknown;
   };
 };
+
+/**
+ * O protobuf decodificado traz uint64 como Long (`{ low, high, unsigned }`)
+ * e bytes como Buffer; nenhum dos dois sobrevive a JSON. Longs viram string
+ * decimal, Buffers somem (são chaves de criptografia da reserva).
+ */
+export function serializavel(valor: unknown): unknown {
+  if (valor === null || typeof valor !== "object") return valor;
+  if (Buffer.isBuffer(valor)) return undefined;
+  if (Array.isArray(valor)) return valor.map(serializavel);
+  const o = valor as Record<string, unknown>;
+  if (typeof o.low === "number" && typeof o.high === "number" && typeof o.unsigned === "boolean") {
+    const hi = BigInt(o.high >>> 0);
+    const lo = BigInt(o.low >>> 0);
+    return o.unsigned ? ((hi << 32n) | lo).toString() : BigInt.asIntN(64, (hi << 32n) | lo).toString();
+  }
+  const saida: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) {
+    const s = serializavel(v);
+    if (s !== undefined) saida[k] = s;
+  }
+  return saida;
+}
 
 const TIMEOUT_MS = 20_000;
 
@@ -167,7 +193,9 @@ export function ligarPartidas(client: SteamUser) {
         mvps: fim.mvps ?? [],
         scores: fim.scores ?? [],
         hs: fim.enemy_headshots ?? [],
+        pings: fim.pings ?? [],
         placar: [fim.team_scores?.[0] ?? 0, fim.team_scores?.[1] ?? 0],
+        gc: serializavel(info),
       },
     };
   }

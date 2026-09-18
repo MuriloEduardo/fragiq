@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Download } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { carregarScoreboard, type Scoreboard } from "@/lib/partidas";
+import { metricasDaPartida, type MetricasDaPartida } from "@/lib/demos";
 import { formatarQuando } from "@/lib/sessoes";
 import { rotularMapa } from "@/lib/cs2-labels";
 import { SteamMark } from "@/components/steam-mark";
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 export default async function PartidaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^\d{1,20}$/.test(id)) notFound();
-  const [partida, session] = await Promise.all([carregarScoreboard(id), getSession()]);
+  const [partida, session, demo] = await Promise.all([carregarScoreboard(id), getSession(), metricasDaPartida(id)]);
   if (!partida) notFound();
 
   const meuSteamId = session?.steamId ?? null;
@@ -31,6 +32,7 @@ export default async function PartidaPage({ params }: { params: Promise<{ id: st
   const estouNela = Boolean(meuTime);
   const resultado = meuTime ? (meuTime.venceu === null ? "empate" : meuTime.venceu ? "vitória" : "derrota") : null;
   const regiao = partida.servidor?.match(/Counter-Strike 2 (\S+) Server/)?.[1]?.replace("_", " ");
+  const minhas = meuSteamId ? demo.porJogador.get(meuSteamId) : undefined;
 
   return (
     <div className="min-h-dvh">
@@ -83,9 +85,25 @@ export default async function PartidaPage({ params }: { params: Promise<{ id: st
 
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
           {partida.times.map((t, i) => (
-            <Time key={t.time} time={t} rotulo={i === 0 ? "Time A" : "Time B"} meuSteamId={meuSteamId} />
+            <Time key={t.time} time={t} rotulo={i === 0 ? "Time A" : "Time B"} meuSteamId={meuSteamId} metricas={demo.porJogador} />
           ))}
         </div>
+
+        {minhas && (
+          <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+            <span className="hud">da demo</span>
+            <span><b className="num text-ink">{minhas.aberturas}–{minhas.aberturasPerdidas}</b> aberturas</span>
+            <span><b className="num text-ink">{minhas.trocas}</b> trocas · <b className="num text-ink">{minhas.mortesTrocadas}/{minhas.deaths}</b> mortes trocadas</span>
+            {minhas.clutches > 0 && <span><b className="num text-ink">{minhas.clutchesGanhos}/{minhas.clutches}</b> clutches</span>}
+            <span><b className="num text-ink">{minhas.inimigosCegados}</b> cegados por <b className="num text-ink">{minhas.segundosCegando.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} s</b></span>
+            <span><b className="num text-ink">{minhas.danoUtil}</b> de dano com granada</span>
+            {minhas.ratingTipo === 11 && minhas.ratingDepois ? (
+              <span>
+                rating <b className="num text-ink">{minhas.ratingAntes?.toLocaleString("pt-BR")}</b> → <b className="num text-ink">{minhas.ratingDepois.toLocaleString("pt-BR")}</b>
+              </span>
+            ) : null}
+          </p>
+        )}
 
         <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-faint">
           <span>Share code {partida.shareCode}</span>
@@ -95,6 +113,8 @@ export default async function PartidaPage({ params }: { params: Promise<{ id: st
             </a>
           )}
           <span>Placar como a Steam mostra em &ldquo;Suas partidas&rdquo; a qualquer um dos dez.</span>
+          {demo.status === "DONE" && <span>ADR e KAST lidos da demo.</span>}
+          {demo.status === "PENDING" && <span>Demo na fila do bot.</span>}
         </p>
 
         {!session && (
@@ -124,8 +144,20 @@ export default async function PartidaPage({ params }: { params: Promise<{ id: st
   );
 }
 
-function Time({ time, rotulo, meuSteamId }: { time: Scoreboard["times"][number]; rotulo: string; meuSteamId: string | null }) {
+function Time({
+  time,
+  rotulo,
+  meuSteamId,
+  metricas,
+}: {
+  time: Scoreboard["times"][number];
+  rotulo: string;
+  meuSteamId: string | null;
+  metricas: MetricasDaPartida;
+}) {
   const n = (v: number) => v.toLocaleString("pt-BR");
+  // As duas colunas da demo só existem quando a demo foi lida; sem ela a tabela é a do GC.
+  const comDemo = time.jogadores.some((j) => metricas.has(j.steamId));
   return (
     <section className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
       <div className="flex items-center justify-between px-4 py-3">
@@ -139,7 +171,7 @@ function Time({ time, rotulo, meuSteamId }: { time: Scoreboard["times"][number];
         <thead>
           <tr className="border-t border-line-soft text-left">
             <th className="hud px-4 py-2 font-normal">Jogador</th>
-            {["K", "A", "D", "HS", "MVP", "Score"].map((c) => (
+            {["K", "A", "D", "HS", ...(comDemo ? ["ADR", "KAST"] : []), "MVP", "Score"].map((c) => (
               <th key={c} className="hud px-3 py-2 text-right font-normal">{c}</th>
             ))}
           </tr>
@@ -162,6 +194,12 @@ function Time({ time, rotulo, meuSteamId }: { time: Scoreboard["times"][number];
               <td className="px-3 py-2 text-right text-ink-muted">{n(j.assists)}</td>
               <td className="px-3 py-2 text-right">{n(j.deaths)}</td>
               <td className="px-3 py-2 text-right">{j.kills ? Math.round((j.hs / j.kills) * 100) : 0}%</td>
+              {comDemo && (
+                <>
+                  <td className="px-3 py-2 text-right">{metricas.has(j.steamId) ? Math.round(metricas.get(j.steamId)!.adr) : "–"}</td>
+                  <td className="px-3 py-2 text-right text-ink-muted">{metricas.has(j.steamId) ? `${Math.round(metricas.get(j.steamId)!.kast * 100)}%` : "–"}</td>
+                </>
+              )}
               <td className="px-3 py-2 text-right">{n(j.mvps)}</td>
               <td className="px-3 py-2 text-right font-medium">{n(j.score)}</td>
             </tr>

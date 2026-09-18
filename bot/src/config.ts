@@ -57,6 +57,10 @@ export const config = {
   precosUrl:
     ler("FRAGIQ_PRECOS_URL") ??
     obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/precos"),
+  /** A fila de demos a baixar e extrair (docs/demos.md). */
+  demosUrl:
+    ler("FRAGIQ_DEMOS_URL") ??
+    obrigatoria("FRAGIQ_WEBHOOK_URL").replace(/\/api\/sync\/steam-event$/, "/api/bot/demos"),
   /** Para onde vai a lista de amigos do bot. */
   amigosUrl:
     ler("FRAGIQ_AMIGOS_URL") ??

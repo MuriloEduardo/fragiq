@@ -14,6 +14,7 @@ declare module "globaloffensive" {
     deaths?: number[];
     scores?: number[];
     mvps?: number[];
+    pings?: number[];
     enemy_kills?: number[];
     enemy_headshots?: number[];
     team_scores?: number[];

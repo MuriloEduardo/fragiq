@@ -74,6 +74,12 @@ direto para o caminho 4.
 
 ### 2º — Caminho 4: share codes e demos
 
+**Em pé desde 18/09/2026** ([demos.md](./demos.md)): o bot baixa e reduz a
+demo, o site calcula ADR, KAST, aberturas, trocas, clutches, utilitário e
+zonas por jogador. O parágrafo do custo abaixo foi escrito antes e ficou
+menor do que previa: o parser leva 3 s e o processo inteiro cabe no bot
+que já existia. O que continua verdadeiro é o "validar a demanda".
+
 **Por que segundo:** é o moat de verdade. ADR e KAST sozinhos são paridade
 com três concorrentes; ADR e KAST **em série temporal com consulta montada
 pelo usuário** não existe em lugar nenhum. O valor vem do cruzamento com o
@@ -107,6 +113,11 @@ queimar o pouco de disposição que ele tem. Isso vem depois de o produto ser
 algo que a pessoa abre sozinha.
 
 ### 4º — Caminho 3: bot no Game Coordinator
+
+**Ficou sem motivo em 18/09/2026:** a demo de cada partida traz o
+`rank_update` dos dez jogadores — o CS Rating antes e depois — e o caminho
+4 já a lê ([demos.md](./demos.md) §2). O que segue abaixo é o raciocínio
+de antes, mantido pelo registro.
 
 **Por que último:** o único item aqui é o CS Rating do Premier ao longo do
 tempo — e essa é exatamente **a única coisa que o csstats já graficamente

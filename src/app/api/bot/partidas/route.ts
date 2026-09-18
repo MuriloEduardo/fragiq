@@ -64,7 +64,9 @@ const resultado = z.object({
       mvps: numeros,
       scores: numeros,
       hs: numeros,
+      pings: numeros.optional(),
       placar: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]),
+      gc: z.unknown().optional(),
     })
     .optional(),
 });

@@ -231,6 +231,14 @@ fonte para casual e para quem não liga a corrente de códigos.
 
 ## 4. Share codes e parsing de demos — a camada profunda
 
+**Em pé desde 18/09/2026**: o bot baixa e reduz a demo, o site guarda os
+eventos e calcula as métricas — desenho, medições e definições em
+[demos.md](./demos.md). Dois achados que este documento não previa: o
+`rank_update` da demo traz o **CS Rating do Premier dos dez jogadores**
+(antes, depois, mudança), o que esvazia a razão de ser do caminho 3; e o
+`last_place_name` de cada jogador é a **zona nomeada do mapa**, o que faz
+"controle de mapa" ser contagem, não geometria.
+
 Toda estatística que csstats, csrep e Leetify mostram e que não existe na Web
 API — ADR, KAST, rating, clutches, entry duels, utility, posições — é
 calculada por eles **a partir dos arquivos de demo**.

@@ -61,6 +61,22 @@ rodada, 24 h de validade; 7 dias para item fora do mercado), o bot lê um
 por vez com 4 s de espaço e devolve em `POST /api/bot/precos`. Um 429
 encerra a rodada e dobra a espera até a próxima (máx. 30 min).
 
+## Demos
+
+`src/demos.ts` + `src/demo-parse.ts`: cada partida que o GC respondeu tem
+uma URL de demo (~100 MB, some em ~30 dias). A cada 5 min o bot pergunta
+ao site (`GET /api/bot/demos`) qual falta, baixa para `/tmp/fragiq-demos`,
+descomprime (`bzip2` do sistema — a imagem instala; JS como reserva) e
+roda o parser (`@laihoe/demoparser2`) **num processo filho**: a demo
+inteira fica em memória (~250 MB para 8 rounds, estimados ~400 MB para
+24) e, se a instância não aguentar, morre o filho e a partida fica
+`FAILED` com o motivo — a conexão com a Steam não cai. O resultado vai
+gzipado em `POST /api/bot/demos` (`FRAGIQ_DEMOS_URL` sobrescreve). O que
+sai, o que vira métrica e as medições: `docs/demos.md`.
+
+O mesmo commit passou a mandar a resposta do GC inteira (`gc`) e os pings
+no `POST /api/bot/partidas`: o site guarda o fato, não só o placar.
+
 ## O log vai para o painel
 
 `src/logs.ts` captura tudo o que passa por `console.*`, enfileira e envia
