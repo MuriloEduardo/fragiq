@@ -461,6 +461,7 @@ model Match {
   jogadores MatchPlayer[]
   demo      MatchDemo?
   metricas  MatchPlayerDemo[]
+  conversao MatchTeamDemo[]
 
   @@index([status, createdAt])
   @@index([jogadaEm])
@@ -572,6 +573,42 @@ model MatchPlayerDemo {
   @@unique([matchId, steamId])
   @@index([steamId])
   @@map("match_player_demos")
+}
+
+/// A conversão de um time numa partida, calculada dos mesmos eventos por
+/// `src/lib/demo/conversao.ts`: o que ele fez com as vantagens que teve.
+/// Uma linha por time (os dois), não por jogador — é a primeira métrica de
+/// time da demo. Recalculável pelo mesmo `recompute:demos`.
+model MatchTeamDemo {
+  id String @id @default(cuid())
+
+  matchId String
+  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  /// O lado em que o time começou a partida ("CT" ou "T"). É a identidade
+  /// dele na demo, que não tem "time A" e "time B" e troca os lados no
+  /// intervalo; a tela casa a linha com o time do placar pela escalação.
+  ladoInicial String
+  /// Os SteamIDs de quem jogou por este time em algum round.
+  jogadores   Json
+
+  versaoRegras Int
+  rounds       Int
+  roundsGanhos Int
+
+  /// Rounds que começaram iguais em que o time, de CT, ficou com mais
+  /// gente viva (com inimigo vivo) — e quantos virou round.
+  vantagensCT       Int
+  vantagensCTGanhas Int
+  /// O mesmo, jogando de T.
+  vantagensT       Int
+  vantagensTGanhas Int
+
+  /// Rounds em que o time, de T, plantou a bomba — e quantos venceu.
+  plants       Int
+  plantsGanhos Int
+
+  @@unique([matchId, ladoInicial])
+  @@map("match_team_demos")
 }
 
 enum MatchStatus {

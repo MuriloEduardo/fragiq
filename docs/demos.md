@@ -105,6 +105,7 @@ POST /api/bot/demos ◄── JSON gzip (~11 KB por 8 rounds; ~300 KB estimado p
         │
         ├─ MatchDemo.dados      ← o payload inteiro (fato)
         ├─ MatchPlayerDemo      ← metricasDaDemo() (regra, REGRAS_VERSAO)
+        ├─ MatchTeamDemo        ← conversaoDaDemo() (regra, a mesma versão)
         └─ Match.mapa/servidor  ← do cabeçalho, se ainda não tinha
 ```
 
@@ -121,10 +122,11 @@ POST /api/bot/demos ◄── JSON gzip (~11 KB por 8 rounds; ~300 KB estimado p
   um registro na primeira amostra de cada round: é assim que o site sabe
   quem estava no round e de que lado.
 - **Aquecimento fora**: eventos com `is_warmup_period` não entram.
-- **Recompute**: `npm run recompute:demos` refaz `MatchPlayerDemo` de
-  todos os `MatchDemo.dados` com a regra vigente.
+- **Recompute**: `npm run recompute:demos` refaz `MatchPlayerDemo` e
+  `MatchTeamDemo` de todos os `MatchDemo.dados` com a regra vigente.
 - **Tela**: `/partida/[id]` ganha ADR e KAST na tabela quando a demo foi
-  lida, e uma linha "da demo" para quem está logado e jogou.
+  lida, uma linha "da demo" para quem está logado e jogou, e o rodapé de
+  conversão em cada time (§4.1).
 
 ## 4. As métricas, definidas
 
@@ -157,6 +159,41 @@ Sem "rating" composto de propósito: um número que mistura tudo esconde o
 que a série temporal existe para mostrar. Testes: `tests/lib/demo-metricas.test.ts`
 (a partida real como fixture + um round sintético por regra).
 
+### 4.1 Conversão do time — `MatchTeamDemo`
+
+`src/lib/demo/conversao.ts`, mesma `REGRAS_VERSAO`, mesmo recompute. Uma
+linha por time (duas por partida), e a primeira métrica que não é de
+jogador: o que o time fez com o que teve.
+
+| Métrica | Definição |
+|---|---|
+| `rounds`, `roundsGanhos` | rounds jogados (sem os rendidos) e os vencidos — fecham o placar |
+| `vantagensCT`, `vantagensCTGanhas` | rounds **que começaram iguais** em que o time, de CT, ficou com mais gente viva que o adversário, **com inimigo vivo** — e quantos virou round |
+| `vantagensT`, `vantagensTGanhas` | o mesmo, jogando de T |
+| `plants`, `plantsGanhos` | rounds em que o time, de T, plantou a bomba — e quantos venceu |
+
+As duas restrições da vantagem são o que separa a métrica de uma taxa de
+vitória disfarçada:
+
+- **round que começa desigual fica fora.** Quando alguém sai da partida, o
+  round inteiro é 5v4 — isso não é uma vantagem criada no jogo, é a
+  condição dele. Na demo medida, quatro dos sete rounds jogados começam
+  assim (o jogador saiu no 3º) e não entram no denominador.
+- **a última morte não é vantagem.** Ficar 1v0 é o round ganho; a situação
+  a converter precisa de inimigo vivo. Sem essa regra todo round vencido
+  por eliminação contaria como uma vantagem convertida.
+
+A vantagem que troca de mão conta para os dois times — cada um teve a sua,
+e no máximo um converteu. O time é identificado pelo **lado em que começou
+a partida**, que é o que sobrevive à troca do intervalo; a página casa
+essa linha com o time do placar pela escalação (`conversaoDosTimes`),
+porque o placar do GC numera os times pela reserva e a demo não os conhece.
+Testes: `tests/lib/demo-conversao.test.ts`.
+
+Na partida real medida: quem começou de CT converteu 2 de 2 vantagens e
+venceu 5 rounds; quem começou de T converteu 1 de 2 e plantou 2 bombas,
+ganhando os dois rounds.
+
 ## 5. A linguagem tática — o que falta e de onde sai
 
 A tese (registrada em 18/09): CS2 é um jogo de **informação e controle de
@@ -185,13 +222,14 @@ o que já existe no payload marcado — é o backlog desta frente.
 | **Ameaça** — fake | o time mostrou presença num site e plantou no outro? | `granada`/`zona`/`dano` num site seguido de `bomba.plantada` no outro | sim, não calculado |
 | **Risco** — disciplina de troca | morreu sozinho ou com aliado a ≤ 5 s de distância? | `morte` + `zona` dos aliados no mesmo tick | `mortesTrocadas` já; falta "morte sem aliado perto" |
 | **Risco** — duelo tomado | morreu cego, atravessando smoke, sem colete, num 1v3? | `morte.cego/atravesSmoke`, `vivos` no tick | sim, não calculado |
-| **Conversão** — vantagem mantida | 5v4 virou round? plant virou round? | `morte` (vivos), `bomba`, `round.vencedor` | sim, não calculado: **próximo item** |
+| **Conversão** — vantagem mantida | 5v4 virou round? plant virou round? | `morte` (vivos), `bomba`, `round.vencedor` | **feito** (§4.1, `MatchTeamDemo`) |
 
 Ordem sugerida para o próximo ciclo, do mais barato ao mais caro:
 
-1. **Conversão por round** (5v4 → round, plant → round, clutch já existe):
-   só `morte` e `bomba`; é a métrica de **time** que falta e a que mais
-   explica placar.
+1. ~~**Conversão por round**~~ — feito em 19/09 (§4.1). O que ficou de
+   fora e continua valendo: a retomada do CT (round em que a bomba foi
+   plantada contra ele e ele venceu assim mesmo) é o complemento do
+   `plants` do outro time e hoje só se lê cruzando as duas linhas.
 2. **Ritmo**: segundo do primeiro contato e da plant, por round e por
    lado. Duas linhas no payload.
 3. **Economia**: `balance` e `current_equip_value` na amostra do início do
@@ -222,8 +260,10 @@ Ordem sugerida para o próximo ciclo, do mais barato ao mais caro:
 
 ## 7. O que precisa do humano para ir ao ar
 
-1. `git push` (migrations `20260918200000_demos` e
-   `20260918210000_gc_bruto` entram pelo `vercel-build`).
+1. `git push` (migrations `20260918200000_demos`,
+   `20260918210000_gc_bruto` e `20260919030000_conversao_do_time` entram
+   pelo `vercel-build`). Demo já gravada antes da última só ganha a linha
+   de time no `npm run recompute:demos`.
 2. `bot/deploy.sh` — a imagem nova instala `bzip2` e o
    `@laihoe/demoparser2`; o `.dockerignore`/`npm ci` já cobrem.
 3. Conferir no `/admin` (log do bot) a primeira linha `Demo CSGO-…: N MB,

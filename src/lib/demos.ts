@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { registrar } from "./eventos";
 import { demoPayload, type DemoPayload } from "./demo/payload";
 import { metricasDaDemo, REGRAS_VERSAO, type Metricas } from "./demo/metricas";
+import { conversaoDaDemo, type ConversaoDeTime } from "./demo/conversao";
 
 /**
  * Demos: a fila para o bot e o que fazer com o que ele traz.
@@ -53,10 +54,16 @@ function linhaDe(matchId: string, m: Metricas): Prisma.MatchPlayerDemoCreateMany
   };
 }
 
+function linhaDoTime(matchId: string, c: ConversaoDeTime): Prisma.MatchTeamDemoCreateManyInput {
+  const { jogadores, ...resto } = c;
+  return { ...resto, matchId, versaoRegras: REGRAS_VERSAO, jogadores: jogadores as Prisma.InputJsonValue };
+}
+
 /** Eventos gravados inteiros, métricas calculadas e gravadas; o mapa da partida ganha o do cabeçalho se ainda não tinha. */
 export async function gravarDemo(matchId: string, bruto: unknown): Promise<{ jogadores: number }> {
   const payload: DemoPayload = demoPayload.parse(bruto);
   const metricas = metricasDaDemo(payload);
+  const conversao = conversaoDaDemo(payload);
   await prisma.$transaction([
     prisma.matchDemo.upsert({
       where: { matchId },
@@ -65,6 +72,8 @@ export async function gravarDemo(matchId: string, bruto: unknown): Promise<{ jog
     }),
     prisma.matchPlayerDemo.deleteMany({ where: { matchId } }),
     prisma.matchPlayerDemo.createMany({ data: metricas.map((m) => linhaDe(matchId, m)) }),
+    prisma.matchTeamDemo.deleteMany({ where: { matchId } }),
+    prisma.matchTeamDemo.createMany({ data: conversao.map((c) => linhaDoTime(matchId, c)) }),
     prisma.match.updateMany({ where: { id: matchId, mapa: null, NOT: { demo: null } }, data: { mapa: payload.mapa, servidor: payload.servidor } }),
   ]);
   await registrar("demo.lida", { dados: { matchId, rounds: payload.rounds.length, eventos: payload.eventos.length, jogadores: metricas.length } });
@@ -90,9 +99,12 @@ export async function recomputarMetricasDasDemos(): Promise<number> {
     const parsed = demoPayload.safeParse(d.dados);
     if (!parsed.success) continue;
     const metricas = metricasDaDemo(parsed.data);
+    const conversao = conversaoDaDemo(parsed.data);
     await prisma.$transaction([
       prisma.matchPlayerDemo.deleteMany({ where: { matchId: d.matchId } }),
       prisma.matchPlayerDemo.createMany({ data: metricas.map((m) => linhaDe(d.matchId, m)) }),
+      prisma.matchTeamDemo.deleteMany({ where: { matchId: d.matchId } }),
+      prisma.matchTeamDemo.createMany({ data: conversao.map((c) => linhaDoTime(d.matchId, c)) }),
     ]);
     n++;
   }
@@ -102,14 +114,19 @@ export async function recomputarMetricasDasDemos(): Promise<number> {
 /* --------------------------------- leitura -------------------------------- */
 
 export type MetricasDaPartida = Map<string, Prisma.MatchPlayerDemoGetPayload<object>>;
+export type ConversaoGravada = Prisma.MatchTeamDemoGetPayload<object>;
 
 /** As métricas dos jogadores de uma partida, por SteamID; vazio quando a demo ainda não foi lida. */
-export async function metricasDaPartida(matchId: string): Promise<{ status: string | null; porJogador: MetricasDaPartida }> {
-  const [demo, linhas] = await Promise.all([
+export async function metricasDaPartida(
+  matchId: string,
+): Promise<{ status: string | null; porJogador: MetricasDaPartida; times: ConversaoGravada[] }> {
+  const [demo, linhas, times] = await Promise.all([
     prisma.matchDemo.findUnique({ where: { matchId }, select: { status: true } }),
     prisma.matchPlayerDemo.findMany({ where: { matchId } }),
+    prisma.matchTeamDemo.findMany({ where: { matchId } }),
   ]);
   const porJogador: MetricasDaPartida = new Map();
   for (const linha of linhas) porJogador.set(linha.steamId, linha);
-  return { status: demo?.status ?? null, porJogador };
+  return { status: demo?.status ?? null, porJogador, times };
 }
+

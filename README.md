@@ -301,8 +301,11 @@ Game Coordinator por cada um e recebe o scoreboard dos dez jogadores sem
 baixar demo (`src/lib/partidas.ts`, `bot/src/partidas.ts`). É o que a aba
 Partidas mostra. ADR, KAST e rating pedem a demo — e o bot passou a
 baixá-la e lê-la (18/09/2026): eventos em `MatchDemo`, métricas por
-jogador em `MatchPlayerDemo`, ADR e KAST na página da partida. O que a
-demo tem, o custo medido e a linguagem tática que falta construir estão em
+jogador em `MatchPlayerDemo`, ADR e KAST na página da partida. Da mesma
+demo sai a primeira métrica de **time** (19/09/2026), em `MatchTeamDemo`:
+a vantagem numérica e a bomba plantada que viraram round — "converteu 2 de
+2 vantagens" no rodapé de cada time. O que a demo tem, o custo medido e a
+linguagem tática que falta construir estão em
 [docs/demos.md](docs/demos.md).
 
 Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:

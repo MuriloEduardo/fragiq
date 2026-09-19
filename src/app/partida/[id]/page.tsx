@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Download } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { carregarScoreboard, type Scoreboard } from "@/lib/partidas";
-import { metricasDaPartida, type MetricasDaPartida } from "@/lib/demos";
+import { metricasDaPartida, type ConversaoGravada, type MetricasDaPartida } from "@/lib/demos";
+import { conversaoDosTimes, vantagens } from "@/lib/demo/conversao";
 import { formatarQuando } from "@/lib/sessoes";
 import { rotularMapa } from "@/lib/cs2-labels";
 import { SteamMark } from "@/components/steam-mark";
@@ -33,6 +34,10 @@ export default async function PartidaPage({ params }: { params: Promise<{ id: st
   const resultado = meuTime ? (meuTime.venceu === null ? "empate" : meuTime.venceu ? "vitória" : "derrota") : null;
   const regiao = partida.servidor?.match(/Counter-Strike 2 (\S+) Server/)?.[1]?.replace("_", " ");
   const minhas = meuSteamId ? demo.porJogador.get(meuSteamId) : undefined;
+  const conversao = conversaoDosTimes(
+    demo.times,
+    partida.times.map((t) => t.jogadores.map((j) => j.steamId)),
+  );
 
   return (
     <div className="min-h-dvh">
@@ -85,7 +90,14 @@ export default async function PartidaPage({ params }: { params: Promise<{ id: st
 
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
           {partida.times.map((t, i) => (
-            <Time key={t.time} time={t} rotulo={i === 0 ? "Time A" : "Time B"} meuSteamId={meuSteamId} metricas={demo.porJogador} />
+            <Time
+              key={t.time}
+              time={t}
+              rotulo={i === 0 ? "Time A" : "Time B"}
+              meuSteamId={meuSteamId}
+              metricas={demo.porJogador}
+              conversao={conversao[i]}
+            />
           ))}
         </div>
 
@@ -149,11 +161,13 @@ function Time({
   rotulo,
   meuSteamId,
   metricas,
+  conversao,
 }: {
   time: Scoreboard["times"][number];
   rotulo: string;
   meuSteamId: string | null;
   metricas: MetricasDaPartida;
+  conversao: ConversaoGravada | null;
 }) {
   const n = (v: number) => v.toLocaleString("pt-BR");
   // As duas colunas da demo só existem quando a demo foi lida; sem ela a tabela é a do GC.
@@ -206,6 +220,46 @@ function Time({
           ))}
         </tbody>
       </table>
+      <Conversao c={conversao} />
     </section>
+  );
+}
+
+/**
+ * O que o time fez com o que teve: a vantagem numérica e a bomba plantada
+ * que viraram round (src/lib/demo/conversao.ts). Uma linha, e só quando há
+ * o que dizer — partida sem nenhuma vantagem nem plant não ganha rodapé
+ * com zeros. O critério inteiro fica no `title`.
+ */
+function Conversao({ c }: { c: ConversaoGravada | null }) {
+  if (!c) return null;
+  const { situacoes, convertidas } = vantagens(c);
+  if (situacoes === 0 && c.plants === 0) return null;
+  // O lado que não teve nenhuma vantagem fica fora da frase: "de CT 0 de 0" não diz nada.
+  const porLado = [
+    c.vantagensCT > 0 && `de CT ${c.vantagensCTGanhas} de ${c.vantagensCT}`,
+    c.vantagensT > 0 && `de T ${c.vantagensTGanhas} de ${c.vantagensT}`,
+  ].filter(Boolean);
+  const criterio = [
+    situacoes > 0 &&
+      `Vantagem: round que começou igual em que o time ficou com mais gente viva, com inimigo vivo (a última morte não conta) — ${porLado.join(", ")}.`,
+    c.plants > 0 && `Plantada: round em que o time, de T, plantou a bomba.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <p className="border-t border-line-soft px-4 py-2.5 text-sm text-ink-muted" title={criterio}>
+      {situacoes > 0 && (
+        <span>
+          converteu <b className="num text-ink">{convertidas} de {situacoes}</b> vantagens
+        </span>
+      )}
+      {situacoes > 0 && c.plants > 0 && <span className="text-ink-faint"> · </span>}
+      {c.plants > 0 && (
+        <span>
+          plantou <b className="num text-ink">{c.plants}</b> e venceu <b className="num text-ink">{c.plantsGanhos}</b>
+        </span>
+      )}
+    </p>
   );
 }

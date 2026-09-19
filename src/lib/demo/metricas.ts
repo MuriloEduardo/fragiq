@@ -101,12 +101,21 @@ function vazio(steamId: string): Acumulador {
 }
 
 /**
+ * Os rounds que foram jogados: os que têm vencedor e não terminaram em
+ * rendição. É o denominador de tudo que se calcula da demo — aqui e em
+ * `conversao.ts` —, por isso mora num lugar só.
+ */
+export function roundsJogados(p: DemoPayload): Round[] {
+  return p.rounds.filter((r) => r.n >= 1 && r.vencedor && !r.motivo?.endsWith("surrender"));
+}
+
+/**
  * De que lado cada jogador esteve em cada round. A demo não tem "escalação"
  * por round; o lado vem do primeiro evento do jogador no round (zona,
  * morte, dano). Quem não aparece num round não jogou nele — é assim que
  * quem saiu no meio deixa de contar.
  */
-function ladosPorRound(p: DemoPayload): Map<number, Map<string, Lado>> {
+export function ladosPorRound(p: DemoPayload): Map<number, Map<string, Lado>> {
   const lados = new Map<number, Map<string, Lado>>();
   const marcar = (round: number, quem: string | null, lado: Lado | null) => {
     if (!quem || !lado || round < 1) return;
@@ -134,7 +143,7 @@ export function metricasDaDemo(p: DemoPayload): Metricas[] {
   for (const j of p.jogadores) de(j.steamId);
 
   // Um round rendido não foi jogado: ninguém "sobreviveu" nele.
-  const rounds = p.rounds.filter((r) => r.n >= 1 && r.vencedor && !r.motivo?.endsWith("surrender"));
+  const rounds = roundsJogados(p);
   const lados = ladosPorRound(p);
   const porRound = new Map<number, DemoPayload["eventos"]>();
   for (const e of p.eventos) {
