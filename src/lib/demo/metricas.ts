@@ -16,7 +16,13 @@ import type { DemoPayload, Lado, Morte, Round } from "./payload";
  * que a granada comprou — é trabalho de cima, ainda por escrever.
  */
 
-export const REGRAS_VERSAO = 1;
+/**
+ * Versão 2 desde 2026-09-21: a linha de time ganhou o ritmo (`ritmo.ts`).
+ * Nenhuma definição de jogador mudou, mas a versão é da rodada de
+ * recompute, não de cada coluna: linha com `versaoRegras` 1 é linha
+ * gravada antes do ritmo existir.
+ */
+export const REGRAS_VERSAO = 2;
 
 /** Demos de matchmaking são gravadas a 64 ticks por segundo. */
 export const TICKS_POR_S = 64;

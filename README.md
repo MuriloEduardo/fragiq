@@ -304,9 +304,11 @@ baixá-la e lê-la (18/09/2026): eventos em `MatchDemo`, métricas por
 jogador em `MatchPlayerDemo`, ADR e KAST na página da partida. Da mesma
 demo sai a primeira métrica de **time** (19/09/2026), em `MatchTeamDemo`:
 a vantagem numérica e a bomba plantada que viraram round — "converteu 2 de
-2 vantagens" no rodapé de cada time. O que a demo tem, o custo medido e a
-linguagem tática que falta construir estão em
-[docs/demos.md](docs/demos.md).
+2 vantagens" no rodapé de cada time. Desde 21/09/2026 a mesma linha diz o
+**ritmo**: a que segundo do round, contado do fim do freeze, vem o
+primeiro contato e a plantada — de T é o ritmo que o time impõe, de CT o
+que ele sofre. O que a demo tem, o custo medido e a linguagem tática que
+falta construir estão em [docs/demos.md](docs/demos.md).
 
 Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:
 

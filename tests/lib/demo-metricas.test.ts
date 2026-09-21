@@ -216,6 +216,6 @@ describe("métricas da demo — regras", () => {
   });
 
   it("a versão das regras existe para o recompute", () => {
-    expect(REGRAS_VERSAO).toBe(1);
+    expect(REGRAS_VERSAO).toBe(2);
   });
 });

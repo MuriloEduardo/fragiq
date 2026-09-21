@@ -607,6 +607,18 @@ model MatchTeamDemo {
   plants       Int
   plantsGanhos Int
 
+  /// Ritmo (docs/demos.md §4.2): mediana do segundo do primeiro contato
+  /// nos rounds em que o time jogou de cada lado, contada do fim do
+  /// freeze, com quantos rounds entraram na conta — round sem contato não
+  /// entra. De T é o ritmo que o time impôs; de CT, o que sofreu.
+  segundoContatoCT Float?
+  contatosCT       Int    @default(0)
+  segundoContatoT  Float?
+  contatosT        Int    @default(0)
+  /// Mediana do segundo da plantada nos rounds em que o time plantou; a
+  /// base é `plants`.
+  segundoPlant     Float?
+
   @@unique([matchId, ladoInicial])
   @@map("match_team_demos")
 }

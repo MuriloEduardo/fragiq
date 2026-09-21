@@ -3,7 +3,8 @@ import { prisma } from "./prisma";
 import { registrar } from "./eventos";
 import { demoPayload, type DemoPayload } from "./demo/payload";
 import { metricasDaDemo, REGRAS_VERSAO, type Metricas } from "./demo/metricas";
-import { conversaoDaDemo, type ConversaoDeTime } from "./demo/conversao";
+import { conversaoDaDemo } from "./demo/conversao";
+import { ritmoDaDemo, type RitmoDeTime } from "./demo/ritmo";
 
 /**
  * Demos: a fila para o bot e o que fazer com o que ele traz.
@@ -54,16 +55,39 @@ function linhaDe(matchId: string, m: Metricas): Prisma.MatchPlayerDemoCreateMany
   };
 }
 
-function linhaDoTime(matchId: string, c: ConversaoDeTime): Prisma.MatchTeamDemoCreateManyInput {
-  const { jogadores, ...resto } = c;
-  return { ...resto, matchId, versaoRegras: REGRAS_VERSAO, jogadores: jogadores as Prisma.InputJsonValue };
+/**
+ * A linha de um time: conversão e ritmo, as duas leituras de time da mesma
+ * demo, casadas pelo lado em que o time começou — que é a identidade que
+ * `timesPorRound` dá às duas.
+ */
+function linhasDosTimes(matchId: string, p: DemoPayload): Prisma.MatchTeamDemoCreateManyInput[] {
+  const ritmo = new Map(ritmoDaDemo(p).map((r) => [r.ladoInicial, r]));
+  return conversaoDaDemo(p).map((c) => {
+    const { jogadores, ...resto } = c;
+    return { ...resto, ...colunasDoRitmo(ritmo.get(c.ladoInicial)), matchId, versaoRegras: REGRAS_VERSAO, jogadores: jogadores as Prisma.InputJsonValue };
+  });
+}
+
+/**
+ * As colunas de ritmo, nomeadas uma a uma para que o banco não herde campo
+ * que ninguém pediu. Time sem ritmo cai no ritmo vazio — que é o mesmo que
+ * `ritmoDaDemo` devolve para quem não encostou em ninguém nem plantou.
+ */
+function colunasDoRitmo(r: RitmoDeTime | undefined) {
+  return {
+    segundoContatoCT: r?.segundoContatoCT ?? null,
+    contatosCT: r?.contatosCT ?? 0,
+    segundoContatoT: r?.segundoContatoT ?? null,
+    contatosT: r?.contatosT ?? 0,
+    segundoPlant: r?.segundoPlant ?? null,
+  };
 }
 
 /** Eventos gravados inteiros, métricas calculadas e gravadas; o mapa da partida ganha o do cabeçalho se ainda não tinha. */
 export async function gravarDemo(matchId: string, bruto: unknown): Promise<{ jogadores: number }> {
   const payload: DemoPayload = demoPayload.parse(bruto);
   const metricas = metricasDaDemo(payload);
-  const conversao = conversaoDaDemo(payload);
+  const times = linhasDosTimes(matchId, payload);
   await prisma.$transaction([
     prisma.matchDemo.upsert({
       where: { matchId },
@@ -73,7 +97,7 @@ export async function gravarDemo(matchId: string, bruto: unknown): Promise<{ jog
     prisma.matchPlayerDemo.deleteMany({ where: { matchId } }),
     prisma.matchPlayerDemo.createMany({ data: metricas.map((m) => linhaDe(matchId, m)) }),
     prisma.matchTeamDemo.deleteMany({ where: { matchId } }),
-    prisma.matchTeamDemo.createMany({ data: conversao.map((c) => linhaDoTime(matchId, c)) }),
+    prisma.matchTeamDemo.createMany({ data: times }),
     prisma.match.updateMany({ where: { id: matchId, mapa: null, NOT: { demo: null } }, data: { mapa: payload.mapa, servidor: payload.servidor } }),
   ]);
   await registrar("demo.lida", { dados: { matchId, rounds: payload.rounds.length, eventos: payload.eventos.length, jogadores: metricas.length } });
@@ -99,12 +123,11 @@ export async function recomputarMetricasDasDemos(): Promise<number> {
     const parsed = demoPayload.safeParse(d.dados);
     if (!parsed.success) continue;
     const metricas = metricasDaDemo(parsed.data);
-    const conversao = conversaoDaDemo(parsed.data);
     await prisma.$transaction([
       prisma.matchPlayerDemo.deleteMany({ where: { matchId: d.matchId } }),
       prisma.matchPlayerDemo.createMany({ data: metricas.map((m) => linhaDe(d.matchId, m)) }),
       prisma.matchTeamDemo.deleteMany({ where: { matchId: d.matchId } }),
-      prisma.matchTeamDemo.createMany({ data: conversao.map((c) => linhaDoTime(d.matchId, c)) }),
+      prisma.matchTeamDemo.createMany({ data: linhasDosTimes(d.matchId, parsed.data) }),
     ]);
     n++;
   }

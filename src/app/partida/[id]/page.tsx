@@ -221,6 +221,7 @@ function Time({
         </tbody>
       </table>
       <Conversao c={conversao} />
+      <Ritmo c={conversao} />
     </section>
   );
 }
@@ -260,6 +261,43 @@ function Conversao({ c }: { c: ConversaoGravada | null }) {
           plantou <b className="num text-ink">{c.plants}</b> e venceu <b className="num text-ink">{c.plantsGanhos}</b>
         </span>
       )}
+    </p>
+  );
+}
+
+/**
+ * A que segundo do round este time joga (src/lib/demo/ritmo.ts). De T o
+ * número é o ritmo que ele impôs — ele escolhe quando executar; de CT é o
+ * ritmo que sofreu, e por isso o de CT de um time é o de T do outro. Só
+ * aparece o que tem número: demo antiga, gravada antes da regra, tem as
+ * colunas vazias até o recompute.
+ */
+function Ritmo({ c }: { c: ConversaoGravada | null }) {
+  if (!c) return null;
+  const s = (v: number) => `${Math.round(v).toLocaleString("pt-BR")} s`;
+  const partes = [
+    c.segundoContatoT != null && ["de T contato aos", s(c.segundoContatoT)],
+    c.segundoPlant != null && ["planta aos", s(c.segundoPlant)],
+    c.segundoContatoCT != null && ["de CT contato aos", s(c.segundoContatoCT)],
+  ].filter((p): p is string[] => Array.isArray(p));
+  if (partes.length === 0) return null;
+  const base = [
+    c.contatosT > 0 && `${c.contatosT} round(s) de T com contato`,
+    c.plants > 0 && `${c.plants} com plantada`,
+    c.contatosCT > 0 && `${c.contatosCT} de CT com contato`,
+  ].filter(Boolean);
+  return (
+    <p
+      className="border-t border-line-soft px-4 py-2.5 text-sm text-ink-muted"
+      title={`Mediana do segundo, contado do fim do freeze, nos rounds jogados: ${base.join(", ")}. O contato é o primeiro dano entre lados opostos — de T o time escolhe a hora, de CT ele a sofre.`}
+    >
+      <span className="hud mr-2">ritmo</span>
+      {partes.map(([rotulo, valor], i) => (
+        <span key={rotulo}>
+          {i > 0 && <span className="text-ink-faint"> · </span>}
+          {rotulo} <b className="num text-ink">{valor}</b>
+        </span>
+      ))}
     </p>
   );
 }

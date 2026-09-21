@@ -48,6 +48,11 @@ const oposto = (l: Lado): Lado => (l === "CT" ? "T" : "CT");
 
 type Time = { ladoInicial: Lado; jogadores: Set<string> };
 
+/** Um time da partida, identificado pelo lado em que começou. */
+export type TimeDaDemo = { ladoInicial: Lado; jogadores: string[] };
+/** Em cada round jogado, qual time (0 = começou de CT, 1 = de T) ocupou cada lado. */
+export type DonoDoLado = Map<number, Record<Lado, 0 | 1>>;
+
 /**
  * Os dois times, pelo primeiro round jogado: quem estava de CT nele é o
  * time "CT", e assim segue o resto da partida, inclusive depois da troca.
@@ -79,7 +84,30 @@ function donoDoLado(doRound: Map<string, Lado>, times: Time[]): Record<Lado, Tim
   return dono;
 }
 
-function vazio(t: Time): ConversaoDeTime {
+/**
+ * Quem é quem em cada round jogado: os dois times da partida e o lado que
+ * cada um ocupou em cada round.
+ *
+ * Mora aqui e é exportado porque a identidade do time é a parte cara da
+ * conversão — escalação que muda, troca de lado, gente que entra no meio —
+ * e qualquer outra métrica de time (`ritmo.ts`) precisa exatamente dela.
+ * Duas versões disso dariam dois times diferentes na mesma partida.
+ */
+export function timesPorRound(p: DemoPayload): { times: TimeDaDemo[]; dono: DonoDoLado } {
+  const rounds = roundsJogados(p);
+  const lados = ladosPorRound(p);
+  const times = timesDaPartida(lados, rounds);
+  const dono: DonoDoLado = new Map();
+  for (const round of rounds) {
+    const doRound = lados.get(round.n);
+    if (!doRound || doRound.size === 0) continue;
+    const quem = donoDoLado(doRound, times);
+    dono.set(round.n, { CT: times.indexOf(quem.CT) as 0 | 1, T: times.indexOf(quem.T) as 0 | 1 });
+  }
+  return { times: times.map((t) => ({ ladoInicial: t.ladoInicial, jogadores: [...t.jogadores] })), dono };
+}
+
+function vazio(t: TimeDaDemo): ConversaoDeTime {
   return {
     ladoInicial: t.ladoInicial,
     jogadores: [],
@@ -97,8 +125,8 @@ function vazio(t: Time): ConversaoDeTime {
 export function conversaoDaDemo(p: DemoPayload): ConversaoDeTime[] {
   const rounds = roundsJogados(p);
   const lados = ladosPorRound(p);
-  const times = timesDaPartida(lados, rounds);
-  const acc = new Map<Time, ConversaoDeTime>(times.map((t) => [t, vazio(t)]));
+  const { times, dono: donoPorRound } = timesPorRound(p);
+  const acc = times.map(vazio);
 
   const porRound = new Map<number, DemoPayload["eventos"]>();
   for (const e of p.eventos) {
@@ -109,11 +137,11 @@ export function conversaoDaDemo(p: DemoPayload): ConversaoDeTime[] {
 
   for (const round of rounds) {
     const doRound = lados.get(round.n);
-    if (!doRound || doRound.size === 0) continue;
+    const dono = donoPorRound.get(round.n);
+    if (!doRound || !dono) continue;
     const eventos = porRound.get(round.n) ?? [];
-    const dono = donoDoLado(doRound, times);
     for (const lado of LADOS) {
-      const a = acc.get(dono[lado])!;
+      const a = acc[dono[lado]];
       a.rounds++;
       if (round.vencedor === lado) a.roundsGanhos++;
     }
@@ -136,7 +164,7 @@ export function conversaoDaDemo(p: DemoPayload): ConversaoDeTime[] {
           const outro = oposto(lado);
           if (abriu.has(lado) || vivos[outro].size < 1 || vivos[lado].size <= vivos[outro].size) continue;
           abriu.add(lado);
-          const a = acc.get(dono[lado])!;
+          const a = acc[dono[lado]];
           if (lado === "CT") {
             a.vantagensCT++;
             if (round.vencedor === "CT") a.vantagensCTGanhas++;
@@ -149,15 +177,13 @@ export function conversaoDaDemo(p: DemoPayload): ConversaoDeTime[] {
     }
 
     if (eventos.some((e) => e.t === "bomba" && e.acao === "plantada")) {
-      const a = acc.get(dono.T)!;
+      const a = acc[dono.T];
       a.plants++;
       if (round.vencedor === "T") a.plantsGanhos++;
     }
   }
 
-  return times
-    .map((t) => ({ ...acc.get(t)!, jogadores: [...t.jogadores] }))
-    .filter((c) => c.rounds > 0);
+  return acc.map((c, i) => ({ ...c, jogadores: times[i].jogadores })).filter((c) => c.rounds > 0);
 }
 
 /** Total das vantagens dos dois lados — o "converteu N de M" da tela. */

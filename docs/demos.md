@@ -105,7 +105,7 @@ POST /api/bot/demos ◄── JSON gzip (~11 KB por 8 rounds; ~300 KB estimado p
         │
         ├─ MatchDemo.dados      ← o payload inteiro (fato)
         ├─ MatchPlayerDemo      ← metricasDaDemo() (regra, REGRAS_VERSAO)
-        ├─ MatchTeamDemo        ← conversaoDaDemo() (regra, a mesma versão)
+        ├─ MatchTeamDemo        ← conversaoDaDemo() + ritmoDaDemo() (a mesma versão)
         └─ Match.mapa/servidor  ← do cabeçalho, se ainda não tinha
 ```
 
@@ -125,13 +125,16 @@ POST /api/bot/demos ◄── JSON gzip (~11 KB por 8 rounds; ~300 KB estimado p
 - **Recompute**: `npm run recompute:demos` refaz `MatchPlayerDemo` e
   `MatchTeamDemo` de todos os `MatchDemo.dados` com a regra vigente.
 - **Tela**: `/partida/[id]` ganha ADR e KAST na tabela quando a demo foi
-  lida, uma linha "da demo" para quem está logado e jogou, e o rodapé de
-  conversão em cada time (§4.1).
+  lida, uma linha "da demo" para quem está logado e jogou, e os rodapés de
+  conversão (§4.1) e ritmo (§4.2) em cada time.
 
 ## 4. As métricas, definidas
 
-`src/lib/demo/metricas.ts`, versão 1. Por jogador, por partida. Round
-rendido não é jogado; jogador que saiu conta só os rounds em que apareceu.
+`src/lib/demo/metricas.ts`, regras versão 2 (a `REGRAS_VERSAO` é a da
+rodada de recompute, não a de cada coluna: nenhuma definição de jogador
+mudou desde a versão 1 — o que entrou na 2 foi o ritmo do time, §4.2).
+Por jogador, por partida. Round rendido não é jogado; jogador que saiu
+conta só os rounds em que apareceu.
 
 | Métrica | Definição |
 |---|---|
@@ -194,6 +197,50 @@ Na partida real medida: quem começou de CT converteu 2 de 2 vantagens e
 venceu 5 rounds; quem começou de T converteu 1 de 2 e plantou 2 bombas,
 ganhando os dois rounds.
 
+### 4.2 Ritmo do time — a dimensão tempo
+
+`src/lib/demo/ritmo.ts`, mesma `REGRAS_VERSAO`, mesmas colunas de
+`MatchTeamDemo`. A conversão diz o que o time fez com o que teve e nada
+diz **quando**: dois times com o mesmo placar, o mesmo ADR e a mesma
+conversão podem estar jogando jogos diferentes.
+
+| Métrica | Definição |
+|---|---|
+| `segundoContatoCT`, `contatosCT` | mediana do segundo do primeiro contato nos rounds em que o time jogou de CT, e quantos rounds entraram na conta |
+| `segundoContatoT`, `contatosT` | o mesmo de T |
+| `segundoPlant` | mediana do segundo da plantada nos rounds em que o time plantou; a base é `plants` |
+
+Três decisões:
+
+- **O zero é o fim do freeze** (`round.jogo`), não o início do round.
+  Antes dele ninguém anda, e contar o freeze somaria um tempo morto igual
+  para todo mundo. Round que a demo não marcou o freeze fica de fora — sem
+  zero não há segundo — e o mesmo guarda tira o que ainda queima do round
+  anterior: molotov que arde depois do `round_start` não é o contato deste
+  round.
+- **Contato é dano entre lados opostos** (o `player_hurt` ou a morte, o
+  que vier primeiro). Cegar ou fumaçar não encosta em ninguém; dano em
+  aliado e em si mesmo caem no mesmo teste, porque o autor está do lado da
+  vítima.
+- **Mediana, não média.** Um round em que o T salva e ninguém se toca até
+  os 90 s não deve mover o ritmo dos outros onze.
+
+O contato é do **round** — o primeiro tiro que acerta vale para os dois
+times ao mesmo tempo —, e o que o torna do time é o lado: de T o time
+escolhe quando executar, e o segundo é o ritmo que ele **impôs**; de CT é
+o ritmo que ele **sofreu**. Dentro de uma partida, portanto, o número de
+CT de um time é igual ao de T do outro; o que dá sentido à coluna é a
+série, contra adversários diferentes. Por isso a base (`contatosCT`,
+`contatosT`, `plants`) é gravada junto: mediana de dois rounds é mediana
+de dois rounds, e quem lê precisa ver isso.
+
+Na partida real medida (7 rounds jogados, ninguém trocou de lado): os
+contatos vieram aos 13,1 · 9,3 · 8,3 · 12,9 · 54,6 · 8,6 · 8,3 s —
+mediana **9,3 s**, média 16,4 s, e a diferença entre as duas é o round 5
+sozinho. As duas plantadas foram aos 23,9 e 109,5 s (mediana 66,7 s sobre
+uma base de dois: o número existe, a leitura ainda não).
+Testes: `tests/lib/demo-ritmo.test.ts`.
+
 ## 5. A linguagem tática — o que falta e de onde sai
 
 A tese (registrada em 18/09): CS2 é um jogo de **informação e controle de
@@ -205,16 +252,17 @@ risco. A métrica de jogador que interessa não é K/D — é comportamento
 tático: controle de mapa, disciplina de troca, timing de rotação, valor do
 utilitário, jogo de informação, gestão de risco.
 
-O que a versão 1 já cobre é a camada de **conversão** (o que aconteceu e a
-quem se atribui) e contagens de **recurso** (granadas, cegueira, dano de
-utilitário). A tabela abaixo mapeia cada princípio ao que a demo tem, com
-o que já existe no payload marcado — é o backlog desta frente.
+O que já está coberto é a camada de **conversão** (o que aconteceu e a
+quem se atribui), contagens de **recurso** (granadas, cegueira, dano de
+utilitário) e, desde 21/09, o **tempo** do contato e da plantada (§4.2).
+A tabela abaixo mapeia cada princípio ao que a demo tem, com o que já
+existe no payload marcado — é o backlog desta frente.
 
 | Princípio | Pergunta | Fatos na demo | No payload v1? |
 |---|---|---|---|
 | **Espaço** — controle de mapa | que zonas o time ocupa, quando, e por quanto tempo antes do contato? | `zona` por segundo, por lado; `morte.zonaVitima/zonaAutor` | sim (`zonas` soma por jogador; falta por round e por **time**) |
 | **Espaço** — profundidade | quão longe do spawn o time chega antes da primeira morte? | zona + posição da primeira morte do round | sim, não calculado |
-| **Tempo** — ritmo | a que segundo do round vem o primeiro contato, a plant, a execução? | `round.jogo`, tick da primeira `morte`/`dano`, `bomba.plantando` | sim, não calculado |
+| **Tempo** — ritmo | a que segundo do round vem o primeiro contato, a plant, a execução? | `round.jogo`, tick da primeira `morte`/`dano`, `bomba.plantada` | **feito** para contato e plant (§4.2); a execução ainda não tem definição |
 | **Tempo** — timing de rotação | quanto o CT demora a mudar de site depois do primeiro sinal? | `zona` (mudança de site) contra tick do primeiro `dano`/`granada` no outro site | sim, não calculado |
 | **Informação** — o que se revelou | o time viu antes de comprometer? | `dano` sem morte, `cego`, `granada` de reconhecimento, `zona` de quem entrou e saiu | parcial: falta `weapon_fire` por round (um tiro de "info") e `player_footstep` |
 | **Recursos** — utilitário que compra algo | a smoke/flash antecedeu uma entrada com kill ou uma plant? | `granada.pos`+tick vs `morte`/`bomba` logo depois, `flashAssist` | sim, não calculado |
@@ -230,11 +278,16 @@ Ordem sugerida para o próximo ciclo, do mais barato ao mais caro:
    fora e continua valendo: a retomada do CT (round em que a bomba foi
    plantada contra ele e ele venceu assim mesmo) é o complemento do
    `plants` do outro time e hoje só se lê cruzando as duas linhas.
-2. **Ritmo**: segundo do primeiro contato e da plant, por round e por
-   lado. Duas linhas no payload.
+2. ~~**Ritmo**~~ — feito em 21/09 (§4.2), contato e plantada. O que ficou
+   de fora: a **execução** (o momento em que o time compromete a entrada)
+   não tem definição que os eventos sustentem — "primeiro contato" é o que
+   se consegue medir sem inventar intenção. Fica como pergunta aberta,
+   não como item.
 3. **Economia**: `balance` e `current_equip_value` na amostra do início do
    round (dois campos em `parseTicks`, versão 2 do payload). Sem isso,
-   "força vs eco" não existe e ADR num eco é lido como ADR.
+   "força vs eco" não existe e ADR num eco é lido como ADR. É o único
+   item desta lista que **não** sai das demos já gravadas: os campos não
+   estão nelas, então só vale para demo lida depois do `bot/deploy.sh`.
 4. **Utilitário que compra algo**: flash seguida de kill/entrada, smoke
    seguida de plant. Cruza dois eventos por tick e zona.
 5. **Controle de mapa por time e por round**: `zonas` já existe por
@@ -261,9 +314,10 @@ Ordem sugerida para o próximo ciclo, do mais barato ao mais caro:
 ## 7. O que precisa do humano para ir ao ar
 
 1. `git push` (migrations `20260918200000_demos`,
-   `20260918210000_gc_bruto` e `20260919030000_conversao_do_time` entram
-   pelo `vercel-build`). Demo já gravada antes da última só ganha a linha
-   de time no `npm run recompute:demos`.
+   `20260918210000_gc_bruto`, `20260919030000_conversao_do_time` e
+   `20260921120000_ritmo_do_time` entram pelo `vercel-build`). Demo já
+   gravada antes de cada uma delas só ganha os números novos no `npm run
+   recompute:demos` — é ele também quem sobe o `versaoRegras` de 1 para 2.
 2. `bot/deploy.sh` — a imagem nova instala `bzip2` e o
    `@laihoe/demoparser2`; o `.dockerignore`/`npm ci` já cobrem.
 3. Conferir no `/admin` (log do bot) a primeira linha `Demo CSGO-…: N MB,
