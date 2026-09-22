@@ -4,9 +4,14 @@ import { getFriendIds } from "./steam/api";
 /**
  * A parte social: amigos da Steam que já estão aqui, e quem segue quem.
  *
- * "Seguir" é pedir para ver a curva; só vale depois de aceito. Tudo aqui
- * é lido por quem está logado e sobre si mesmo — a lista de amigos da
- * Steam de alguém nunca é mostrada a terceiros.
+ * Seguir é unilateral e imediato — não há pedido, não há aceite. O que a
+ * aprovação controlava de verdade era outra coisa: ver a curva. Isso virou
+ * `User.curvaVisivel`, uma decisão só, do dono, que vale para todos os
+ * seguidores; e assim acompanhar alguém deixa de exigir a permissão dessa
+ * pessoa, que é como funciona em qualquer outro lugar.
+ *
+ * Tudo aqui é lido por quem está logado e sobre si mesmo — a lista de
+ * amigos da Steam de alguém nunca é mostrada a terceiros.
  */
 
 const CACHE_MS = 10 * 60_000;
@@ -19,7 +24,7 @@ export type Pessoa = {
   avatarUrl: string | null;
 };
 
-export type EstadoSeguir = "nada" | "pedido" | "seguindo";
+export type EstadoSeguir = "nada" | "seguindo";
 
 async function idsDeAmigos(steamId: string): Promise<string[]> {
   const hit = amigosCache.get(steamId);
@@ -43,14 +48,18 @@ export async function amigosNoFragiq(
       select: { id: true, steamId: true, personaName: true, avatarUrl: true },
       orderBy: { personaName: "asc" },
     }),
-    prisma.follow.findMany({ where: { seguidorId: meuId }, select: { seguidoId: true, status: true } }),
-    prisma.follow.findMany({ where: { seguidoId: meuId, status: "ACCEPTED" }, select: { seguidorId: true } }),
+    prisma.follow.findMany({ where: { seguidorId: meuId }, select: { seguidoId: true } }),
+    prisma.follow.findMany({ where: { seguidoId: meuId }, select: { seguidorId: true } }),
   ]);
-  const estadoPor = new Map(saidas.map((f) => [f.seguidoId, f.status === "ACCEPTED" ? "seguindo" : "pedido"] as const));
+  const sigo = new Set(saidas.map((f) => f.seguidoId));
   const meSeguem = new Set(entradas.map((f) => f.seguidorId));
 
   return {
-    amigos: pessoas.map((p) => ({ ...p, estado: estadoPor.get(p.id) ?? "nada", meSegue: meSeguem.has(p.id) })),
+    amigos: pessoas.map((p) => ({
+      ...p,
+      estado: sigo.has(p.id) ? ("seguindo" as const) : ("nada" as const),
+      meSegue: meSeguem.has(p.id),
+    })),
     listaPrivada: false,
     totalAmigos: ids.length,
   };
@@ -59,27 +68,17 @@ export async function amigosNoFragiq(
 export async function estadoDeSeguir(meuId: string, alvoId: string): Promise<EstadoSeguir> {
   const f = await prisma.follow.findUnique({
     where: { seguidorId_seguidoId: { seguidorId: meuId, seguidoId: alvoId } },
-    select: { status: true },
+    select: { id: true },
   });
-  if (!f) return "nada";
-  return f.status === "ACCEPTED" ? "seguindo" : "pedido";
+  return f ? "seguindo" : "nada";
 }
 
 const pessoa = { id: true, steamId: true, personaName: true, avatarUrl: true } as const;
 
-export async function pedidosRecebidos(meuId: string): Promise<Pessoa[]> {
-  const rows = await prisma.follow.findMany({
-    where: { seguidoId: meuId, status: "PENDING" },
-    orderBy: { createdAt: "desc" },
-    select: { seguidor: { select: pessoa } },
-  });
-  return rows.map((r) => r.seguidor);
-}
-
 export async function quemSigo(meuId: string): Promise<Pessoa[]> {
   const rows = await prisma.follow.findMany({
-    where: { seguidorId: meuId, status: "ACCEPTED" },
-    orderBy: { decididoEm: "desc" },
+    where: { seguidorId: meuId },
+    orderBy: { createdAt: "desc" },
     select: { seguido: { select: pessoa } },
   });
   return rows.map((r) => r.seguido);
@@ -87,8 +86,8 @@ export async function quemSigo(meuId: string): Promise<Pessoa[]> {
 
 export async function quemMeSegue(meuId: string): Promise<Pessoa[]> {
   const rows = await prisma.follow.findMany({
-    where: { seguidoId: meuId, status: "ACCEPTED" },
-    orderBy: { decididoEm: "desc" },
+    where: { seguidoId: meuId },
+    orderBy: { createdAt: "desc" },
     select: { seguidor: { select: pessoa } },
   });
   return rows.map((r) => r.seguidor);

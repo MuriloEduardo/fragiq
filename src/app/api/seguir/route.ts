@@ -6,13 +6,16 @@ import { getSession } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 /**
- * Os cinco gestos de seguir. Quem pede: pedir, cancelar, remover. Quem é
- * seguido: aceitar, recusar, revogar. Tudo idempotente — repetir um gesto
- * não erra, só não muda nada.
+ * Três gestos, todos imediatos e idempotentes.
+ *
+ * `seguir` e `deixar` são meus sobre outra pessoa; `remover` tira alguém
+ * de quem me segue. Não há mais `pedir`, `aceitar` nem `recusar`: seguir
+ * não depende de autorização, e o que era autorizado pessoa a pessoa —
+ * ver a curva — é agora uma escolha só, em Configurações.
  */
 const schema = z.object({
   steamId: z.string().regex(/^7656119\d{10}$/),
-  acao: z.enum(["pedir", "cancelar", "aceitar", "recusar", "revogar"]),
+  acao: z.enum(["seguir", "deixar", "remover"]),
 });
 
 export async function POST(request: NextRequest) {
@@ -22,14 +25,16 @@ export async function POST(request: NextRequest) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
   const { steamId, acao } = parsed.data;
-  if (steamId === session.steamId) return NextResponse.json({ error: "Você já vê a sua curva." }, { status: 400 });
+  if (steamId === session.steamId) return NextResponse.json({ error: "Você já se acompanha." }, { status: 400 });
 
   const outro = await prisma.user.findUnique({ where: { steamId }, select: { id: true, perfilPublico: true } });
   if (!outro) return NextResponse.json({ error: "Essa pessoa ainda não está no FragIQ." }, { status: 404 });
 
   const eu = session.userId;
   switch (acao) {
-    case "pedir":
+    case "seguir":
+      // Perfil oculto é a única recusa que resta: sem página pública não há
+      // o que acompanhar.
       if (!outro.perfilPublico) return NextResponse.json({ error: "Perfil oculto." }, { status: 403 });
       await prisma.follow.upsert({
         where: { seguidorId_seguidoId: { seguidorId: eu, seguidoId: outro.id } },
@@ -37,17 +42,10 @@ export async function POST(request: NextRequest) {
         update: {},
       });
       break;
-    case "cancelar":
+    case "deixar":
       await prisma.follow.deleteMany({ where: { seguidorId: eu, seguidoId: outro.id } });
       break;
-    case "aceitar":
-      await prisma.follow.updateMany({
-        where: { seguidorId: outro.id, seguidoId: eu, status: "PENDING" },
-        data: { status: "ACCEPTED", decididoEm: new Date() },
-      });
-      break;
-    case "recusar":
-    case "revogar":
+    case "remover":
       await prisma.follow.deleteMany({ where: { seguidorId: outro.id, seguidoId: eu } });
       break;
   }

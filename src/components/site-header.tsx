@@ -1,13 +1,16 @@
+"use client";
+
 import Link from "next/link";
-import Image from "next/image";
-import { Gauge, LogOut, Megaphone, ShieldCheck, Users } from "lucide-react";
-import { Selo } from "./selo";
+import { usePathname } from "next/navigation";
+import { MenuConta } from "./menu-conta";
 import { SyncButton } from "./sync-button";
 import { FeedbackButton } from "./feedback-button";
+import { cn } from "@/lib/utils";
 
 type Props = {
   personaName: string;
   avatarUrl: string | null;
+  steamId: string;
   lastSyncedAt: Date | null;
   /** Mostra o atalho para /admin. Só quem está em ADMIN_STEAM_IDS. */
   admin?: boolean;
@@ -18,107 +21,87 @@ type Props = {
 /**
  * Cabeçalho.
  *
- * Mobile primeiro, e por um defeito medido: numa viewport de 390px o layout
- * anterior produzia 471px de conteúdo — o botão de feedback e o de sair
- * ficavam inteiramente fora da tela, e a página inteira deslizava para o
- * lado. Agora o grupo de sincronização quebra para uma linha própria abaixo
- * de `sm` (`order-last w-full`) e volta para a mesma linha a partir dali, sem
- * duplicar o componente — duas instâncias de SyncButton seriam dois estados
- * de seleção de modo divergindo em silêncio.
+ * A forma é a convencional — marca à esquerda, navegação ao lado, conta à
+ * direita — porque a anterior não era: seis ícones sem rótulo disputavam o
+ * canto direito, misturando navegação ("amigos", "comunidade") com ação
+ * ("sincronizar", "feedback") e com conta ("sair"). Nada dizia onde era o
+ * "meu". Separadas, cada coisa fica onde se procura por ela: as seções no
+ * meio, a ação da sessão à direita, e tudo que é da pessoa dentro do
+ * avatar.
+ *
+ * A aba ativa é marcada porque a área do jogo já tem um segundo nível de
+ * abas: sem marcar o primeiro, as duas linhas de navegação competiam.
+ *
+ * Mobile: a navegação vira uma segunda linha rolável e o grupo de
+ * sincronização desce com ela. Numa viewport de 390px a versão anterior
+ * produzia 471px de conteúdo e jogava o botão de sair para fora da tela.
  */
-export function SiteHeader({ personaName, avatarUrl, lastSyncedAt, admin, selo }: Props) {
+const SECOES = [
+  { href: "/cs2", rotulo: "CS2", combina: (p: string) => p === "/cs2" || p.startsWith("/games/") },
+  { href: "/amigos", rotulo: "Amigos", combina: (p: string) => p.startsWith("/amigos") },
+  { href: "/comunidade", rotulo: "Comunidade", combina: (p: string) => p.startsWith("/comunidade") },
+];
+
+export function SiteHeader({ personaName, avatarUrl, steamId, lastSyncedAt, admin, selo }: Props) {
+  const pathname = usePathname() ?? "";
+
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-canvas/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 sm:flex-nowrap sm:gap-x-4 sm:px-6 sm:py-3">
-        <Link
-          href="/cs2"
-          className="font-mono text-sm font-bold tracking-tight"
-        >
+    <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 sm:gap-5 sm:px-6 sm:py-2.5">
+        <Link href="/cs2" className="shrink-0 font-mono text-sm font-bold tracking-tight">
           Frag<span className="text-accent">IQ</span>
         </Link>
 
-        {admin && (
-          <Link
-            href="/admin"
-            className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
-            aria-label="Painel"
-            title="Painel"
-          >
-            <Gauge className="size-4" />
-          </Link>
-        )}
-
-        {/* Identidade e ações ficam sempre na primeira linha: são o que
-            precisa estar alcançável mesmo com o teclado aberto. */}
-        <div className="ml-auto flex items-center gap-1 sm:order-last sm:gap-2">
-          <div className="flex items-center gap-2 sm:border-l sm:border-line sm:pl-4">
-            {avatarUrl && (
-              <Image
-                src={avatarUrl}
-                alt=""
-                width={28}
-                height={28}
-                className="size-7 rounded-full ring-1 ring-line"
-                unoptimized
-              />
-            )}
-            <div className="hidden sm:block">
-              <p className="flex items-center gap-2 text-sm leading-tight">
-                {personaName}
-                {selo && <Selo tipo={selo} />}
-              </p>
-              <p className="text-[11px] leading-tight text-ink-faint">
-                {lastSyncedAt
-                  ? `sync ${lastSyncedAt.toLocaleDateString("pt-BR")}`
-                  : "nunca sincronizado"}
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href="/amigos"
-            aria-label="Amigos"
-            title="Amigos"
-            className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
-          >
-            <Users className="size-4" />
-          </Link>
-
-          <Link
-            href="/comunidade"
-            aria-label="Comunidade"
-            title="Comunidade"
-            className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
-          >
-            <Megaphone className="size-4" />
-          </Link>
-
-          <Link
-            href="/seguranca"
-            aria-label="Segurança e dados"
-            title="Segurança e dados"
-            className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-accent sm:size-9"
-          >
-            <ShieldCheck className="size-4" />
-          </Link>
-
-          <FeedbackButton />
-
-          <form action="/api/auth/logout" method="post" className="flex">
-            <button
-              type="submit"
-              aria-label="Sair"
-              className="inline-flex size-11 items-center justify-center rounded-lg text-ink-faint transition hover:bg-surface-2 hover:text-danger sm:size-9"
+        <nav className="hidden items-center gap-1 sm:flex">
+          {SECOES.map((s) => (
+            <Link
+              key={s.href}
+              href={s.href}
+              aria-current={s.combina(pathname) ? "page" : undefined}
+              className={cn(
+                "rounded-lg px-2.5 py-1.5 text-sm transition",
+                s.combina(pathname) ? "bg-surface-2 text-ink" : "text-ink-muted hover:bg-surface-2 hover:text-ink",
+              )}
             >
-              <LogOut className="size-4" />
-            </button>
-          </form>
-        </div>
+              {s.rotulo}
+            </Link>
+          ))}
+        </nav>
 
-        {/* No celular vira a segunda linha, ocupando a largura toda. */}
-        <div className="order-last w-full sm:order-none sm:ml-auto sm:w-auto">
-          <SyncButton className="w-full sm:w-auto" />
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <div className="hidden sm:block">
+            <SyncButton />
+          </div>
+          <FeedbackButton />
+          <MenuConta
+            personaName={personaName}
+            avatarUrl={avatarUrl}
+            steamId={steamId}
+            lastSyncedAt={lastSyncedAt}
+            selo={selo}
+            admin={admin}
+          />
         </div>
+      </div>
+
+      {/* No celular a navegação e o sync viram a segunda linha. */}
+      <div className="flex items-center gap-2 border-t border-line-soft px-4 py-1.5 sm:hidden">
+        <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {SECOES.map((s) => (
+            <Link
+              key={s.href}
+              href={s.href}
+              aria-current={s.combina(pathname) ? "page" : undefined}
+              className={cn(
+                "shrink-0 rounded-lg px-2.5 py-1.5 text-sm transition",
+                s.combina(pathname) ? "bg-surface-2 text-ink" : "text-ink-muted",
+              )}
+            >
+              {s.rotulo}
+            </Link>
+          ))}
+        </nav>
+        <SyncButton className="shrink-0" />
       </div>
     </header>
   );

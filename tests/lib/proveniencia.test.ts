@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const prisma = {
   user: { findUnique: vi.fn() },
   botObservation: { create: vi.fn() },
-  pendingCapture: { upsert: vi.fn(), findMany: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
+  pendingCapture: { upsert: vi.fn(), create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
   userGame: { findUnique: vi.fn() },
   statSnapshot: { update: vi.fn() },
 };
@@ -23,9 +23,14 @@ vi.mock("@/lib/segredos", () => ({ segredoOpcional: vi.fn(async () => "segredo")
 const TRACE = "11111111-2222-4333-8444-555555555555";
 const STEAM = "76561198000000001";
 
+let obsSeq = 0;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  prisma.pendingCapture.upsert.mockImplementation(async ({ create }) => ({ ...create, id: "cap-1" }));
+  obsSeq = 0;
+  prisma.botObservation.create.mockImplementation(async ({ data }) => ({ ...data, id: `obs-${++obsSeq}` }));
+  prisma.pendingCapture.upsert.mockImplementation(async ({ create }) => ({ ...create, id: `cap-${create.observacaoId}` }));
+  prisma.pendingCapture.findMany.mockResolvedValue([]);
 });
 
 describe("steam-event: observação antes da captura, com o trace do bot", () => {
@@ -44,8 +49,38 @@ describe("steam-event: observação antes da captura, com o trace do bot", () =>
     const obs = prisma.botObservation.create.mock.calls[0][0].data;
     expect(obs).toMatchObject({ steamId: STEAM, userId: "u1", kind: "MATCH_ENDED", map: "de_mirage", mode: "premier", traceId: TRACE });
 
-    const cap = prisma.pendingCapture.upsert.mock.calls[0][0].create;
-    expect(cap).toMatchObject({ userId: "u1", matchMode: "premier", traceId: TRACE });
+    const chamada = prisma.pendingCapture.upsert.mock.calls[0][0];
+    expect(chamada.create).toMatchObject({ userId: "u1", matchMode: "premier", traceId: TRACE, observacaoId: "obs-1" });
+    // A chave de idempotência é a observação, não o jogador: é o que
+    // impede o aviso seguinte de apagar esta captura.
+    expect(chamada.where).toEqual({ observacaoId: "obs-1" });
+  });
+
+  it("duas partidas seguidas viram duas capturas, não uma", async () => {
+    // A regressão que aglomerava partidas: `pending_captures.userId` era
+    // único e o upsert por jogador fazia o fim da segunda partida
+    // sobrescrever a captura da primeira. A primeira nunca era coletada e
+    // o ponto seguinte cobria as duas — uma sessão com duas partidas
+    // dentro, que nenhum gráfico consegue ler como desempenho.
+    prisma.user.findUnique.mockResolvedValue({ id: "u1", steamId: STEAM });
+    const { POST } = await import("@/app/api/sync/steam-event/route");
+    const avisar = (mapa: string) =>
+      POST(
+        new Request("http://x/api/sync/steam-event", {
+          method: "POST",
+          headers: { authorization: "Bearer segredo", "content-type": "application/json" },
+          body: JSON.stringify({ steamId: STEAM, event: "match_ended", map: mapa, mode: "premier" }),
+        }) as never,
+      );
+
+    await avisar("de_mirage");
+    await avisar("de_nuke");
+
+    expect(prisma.pendingCapture.upsert).toHaveBeenCalledTimes(2);
+    const chaves = prisma.pendingCapture.upsert.mock.calls.map((c) => c[0].where.observacaoId);
+    expect(chaves).toEqual(["obs-1", "obs-2"]);
+    const mapas = prisma.pendingCapture.upsert.mock.calls.map((c) => c[0].create.matchMap);
+    expect(mapas).toEqual(["de_mirage", "de_nuke"]);
   });
 
   it("quem não tem conta ainda deixa observação mesmo assim", async () => {
@@ -75,5 +110,21 @@ describe("tick: a coleta reativa herda o trace da captura", () => {
     const r = await processarCapturasDevidas();
     expect(r).toMatchObject({ processadas: 1, gravadas: 1 });
     expect(syncUser).toHaveBeenCalledWith("u1", STEAM, "EVENT", { map: "de_mirage", mode: "premier", score: undefined }, TRACE);
+  });
+
+  it("processa uma captura por pessoa por rodada", async () => {
+    // Duas capturas da mesma pessoa vencidas juntas leriam o mesmo estado
+    // da Steam; a segunda não viraria ponto e gastaria chamada. Fica para
+    // o tick seguinte, quando a Steam já publicou a partida seguinte.
+    prisma.pendingCapture.findMany.mockResolvedValue([
+      { id: "cap-1", userId: "u1", steamId: STEAM, matchMap: "de_mirage", matchMode: "premier", matchScore: null, traceId: TRACE, tentativa: 0 },
+      { id: "cap-2", userId: "u1", steamId: STEAM, matchMap: "de_nuke", matchMode: "premier", matchScore: null, traceId: TRACE, tentativa: 0 },
+      { id: "cap-3", userId: "u2", steamId: STEAM, matchMap: "de_inferno", matchMode: "premier", matchScore: null, traceId: TRACE, tentativa: 0 },
+    ]);
+    syncUser.mockResolvedValue({ snapshotsCreated: 1 });
+    const { processarCapturasDevidas } = await import("@/lib/capturas");
+    const r = await processarCapturasDevidas();
+    expect(r).toMatchObject({ processadas: 2, gravadas: 2 });
+    expect(syncUser.mock.calls.map((c) => c[3].map)).toEqual(["de_mirage", "de_inferno"]);
   });
 });

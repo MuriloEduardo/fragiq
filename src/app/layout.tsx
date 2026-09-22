@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -11,6 +11,18 @@ export const metadata: Metadata = {
   title: "FragIQ — suas estatísticas de CS2 ao longo do tempo",
   description:
     "A Steam guarda só o total acumulado desde sempre. O FragIQ coleta periodicamente e mostra a diferença entre as coletas: 178 estatísticas de CS2 em série temporal, com leituras em português, painel fixo e todos os contadores comparados com o vitalício. Beta aberto.",
+};
+
+/**
+ * A barra do navegador acompanha o tema do sistema, como o resto da
+ * interface. Duas entradas com media query, e não um valor só: com um
+ * valor só, o Safari pinta a barra de grafite numa página clara.
+ */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f6f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0d10" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

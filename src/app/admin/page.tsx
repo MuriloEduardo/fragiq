@@ -25,7 +25,7 @@ export default async function AdminPage() {
   const [user, painel] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
-      select: { personaName: true, avatarUrl: true, lastSyncedAt: true },
+      select: { personaName: true, avatarUrl: true, lastSyncedAt: true, steamId: true },
     }),
     carregarPainel(),
   ]);
@@ -44,7 +44,10 @@ export default async function AdminPage() {
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="flex items-baseline justify-between">
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Painel</h1>
-          <Link href="/admin/dados" className="text-sm text-accent hover:underline">Dados →</Link>
+          <nav className="flex items-center gap-4 text-sm">
+            <Link href="/admin/bruto" className="text-ink-muted hover:text-accent">Cru</Link>
+            <Link href="/admin/dados" className="text-accent hover:underline">Dados →</Link>
+          </nav>
         </div>
         <p className="mt-1 text-sm text-ink-muted">
           Quem entrou, o que aconteceu e se a coleta está saudável. Horários em Brasília.

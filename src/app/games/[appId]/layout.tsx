@@ -40,7 +40,7 @@ export default async function GameLayout({
   const [user, userGame, selo, lente, jar] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
-      select: { personaName: true, avatarUrl: true, lastSyncedAt: true },
+      select: { personaName: true, avatarUrl: true, lastSyncedAt: true, steamId: true },
     }),
     prisma.userGame.findUnique({
       where: { userId_gameAppId: { userId: session.userId, gameAppId: appId } },

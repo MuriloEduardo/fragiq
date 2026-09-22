@@ -35,48 +35,94 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-/* Claro é o padrão para o HTML servido antes de qualquer JS: se a primeira
-   pintura for escura e o sistema pedir claro, o usuário vê um flash. */
+/* Dois temas, nenhum botão.
+   O tema é do sistema operacional, lido por `prefers-color-scheme`: quem
+   configurou o computador já disse o que quer, e um seletor no site seria
+   uma terceira opinião sobre uma escolha que a pessoa já fez uma vez.
+
+   A ordem importa. O claro fica no `:root` puro e o escuro dentro da media
+   query, então nenhuma cor tem a sua única definição dentro de um bloco
+   condicional — um token que só existisse lá dentro sumiria em qualquer
+   contexto que não avalie a query (impressão, captura, leitor de tela com
+   folha própria).
+
+   O que não muda entre os dois: o laranja é a marca e nunca codifica
+   valência, verde/vermelho são movimento, e os números são mono. O que
+   muda é só o valor de cada token — nenhum componente sabe que existe
+   mais de um tema. */
 :root {
-  /* Um tema só, escuro.
-     O produto fala com quem joga CS2: gente que passa a noite em telas
-     escuras e reconhece um HUD à distância. Dois temas dobravam o trabalho
-     de desenho e diluíam a identidade; o claro foi removido. Grafite frio,
-     não preto — o preto puro faz o laranja vibrar demais e cansa. */
-  --canvas: #0b0d10;
-  --surface: #13161a;
-  --surface-2: #1a1e24;
-  --line: #262b32;
-  --line-soft: #1e2228;
+  /* Claro: papel frio, não branco puro. O branco absoluto sob o laranja da
+     marca vibra do mesmo jeito que o preto absoluto vibrava no escuro. */
+  --canvas: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef1f5;
+  --line: #dde2e9;
+  --line-soft: #ebeef2;
 
-  --ink: #eef0f3;
-  --ink-muted: #a3a9b3;
-  --ink-faint: #7d8590;
+  --ink: #11141a;
+  --ink-muted: #565e6b;
+  --ink-faint: #7c8695;
 
-  /* A marca é luz, não fundo: aparece onde há informação — o valor que
-     subiu, a linha do gráfico, a aba ativa. Medido: 6,2:1 sobre --surface. */
-  --accent: #ff6b3d;
-  --accent-soft: #33200f;
-  --accent-glow: rgba(255, 107, 61, 0.22);
-  --danger: #ff7b6e;
-  --warn: #e8c25a;
+  /* O mesmo laranja do escuro tem 2,6:1 sobre branco — ilegível. No claro
+     a marca escurece até 4,9:1 sobre `--surface` mantendo o matiz; é a
+     mesma cor, na luz certa. */
+  --accent: #c2410c;
+  --accent-soft: #fdece3;
+  --accent-glow: rgba(194, 65, 12, 0.16);
+  --danger: #b3261e;
+  --warn: #8a6300;
 
-  /* Valência é verde/vermelho; o laranja nunca diz "subiu". Mint frio para
-     contrastar com a marca: 8,9:1 sobre --surface. */
-  --good: #4fd1a5;
-  --good-soft: #0f2b22;
+  --good: #0e7a5b;
+  --good-soft: #e1f4ee;
   --bad: var(--danger);
-  --bad-soft: #331a17;
+  --bad-soft: #fceceb;
   --neutral: var(--ink-muted);
-  --steam: #5db1f0;
+  --steam: #1266a8;
 
-  --side-ct: #7fb4ee;
-  --side-t: #e6c07a;
+  --side-ct: #2f6fb3;
+  --side-t: #8a6a28;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* O produto fala com quem joga CS2: gente que passa a noite em telas
+       escuras e reconhece um HUD à distância. Grafite frio, não preto — o
+       preto puro faz o laranja vibrar demais e cansa. */
+    --canvas: #0b0d10;
+    --surface: #13161a;
+    --surface-2: #1a1e24;
+    --line: #262b32;
+    --line-soft: #1e2228;
+
+    --ink: #eef0f3;
+    --ink-muted: #a3a9b3;
+    --ink-faint: #7d8590;
+
+    /* A marca é luz, não fundo: aparece onde há informação — o valor que
+       subiu, a linha do gráfico, a aba ativa. Medido: 6,2:1 sobre --surface. */
+    --accent: #ff6b3d;
+    --accent-soft: #33200f;
+    --accent-glow: rgba(255, 107, 61, 0.22);
+    --danger: #ff7b6e;
+    --warn: #e8c25a;
+
+    /* Valência é verde/vermelho; o laranja nunca diz "subiu". Mint frio para
+       contrastar com a marca: 8,9:1 sobre --surface. */
+    --good: #4fd1a5;
+    --good-soft: #0f2b22;
+    --bad: var(--danger);
+    --bad-soft: #331a17;
+    --neutral: var(--ink-muted);
+    --steam: #5db1f0;
+
+    --side-ct: #7fb4ee;
+    --side-t: #e6c07a;
+  }
 }
 
 html {
-  /* Scrollbars, seletores e inputs nativos no esquema certo. */
-  color-scheme: dark;
+  /* Scrollbars, seletores e inputs nativos seguem o mesmo sinal do sistema. */
+  color-scheme: light dark;
 }
 
 body {

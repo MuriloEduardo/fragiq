@@ -12,7 +12,7 @@ export function SeguirBotao({
   className,
 }: {
   steamId: string;
-  acao: "pedir" | "cancelar" | "aceitar" | "recusar" | "revogar";
+  acao: "seguir" | "deixar" | "remover";
   rotulo: string;
   primario?: boolean;
   className?: string;

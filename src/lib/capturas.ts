@@ -8,11 +8,19 @@ import { fecharSessao } from "./sessao/materializar";
  * Coleta reativa com memória.
  *
  * O bot de presença vê o fim da partida e avisa; daqui em diante o estado
- * é do banco. Cada pessoa tem no máximo uma captura pendente, com o
- * contexto observado (mapa, modo, placar), quantas vezes já tentamos e
- * quando é a próxima. O bot só serve de relógio: a cada tick processamos
- * o que venceu. Reiniciar o bot, trocar de host ou subir uma segunda
- * instância não perde nada — e o cron pode processar o mesmo balde.
+ * é do banco. Cada **partida observada** tem a sua captura pendente, com o
+ * contexto (mapa, modo, placar), quantas vezes já tentamos e quando é a
+ * próxima. O bot só serve de relógio: a cada tick processamos o que
+ * venceu. Reiniciar o bot, trocar de host ou subir uma segunda instância
+ * não perde nada — e o cron pode processar o mesmo balde.
+ *
+ * Era uma captura por *pessoa*, com upsert. Quem jogava duas partidas
+ * seguidas perdia a primeira: o segundo aviso sobrescrevia a captura que
+ * ainda esperava a Steam publicar a primeira, e o ponto que vinha depois
+ * cobria as duas. A sessão nascia então com duas, quatro, cinco partidas
+ * dentro — um ponto de gráfico que não é o desempenho de partida nenhuma.
+ * A unicidade mudou de lugar: é da observação, que é o que de fato não
+ * pode entrar duas vezes na fila.
  */
 
 const CS2_APPID = 730;
@@ -28,9 +36,26 @@ const RETRY_MS = [2, 4, 8, 16].map((min) => min * 60_000);
 /** Janela em que um ponto sem contexto ainda é "a partida que o bot viu". */
 const JANELA_ANEXO_MS = 30 * 60_000;
 
-export async function agendarCaptura(userId: string, steamId: string, contexto: MatchContext, traceId: string) {
+/**
+ * Quantas capturas de uma pessoa podem estar na fila ao mesmo tempo.
+ *
+ * Existe porque o rich presence pode oscilar (entrar e sair do lobby
+ * várias vezes) e cada oscilação é um aviso. Seis cobre uma noite inteira
+ * de Premier com folga; acima disso é ruído, e o cron pega o resto.
+ */
+const NA_FILA_POR_PESSOA = 6;
+
+export async function agendarCaptura(
+  userId: string,
+  steamId: string,
+  contexto: MatchContext,
+  traceId: string,
+  observacaoId: string | null,
+) {
   const dados = {
+    userId,
     steamId,
+    observacaoId,
     matchMap: contexto.map ?? null,
     matchMode: contexto.mode ?? null,
     matchScore: contexto.score ?? null,
@@ -38,11 +63,33 @@ export async function agendarCaptura(userId: string, steamId: string, contexto: 
     tentativa: 0,
     proximaEm: new Date(Date.now() + GRACE_MS),
   };
-  return prisma.pendingCapture.upsert({
-    where: { userId },
-    create: { userId, ...dados },
+
+  // Sem observação (bot antigo, que não manda o id) não há chave de
+  // idempotência: cai no comportamento de antes, uma por pessoa, porque
+  // duas entradas indistinguíveis na fila seriam duas coletas iguais.
+  if (!observacaoId) {
+    const pendente = await prisma.pendingCapture.findFirst({ where: { userId, observacaoId: null } });
+    if (pendente) return prisma.pendingCapture.update({ where: { id: pendente.id }, data: dados });
+    return prisma.pendingCapture.create({ data: dados });
+  }
+
+  const criada = await prisma.pendingCapture.upsert({
+    where: { observacaoId },
+    create: dados,
     update: dados,
   });
+
+  // A fila é por partida, mas não é infinita: sobra a mais recente.
+  const excedente = await prisma.pendingCapture.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    skip: NA_FILA_POR_PESSOA,
+    select: { id: true },
+  });
+  if (excedente.length) {
+    await prisma.pendingCapture.deleteMany({ where: { id: { in: excedente.map((e) => e.id) } } });
+  }
+  return criada;
 }
 
 export type ResultadoDoTick = {
@@ -54,11 +101,16 @@ export type ResultadoDoTick = {
 
 /** Processa as capturas vencidas, uma por vez (rajada contra a Steam custa a chave). */
 export async function processarCapturasDevidas(limite = 5): Promise<ResultadoDoTick> {
-  const devidas = await prisma.pendingCapture.findMany({
+  const candidatas = await prisma.pendingCapture.findMany({
     where: { proximaEm: { lte: new Date() } },
     orderBy: { proximaEm: "asc" },
-    take: limite,
+    take: limite * 4,
   });
+  // Uma por pessoa por rodada: duas coletas do mesmo jogador com segundos
+  // de diferença leem o mesmo estado da Steam e a segunda não vira ponto.
+  // A outra continua na fila e é processada no tick seguinte.
+  const vistos = new Set<string>();
+  const devidas = candidatas.filter((c) => !vistos.has(c.userId) && vistos.add(c.userId)).slice(0, limite);
 
   const r: ResultadoDoTick = { processadas: 0, gravadas: 0, reagendadas: 0, desistidas: 0 };
   for (const c of devidas) {

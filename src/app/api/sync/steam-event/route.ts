@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   // A observação fica mesmo para quem não tem conta: o bot é amigo de gente
   // que talvez entre no site depois, e aí a história já está lá.
-  await prisma.botObservation.create({
+  const observacao = await prisma.botObservation.create({
     data: {
       steamId: d.steamId,
       userId: user?.id ?? null,
@@ -70,6 +70,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ skipped: "usuário desconhecido", traceId });
   }
 
-  const captura = await agendarCaptura(user.id, user.steamId, { map: d.map, mode: d.mode, score: d.score }, traceId);
+  // A captura é pendurada na observação: é ela que dá a chave de
+  // idempotência e, sobretudo, é ela que garante uma coleta por partida
+  // vista — o aviso da partida seguinte não apaga mais o da anterior.
+  const captura = await agendarCaptura(
+    user.id,
+    user.steamId,
+    { map: d.map, mode: d.mode, score: d.score },
+    traceId,
+    observacao.id,
+  );
   return NextResponse.json({ scheduled: captura.proximaEm.toISOString(), traceId }, { status: 202 });
 }

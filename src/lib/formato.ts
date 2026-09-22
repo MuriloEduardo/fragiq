@@ -61,3 +61,17 @@ export function formatarDuracao(minutos: number): string {
   const m = Math.round(minutos % 60);
   return m ? `${h} h ${m} min` : `${h} h`;
 }
+
+/**
+ * Tamanho de payload, para o painel de dados crus.
+ *
+ * Vive aqui pela mesma razão que o resto: é um número na tela, e números na
+ * tela têm um formatador só. Base 1024 e não 1000 porque o que se compara é
+ * com o que o banco e o editor dizem, não com o que o disco anuncia.
+ */
+export function formatarBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  const { locale } = getLocale();
+  if (n < 1024 * 1024) return `${(n / 1024).toLocaleString(locale, { maximumFractionDigits: 1 })} KB`;
+  return `${(n / (1024 * 1024)).toLocaleString(locale, { maximumFractionDigits: 1 })} MB`;
+}

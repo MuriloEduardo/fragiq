@@ -3,15 +3,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { isAdmin, seloDe } from "@/lib/admin";
-import { amigosNoFragiq, pedidosRecebidos, quemMeSegue, quemSigo, type Pessoa } from "@/lib/social";
+import { amigosNoFragiq, quemMeSegue, quemSigo, type Pessoa } from "@/lib/social";
 import { SiteHeader } from "@/components/site-header";
 import { SeguirBotao } from "@/components/seguir-botao";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Amigos: quem da sua lista da Steam já está aqui, quem pediu para ver a
- * sua curva, quem você segue e quem te segue.
+ * Amigos: quem da sua lista da Steam já está aqui, quem você segue e quem
+ * te segue.
+ *
+ * A fila de pedidos saiu com a aprovação: seguir é imediato, então não há
+ * nada para julgar. Sobraram duas perguntas — "com quem eu jogo que está
+ * aqui?" e "quem é o meu círculo?" — e uma seção para cada.
  *
  * A lista de amigos vem da Steam e só aparece para você; o que se mostra
  * dela é a interseção com quem tem conta — ninguém descobre por aqui quem
@@ -19,14 +23,13 @@ export const dynamic = "force-dynamic";
  */
 export default async function AmigosPage() {
   const session = await requireSession();
-  const [user, selo, amigos, pedidos, sigo, seguem] = await Promise.all([
+  const [user, selo, amigos, sigo, seguem] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
-      select: { personaName: true, avatarUrl: true, lastSyncedAt: true },
+      select: { personaName: true, avatarUrl: true, lastSyncedAt: true, steamId: true, curvaVisivel: true },
     }),
     seloDe(session.userId),
     amigosNoFragiq(session.userId, session.steamId),
-    pedidosRecebidos(session.userId),
     quemSigo(session.userId),
     quemMeSegue(session.userId),
   ]);
@@ -36,74 +39,61 @@ export default async function AmigosPage() {
     <>
       <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Amigos</h1>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Amigos</h1>
+          <p className="text-xs text-ink-faint">
+            {user.curvaVisivel ? "Quem te segue vê a sua curva." : "A sua curva está fechada para seguidores."}{" "}
+            <Link href="/configuracoes" className="text-accent hover:underline">mudar</Link>
+          </p>
+        </div>
 
-        {pedidos.length > 0 && (
-          <Secao titulo="Pedem para ver a sua curva" n={pedidos.length}>
-            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {pedidos.map((p) => (
-                <Cartao key={p.id} pessoa={p}>
-                  <SeguirBotao steamId={p.steamId} acao="aceitar" rotulo="Aceitar" primario />
-                  <SeguirBotao steamId={p.steamId} acao="recusar" rotulo="Recusar" />
-                </Cartao>
-              ))}
-            </ul>
-          </Secao>
-        )}
-
-        <Secao titulo="Amigos da Steam no FragIQ" n={amigos.amigos.length}>
+        <Secao titulo="Da sua lista da Steam" n={amigos.amigos.length}>
           {amigos.listaPrivada ? (
             <Vazio texto="Sua lista de amigos está privada na Steam. Em Editar perfil → Privacidade, deixe 'Lista de amigos' pública e volte aqui." />
           ) : amigos.amigos.length === 0 ? (
-            <Vazio texto={`Nenhum dos seus ${amigos.totalAmigos} amigos entrou ainda. Mande o link: fragiq-rouge.vercel.app`} />
+            <Vazio texto={`Nenhum dos seus ${amigos.totalAmigos} amigos entrou ainda.`} />
           ) : (
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {amigos.amigos.map((a) => (
-                <Cartao key={a.id} pessoa={a} nota={a.meSegue ? "vê a sua curva" : undefined}>
-                  <Link
-                    href={`/p/${session.steamId}/vs/${a.steamId}`}
-                    className="rounded-lg bg-surface px-3 py-1.5 text-sm text-ink-muted ring-1 ring-line transition hover:text-ink hover:ring-accent/60"
-                  >
+                <Cartao key={a.id} pessoa={a} nota={a.meSegue ? "te segue" : undefined}>
+                  {a.estado === "seguindo" ? (
+                    <SeguirBotao steamId={a.steamId} acao="deixar" rotulo="Seguindo" />
+                  ) : (
+                    <SeguirBotao steamId={a.steamId} acao="seguir" rotulo="Seguir" primario />
+                  )}
+                  <Link href={`/p/${session.steamId}/vs/${a.steamId}`} className={BOTAO}>
                     Comparar
                   </Link>
-                  {a.estado === "nada" && <SeguirBotao steamId={a.steamId} acao="pedir" rotulo="Pedir a curva" primario />}
-                  {a.estado === "pedido" && <SeguirBotao steamId={a.steamId} acao="cancelar" rotulo="Pedido enviado · cancelar" />}
-                  {a.estado === "seguindo" && (
-                    <Link href={`/p/${a.steamId}`} className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-canvas transition hover:brightness-110">
-                      Ver a curva
-                    </Link>
-                  )}
                 </Cartao>
               ))}
             </ul>
           )}
         </Secao>
 
-        <div className="grid gap-10 lg:grid-cols-2">
-          <Secao titulo="Você vê a curva de" n={sigo.length}>
+        <div className="grid gap-8 lg:grid-cols-2">
+          <Secao titulo="Seguindo" n={sigo.length}>
             {sigo.length === 0 ? (
-              <Vazio texto="Ninguém ainda. Peça na página pública de alguém." />
+              <Vazio texto="Ninguém ainda. Siga alguém na página pública dessa pessoa." />
             ) : (
               <ul className="grid gap-3">
                 {sigo.map((p) => (
                   <Cartao key={p.id} pessoa={p}>
-                    <Link href={`/p/${p.steamId}`} className="rounded-lg bg-surface px-3 py-1.5 text-sm text-ink-muted ring-1 ring-line transition hover:text-ink hover:ring-accent/60">
-                      Ver a curva
-                    </Link>
-                    <SeguirBotao steamId={p.steamId} acao="cancelar" rotulo="Deixar de seguir" />
+                    <Link href={`/p/${p.steamId}`} className={BOTAO}>Ver perfil</Link>
+                    <SeguirBotao steamId={p.steamId} acao="deixar" rotulo="Deixar de seguir" />
                   </Cartao>
                 ))}
               </ul>
             )}
           </Secao>
-          <Secao titulo="Veem a sua curva" n={seguem.length}>
+          <Secao titulo="Seguidores" n={seguem.length}>
             {seguem.length === 0 ? (
-              <Vazio texto="Ninguém ainda. Quem pedir aparece aqui em cima para você aceitar." />
+              <Vazio texto="Ninguém ainda." />
             ) : (
               <ul className="grid gap-3">
                 {seguem.map((p) => (
                   <Cartao key={p.id} pessoa={p}>
-                    <SeguirBotao steamId={p.steamId} acao="revogar" rotulo="Revogar" />
+                    <Link href={`/p/${p.steamId}`} className={BOTAO}>Ver perfil</Link>
+                    <SeguirBotao steamId={p.steamId} acao="remover" rotulo="Remover" />
                   </Cartao>
                 ))}
               </ul>
@@ -114,6 +104,9 @@ export default async function AmigosPage() {
     </>
   );
 }
+
+const BOTAO =
+  "rounded-lg bg-surface px-3 py-1.5 text-sm text-ink-muted ring-1 ring-line transition hover:text-ink hover:ring-accent/60";
 
 function Secao({ titulo, n, children }: { titulo: string; n: number; children: React.ReactNode }) {
   return (

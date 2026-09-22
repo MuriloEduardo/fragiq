@@ -1,15 +1,9 @@
 import Link from "next/link";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { isAdmin, seloDe } from "@/lib/admin";
-import { botEhAmigo } from "@/lib/bot";
 import { SiteHeader } from "@/components/site-header";
-import { BotAmigo } from "@/components/bot-amigo";
-import { ApagarConta } from "@/components/apagar-conta";
-import { PerfilPublicoToggle } from "@/components/perfil-publico-toggle";
-import { AvisoSteamToggle } from "@/components/aviso-steam-toggle";
-import { PartidasRevogar } from "@/components/partidas-revogar";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +17,14 @@ export const dynamic = "force-dynamic";
  */
 export default async function SegurancaPage() {
   const session = await getSession();
-  const [user, selo, amigo] = await Promise.all([
+  const [user, selo] = await Promise.all([
     session
       ? prisma.user.findUnique({
           where: { id: session.userId },
-          select: { personaName: true, avatarUrl: true, lastSyncedAt: true, perfilPublico: true, avisoSteam: true, steamId: true, partidasAtivadasEm: true },
+          select: { personaName: true, avatarUrl: true, lastSyncedAt: true, steamId: true },
         })
       : null,
     session ? seloDe(session.userId) : null,
-    session ? botEhAmigo(session.steamId) : null,
   ]);
 
   return (
@@ -80,15 +73,17 @@ export default async function SegurancaPage() {
             temos permissão para agir na sua conta — a Steam não a concede a sites — e não pedimos.
           </Bloco>
           <Bloco titulo="Quem vê o quê">
-            A página pública mostra só o que a Steam já mostra, e você desliga. A curva, as sessões
-            e as leituras são suas: outra pessoa só vê se você aceitar o pedido dela, e você revoga
-            quando quiser.
+            A página pública mostra só o que a Steam já mostra, e você desliga. Seguir é
+            unilateral, como em qualquer rede — ninguém precisa da sua permissão para acompanhar.
+            Mas a curva e as sessões só aparecem para quem te segue se você deixar, num
+            interruptor em Configurações que vale para todos de uma vez. As leituras do analista
+            nunca saem daqui.
           </Bloco>
           <Bloco titulo="Partidas oficiais">
             Opcional. Para ver cada partida com placar, a Steam exige um código de autenticação de
             histórico que só você gera, mais um share code. Esse código lê exclusivamente a lista de
             partidas — não abre inventário, chat, amigos nem senha — e fica cifrado aqui. Você revoga
-            abaixo, ou gerando outro na Steam.
+            em Configurações, ou gerando outro na Steam.
           </Bloco>
           <Bloco titulo="O analista">
             As análises são geradas por um modelo de linguagem (OpenAI) através do nosso serviço.
@@ -97,36 +92,24 @@ export default async function SegurancaPage() {
           </Bloco>
         </div>
 
-        <section className="mt-10 scroll-mt-24" id="bot">
-          <h2 className="hud mb-3">O bot de presença</h2>
-          <BotAmigo amigo={amigo} />
+        {/* Os interruptores, os códigos e o bot moram em /configuracoes.
+            Esta página é o texto — o que vale para qualquer conta, sempre —
+            e ter os dois aqui fazia a mesma coisa existir em dois lugares,
+            com duas cópias para manter em dia. */}
+        <section className="mt-10 rounded-2xl bg-surface p-5 ring-1 ring-line">
+          <p className="hud">Mexer nisso</p>
+          <p className="mt-2 text-sm text-ink-muted">
+            Página pública, bot de presença, avisos no chat, os códigos da Steam, exportar e apagar:
+            está tudo em Configurações.
+          </p>
+          <Link
+            href="/configuracoes"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted ring-1 ring-line transition hover:text-ink hover:ring-accent/60"
+          >
+            <Settings className="size-4" /> Abrir Configurações
+          </Link>
         </section>
 
-        {session && user && (
-          <section className="mt-10 space-y-4">
-            <h2 className="hud">Os seus dados</h2>
-            <PerfilPublicoToggle publico={user.perfilPublico} steamId={user.steamId} />
-            <AvisoSteamToggle ligado={user.avisoSteam} amigo={amigo} />
-            <PartidasRevogar ativo={Boolean(user.partidasAtivadasEm)} desde={user.partidasAtivadasEm} />
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">Baixar tudo</p>
-                <p className="mt-0.5 text-xs text-ink-faint">Um JSON com cada coleta, sessão, análise e o resto. Sem filtro: é seu.</p>
-              </div>
-              <a
-                href="/api/conta/exportar"
-                className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm text-ink-muted ring-1 ring-line transition hover:text-ink hover:ring-accent/60"
-              >
-                <Download className="size-4" /> Exportar
-              </a>
-            </div>
-            <div className="rounded-2xl bg-surface p-4 ring-1 ring-line">
-              <p className="text-sm font-medium">Apagar tudo</p>
-              <p className="mt-0.5 mb-3 text-xs text-ink-faint">Conta, série, sessões, análises, comunidade. Na hora, sem fila e sem e-mail.</p>
-              <ApagarConta />
-            </div>
-          </section>
-        )}
       </main>
     </div>
   );

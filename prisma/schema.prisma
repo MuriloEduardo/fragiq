@@ -24,9 +24,16 @@ model User {
   countryCode String?
 
   /// A página pública em /p/<steamId>. Mostra só o que a Steam já mostra a
-  /// qualquer um; a curva e as leituras nunca saem daqui. Desligar esconde a
-  /// página inteira.
+  /// qualquer um. Desligar esconde a página inteira.
   perfilPublico Boolean @default(true)
+
+  /// Se quem te segue vê a sua curva (a série, as sessões, os cartões).
+  ///
+  /// Substitui a aprovação pedido a pedido: como seguir passou a ser
+  /// unilateral, a escolha de mostrar a evolução precisa existir em algum
+  /// lugar, e uma decisão que vale para todo mundo é a que se consegue
+  /// manter. Desligado, seguidores veem o mesmo que qualquer um vê.
+  curvaVisivel Boolean @default(true)
 
   /// Receber a análise de cada sessão no chat da Steam, pelo bot. Só chega
   /// para quem adicionou o bot; desligar aqui silencia mesmo sendo amigo.
@@ -71,7 +78,7 @@ model User {
   /// Inventário: se a última leitura o achou público, e quando foi.
   inventarioPublico   Boolean?
   inventarioLidoEm    DateTime?
-  captura     PendingCapture?
+  capturas    PendingCapture[]
   games       UserGame[]
   syncRuns    SyncRun[]
   feedback    Feedback[]
@@ -359,6 +366,16 @@ model Participant {
 /// sessões e as leituras não são públicas em lugar nenhum. Então "seguir" é
 /// um pedido: fica PENDING até quem é seguido aceitar, e só a partir daí a
 /// página pública dessa pessoa mostra a curva para quem pediu.
+/// Quem segue quem. Um fato só, sem estado.
+///
+/// Era um pedido que o outro lado aceitava ou recusava, e o que a
+/// aprovação de fato controlava não era o seguir — era ver a curva. Duas
+/// coisas num gesto só: quem queria acompanhar alguém tinha que pedir
+/// autorização, e quem queria manter a curva fechada tinha que recusar
+/// pessoa por pessoa, para sempre.
+///
+/// Separadas: seguir é unilateral e imediato, como em qualquer outro
+/// lugar; quem vê a curva é decidido de uma vez por `User.curvaVisivel`.
 model Follow {
   id String @id @default(cuid())
 
@@ -368,19 +385,11 @@ model Follow {
   seguidoId String
   seguido   User   @relation("seguido", fields: [seguidoId], references: [id], onDelete: Cascade)
 
-  status FollowStatus @default(PENDING)
-
-  createdAt  DateTime  @default(now())
-  decididoEm DateTime?
+  createdAt DateTime @default(now())
 
   @@unique([seguidorId, seguidoId])
-  @@index([seguidoId, status])
+  @@index([seguidoId])
   @@map("follows")
-}
-
-enum FollowStatus {
-  PENDING
-  ACCEPTED
 }
 
 /// Uma mensagem para o bot entregar no chat da Steam.
@@ -676,8 +685,18 @@ model MatchPlayer {
 model PendingCapture {
   id String @id @default(cuid())
 
-  userId String @unique
+  /// Sem `@unique`: uma captura por partida observada, não uma por pessoa.
+  /// Enquanto era única por usuário, o fim da segunda partida sobrescrevia
+  /// a captura pendente da primeira — a coleta da primeira nunca
+  /// acontecia e o ponto seguinte cobria as duas. Era assim que uma sessão
+  /// aparecia com quatro ou cinco partidas dentro.
+  userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// A observação que pediu esta captura. Única: o mesmo fim de partida,
+  /// reenviado pelo bot depois de um reinício, não entra duas vezes na
+  /// fila. Nula no histórico anterior a esta migração.
+  observacaoId String? @unique
 
   steamId String
 
@@ -693,6 +712,7 @@ model PendingCapture {
   updatedAt DateTime @updatedAt
 
   @@index([proximaEm])
+  @@index([userId])
   @@map("pending_captures")
 }
 

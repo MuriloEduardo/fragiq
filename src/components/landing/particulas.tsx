@@ -20,6 +20,15 @@ export function Particulas({ className }: { className?: string }) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // A cor sai do token, não de um literal: no claro o laranja é outro, e
+    // um `rgba(255,107,61,…)` cravado aqui pintaria partículas do tema
+    // escuro sobre papel branco.
+    const marca = getComputedStyle(canvas).getPropertyValue("--accent").trim() || "#ff6b3d";
+    const comAlfa = (a: number) => {
+      const [r, g, b] = hexParaRgb(marca);
+      return `rgba(${r},${g},${b},${a})`;
+    };
+
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     let w = 0;
     let h = 0;
@@ -63,7 +72,7 @@ export function Particulas({ className }: { className?: string }) {
           const dy = a.y - b.y;
           const d = Math.hypot(dx, dy);
           if (d > ALCANCE) continue;
-          ctx!.strokeStyle = `rgba(255,107,61,${(1 - d / ALCANCE) * 0.28})`;
+          ctx!.strokeStyle = comAlfa((1 - d / ALCANCE) * 0.28);
           ctx!.lineWidth = 1;
           ctx!.beginPath();
           ctx!.moveTo(a.x, a.y);
@@ -71,7 +80,7 @@ export function Particulas({ className }: { className?: string }) {
           ctx!.stroke();
         }
       }
-      ctx!.fillStyle = "rgba(255,107,61,0.7)";
+      ctx!.fillStyle = comAlfa(0.7);
       for (const p of pontos) {
         ctx!.beginPath();
         ctx!.arc(p.x, p.y, 1.4, 0, Math.PI * 2);
@@ -100,4 +109,12 @@ export function Particulas({ className }: { className?: string }) {
   }, []);
 
   return <canvas ref={ref} className={className} aria-hidden />;
+}
+
+/** `#rgb` ou `#rrggbb` para os três canais; qualquer outra coisa cai no laranja escuro. */
+function hexParaRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  if (full.length !== 6) return [255, 107, 61];
+  return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16)];
 }
