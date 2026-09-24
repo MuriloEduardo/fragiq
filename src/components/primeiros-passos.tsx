@@ -3,6 +3,7 @@ import { ArrowRight, Check, Circle, ExternalLink, HelpCircle } from "lucide-reac
 import { BOT_STEAM_ID, perfilDoBot } from "@/lib/bot";
 import { SyncButton } from "./sync-button";
 import { cn } from "@/lib/utils";
+import { TOTAL_DE_PASSOS } from "@/lib/primeiros-passos";
 
 /**
  * Os passos entre entrar e ter uma curva — com o estado de cada um.
@@ -220,7 +221,9 @@ export function TudoPronto() {
           <Check className="size-3.5" />
         </span>
         <h2 className="hud text-accent">Primeiros passos concluídos</h2>
-        <span className="num text-xs text-ink-faint">5 de 5</span>
+        <span className="num text-xs text-ink-faint">
+          {TOTAL_DE_PASSOS} de {TOTAL_DE_PASSOS}
+        </span>
       </div>
       <p className="mt-3 text-sm text-ink-muted">
         Agora tudo chega sozinho: cada sessão com modo e mapa, cada partida oficial com o placar dos dez. Não há mais nada para colar.

@@ -72,7 +72,7 @@ export default async function PartidasPage({ params, searchParams }: { params: P
       {user?.partidasErro && (
         <div className="rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm">
           <p className="font-medium text-danger">A corrente parou.</p>
-          <p className="mt-1 truncate text-ink-muted" title={user.partidasErro}>{user.partidasErro}</p>
+          <p className="mt-1 text-ink-muted">{user.partidasErro}</p>
           <div className="mt-3">
             <AtivarPartidas compacto religar={temShare} />
           </div>

@@ -14,6 +14,9 @@ import { prisma } from "./prisma";
  */
 export type Progresso = { feitos: number; total: number };
 
+/** Quantos são — o cartão do Resumo e o cabeçalho contam a mesma lista. */
+export const TOTAL_DE_PASSOS = 5;
+
 export async function progressoDosPrimeirosPassos(userId: string): Promise<Progresso | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
