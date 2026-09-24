@@ -103,24 +103,41 @@ export async function proximoShareCode(steamId: string, authCode: string, conhec
 /* -------------------------------- ativação -------------------------------- */
 
 /**
- * Liga a corrente para uma pessoa. Valida os dois códigos contra a Steam
- * antes de guardar qualquer coisa: uma cola errada tem que virar uma frase
- * clara na hora, não uma fila que nunca anda.
+ * De onde a corrente da pessoa pode começar sem ela colar um share code:
+ * o último que a corrente dela alcançou, ou — nunca tendo ligado — a
+ * partida mais recente dela que a corrente de outra pessoa trouxe. O share
+ * code é da partida, igual para os dez, e a Steam aceita qualquer um deles
+ * como ponto de partida de quem jogou.
  */
+export async function shareCodeConhecido(userId: string, steamId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { shareCodeAtual: true } });
+  if (user?.shareCodeAtual) return user.shareCodeAtual;
+  const partida = await prisma.match.findFirst({
+    where: { jogadaEm: { not: null }, jogadores: { some: { steamId } } },
+    orderBy: { jogadaEm: "desc" },
+    select: { shareCode: true },
+  });
+  return partida?.shareCode ?? null;
+}
+
 /**
- * Liga a corrente — ou religa. Sem share code, continua do último que
- * conhecemos: é o caminho de quem só precisa colar o código de
- * autenticação de novo (a chave que o cifrava mudou em 13/09/2026 e o
- * erro ficou mudo até 17/09), e recupera as partidas do intervalo, porque
- * a Steam só anda para a frente a partir de um código conhecido.
+ * Liga a corrente — ou religa. Valida os códigos contra a Steam antes de
+ * guardar qualquer coisa: uma cola errada tem que virar uma frase clara na
+ * hora, não uma fila que nunca anda.
+ *
+ * Sem share code, começa do que `shareCodeConhecido` achar: é o caminho de
+ * quem só precisa colar o código de autenticação de novo (a chave que o
+ * cifrava mudou em 13/09/2026 e o erro ficou mudo até 17/09), e de quem
+ * nunca ligou mas já apareceu na partida de alguém. A Steam só anda para a
+ * frente a partir de um código conhecido, então as partidas do intervalo
+ * voltam junto.
  */
 export async function ativarPartidas(userId: string, steamId: string, authCode: string, shareCode: string | null | undefined) {
   await registrar("corrente.ativada", { userId });
   if (!authCodeValido(authCode)) throw new CodigoInvalido("auth", "O código de autenticação tem o formato XXXX-XXXXX-XXXX.");
   let share = shareCode?.trim() ? normalizarShareCode(shareCode) : null;
   if (!share) {
-    const atual = await prisma.user.findUnique({ where: { id: userId }, select: { shareCodeAtual: true } });
-    share = atual?.shareCodeAtual ?? null;
+    share = await shareCodeConhecido(userId, steamId);
     if (!share) throw new CodigoInvalido("share", "Cole também o share code da sua última partida: ainda não temos nenhum seu.");
   }
   if (!shareCodeValido(share)) throw new CodigoInvalido("share", "O share code tem o formato CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx (pode colar o link inteiro).");

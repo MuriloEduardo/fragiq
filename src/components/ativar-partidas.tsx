@@ -16,9 +16,9 @@ export const PAGINA_STEAM = "https://help.steampowered.com/pt-br/wizard/HelpWith
  * e uma única página da Steam dá os dois. O formulário valida contra a
  * Steam antes de guardar e aponta o campo errado quando erra.
  *
- * Religando, o share code já é nosso: a corrente continua do último que
- * conhecemos, então o campo some atrás de um link e só volta se a pessoa
- * quiser ou se a Steam recusar o que temos.
+ * Quando já temos um share code dela — da própria corrente ou de uma
+ * partida que a corrente de outra pessoa trouxe —, o campo some atrás de
+ * um link e só volta se a pessoa quiser ou se a Steam recusar o que temos.
  */
 export function AtivarPartidas({ compacto = false, religar = false }: { compacto?: boolean; religar?: boolean }) {
   const router = useRouter();
@@ -80,7 +80,7 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
                 Copie o código de autenticação e o <strong className="text-ink">share code da última partida</strong>, que aparece logo abaixo dele; cole aqui.
               </>
             ) : (
-              <>Copie o código de autenticação e cole aqui. As partidas continuam de onde pararam.</>
+              <>Copie o código de autenticação e cole aqui. Já temos uma partida sua para começar.</>
             )}
           </div>
         </li>
@@ -101,7 +101,7 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
         </label>
         {pedeShare && (
           <label className="block">
-            <span className="hud">{religar ? "Share code (opcional: em branco, continua de onde parou)" : "Share code da última partida"}</span>
+            <span className="hud">{religar ? "Share code (opcional: em branco, começa da última que temos)" : "Share code da última partida"}</span>
             <input
               value={shareCode}
               onChange={(e) => setShareCode(e.target.value)}

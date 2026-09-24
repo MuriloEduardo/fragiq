@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { listarPartidas } from "@/lib/partidas";
+import { listarPartidas, shareCodeConhecido } from "@/lib/partidas";
 import { AtivarPartidas, PAGINA_STEAM } from "@/components/ativar-partidas";
 import { PartidasTabela } from "@/components/partidas-tabela";
 import { Estado } from "@/components/estado";
@@ -25,13 +25,14 @@ export default async function PartidasPage({ params, searchParams }: { params: P
   if (appId !== 730) notFound();
   const modo = await modoDaRequisicao(searchParams, await abasDoUsuario(session.userId, appId));
 
-  const [user, partidas, pendentes] = await Promise.all([
+  const [user, partidas, pendentes, temShare] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
-      select: { partidasAtivadasEm: true, partidasErro: true, shareCodeAtual: true },
+      select: { partidasAtivadasEm: true, partidasErro: true },
     }),
     listarPartidas(session.steamId, 50, filtroDoModo(modo)?.mode),
     prisma.match.count({ where: { status: "PENDING", descobertaPorId: session.userId } }),
+    shareCodeConhecido(session.userId, session.steamId).then(Boolean),
   ]);
   const ativo = Boolean(user?.partidasAtivadasEm);
 
@@ -62,7 +63,7 @@ export default async function PartidasPage({ params, searchParams }: { params: P
           <p className="font-medium text-danger">A corrente parou.</p>
           <p className="mt-1 truncate text-ink-muted" title={user.partidasErro}>{user.partidasErro}</p>
           <div className="mt-3">
-            <AtivarPartidas compacto religar={Boolean(user.shareCodeAtual)} />
+            <AtivarPartidas compacto religar={temShare} />
           </div>
         </div>
       )}
@@ -73,7 +74,7 @@ export default async function PartidasPage({ params, searchParams }: { params: P
             todas as suas, ligue a sua:
           </p>
           <div className="mt-3">
-            <AtivarPartidas compacto />
+            <AtivarPartidas compacto religar={temShare} />
           </div>
         </div>
       )}

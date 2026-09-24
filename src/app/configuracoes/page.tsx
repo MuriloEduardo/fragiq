@@ -15,6 +15,7 @@ import { CurvaVisivelToggle } from "@/components/curva-visivel-toggle";
 import { AvisoSteamToggle } from "@/components/aviso-steam-toggle";
 import { PartidasRevogar } from "@/components/partidas-revogar";
 import { AtivarPartidas, PAGINA_STEAM } from "@/components/ativar-partidas";
+import { shareCodeConhecido } from "@/lib/partidas";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export default async function ConfiguracoesPage() {
   const session = await getSession();
   if (!session) redirect("/");
 
-  const [user, selo, amigo, seguidores] = await Promise.all([
+  const [user, selo, amigo, seguidores, temShare] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: {
@@ -50,12 +51,12 @@ export default async function ConfiguracoesPage() {
         avisoSteam: true,
         partidasAtivadasEm: true,
         partidasErro: true,
-        shareCodeAtual: true,
       },
     }),
     seloDe(session.userId),
     botEhAmigo(session.steamId),
     prisma.follow.count({ where: { seguidoId: session.userId } }),
+    shareCodeConhecido(session.userId, session.steamId).then(Boolean),
   ]);
   if (!user) redirect("/");
   const ativo = Boolean(user.partidasAtivadasEm);
@@ -102,7 +103,7 @@ export default async function ConfiguracoesPage() {
         <Secao
           titulo="Códigos da Steam"
           sub={
-            user.shareCodeAtual
+            temShare
               ? "O código de autenticação destrava o histórico de partidas oficiais: placar dos dez, ADR, KAST e CS Rating. Ele lê só a lista de partidas — nunca inventário, chat, amigos ou senha."
               : "Os dois códigos que destravam o histórico de partidas oficiais: placar dos dez, ADR, KAST e CS Rating. Eles leem só a lista de partidas — nunca inventário, chat, amigos ou senha."
           }
@@ -121,7 +122,7 @@ export default async function ConfiguracoesPage() {
             <PartidasRevogar ativo={ativo} desde={user.partidasAtivadasEm} />
           ) : (
             <div className="rounded-2xl bg-surface p-5 ring-1 ring-line">
-              <AtivarPartidas compacto={Boolean(user.partidasErro)} religar={Boolean(user.shareCodeAtual)} />
+              <AtivarPartidas compacto={Boolean(user.partidasErro)} religar={temShare} />
             </div>
           )}
 
