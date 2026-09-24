@@ -53,8 +53,9 @@ export async function POST(request: NextRequest) {
   });
 
   if (user?.lastSyncedAt && Date.now() - user.lastSyncedAt.getTime() < COOLDOWN_MS) {
+    const faltam = Math.ceil((COOLDOWN_MS - (Date.now() - user.lastSyncedAt.getTime())) / 1000);
     return NextResponse.json(
-      { error: "Aguarde alguns instantes antes de sincronizar novamente." },
+      { error: `Acabamos de sincronizar. Dá para tentar de novo em ${faltam} s.` },
       { status: 429 },
     );
   }

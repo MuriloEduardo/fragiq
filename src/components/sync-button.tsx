@@ -36,8 +36,11 @@ export function SyncButton({ className }: { className?: string }) {
 
       // "Nada novo" sozinho parece falha. Como os contadores da Steam só são
       // gravados no fim da partida, a ação certa é explícita.
+      // Sem stats de CS2 a causa é a privacidade, não a falta de partida.
       setMessage(
-        data.snapshotsCreated > 0
+        data.snapshotsCreated === 0 && data.cs2SemStats
+          ? "A Steam não mostrou suas estatísticas de CS2. Confira se \"Detalhes do jogo\" está Público; a mudança pode levar alguns minutos."
+          : data.snapshotsCreated > 0
           ? data.snapshotsCreated === 1
             ? "1 novo ponto na série."
             : `${data.snapshotsCreated} novos pontos na série.`

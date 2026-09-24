@@ -50,6 +50,12 @@ export type SyncResult = {
    * precisa saber que deve tentar de novo.
    */
   unchanged: number[];
+  /**
+   * A Steam não entregou estatísticas de CS2 nesta coleta — nem o jogo na
+   * biblioteca, nem as stats dele. Quase sempre é "Detalhes do jogo"
+   * privado; sem isto o botão dizia "jogue uma partida", que não resolve.
+   */
+  cs2SemStats: boolean;
 };
 
 /**
@@ -187,6 +193,7 @@ async function runSync(
   let snapshotsCreated = 0;
   let statCallsSpent = 0;
   const unchanged: number[] = [];
+  let cs2SemStats = !played.some((g) => g.appid === CS2_APPID);
 
   // A corrente de share codes anda junto com a coleta: é o momento em que
   // a Steam já tem a partida nova. Só custa chamadas para quem ligou. Vem
@@ -210,6 +217,7 @@ async function runSync(
     const outcome = await captureSnapshot(userId, steamId, game, perfilPublico, proveniencia, context);
     if (outcome === "created") snapshotsCreated++;
     if (outcome === "unchanged") unchanged.push(game.appid);
+    if (outcome === "skipped" && game.appid === CS2_APPID) cs2SemStats = true;
 
     // Ponto novo de CS2 é uma sessão que acabou: a análise dela nasce aqui,
     // sem ninguém pedir. Falha nisso não é falha da coleta — o ponto já está
@@ -236,6 +244,7 @@ async function runSync(
     snapshotsCreated,
     statCallsSpent,
     unchanged,
+    cs2SemStats,
   };
 }
 
