@@ -101,7 +101,11 @@ export default async function ConfiguracoesPage() {
 
         <Secao
           titulo="Códigos da Steam"
-          sub="Os dois códigos que destravam o histórico de partidas oficiais: placar dos dez, ADR, KAST e CS Rating. Eles leem só a lista de partidas — nunca inventário, chat, amigos ou senha."
+          sub={
+            user.shareCodeAtual
+              ? "O código de autenticação destrava o histórico de partidas oficiais: placar dos dez, ADR, KAST e CS Rating. Ele lê só a lista de partidas — nunca inventário, chat, amigos ou senha."
+              : "Os dois códigos que destravam o histórico de partidas oficiais: placar dos dez, ADR, KAST e CS Rating. Eles leem só a lista de partidas — nunca inventário, chat, amigos ou senha."
+          }
         >
           {user.partidasErro && (
             <div className="rounded-2xl border border-danger/30 bg-bad-soft p-4 text-sm">

@@ -15,6 +15,10 @@ export const PAGINA_STEAM = "https://help.steampowered.com/pt-br/wizard/HelpWith
  * autenticação gerado pela própria pessoa e um share code de partida —
  * e uma única página da Steam dá os dois. O formulário valida contra a
  * Steam antes de guardar e aponta o campo errado quando erra.
+ *
+ * Religando, o share code já é nosso: a corrente continua do último que
+ * conhecemos, então o campo some atrás de um link e só volta se a pessoa
+ * quiser ou se a Steam recusar o que temos.
  */
 export function AtivarPartidas({ compacto = false, religar = false }: { compacto?: boolean; religar?: boolean }) {
   const router = useRouter();
@@ -22,6 +26,8 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
   const [shareCode, setShareCode] = useState("");
   const [erro, setErro] = useState<{ campo?: string; texto: string } | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [trocarShare, setTrocarShare] = useState(false);
+  const pedeShare = !religar || trocarShare;
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -31,11 +37,12 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
       const res = await fetch("/api/partidas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ authCode, shareCode }),
+        body: JSON.stringify({ authCode, shareCode: pedeShare ? shareCode : "" }),
       });
       const corpo = (await res.json().catch(() => ({}))) as { error?: string; campo?: string };
       if (!res.ok) {
         setErro({ campo: corpo.campo, texto: corpo.error ?? "Não deu certo. Tente de novo." });
+        if (corpo.campo === "share") setTrocarShare(true);
         return;
       }
       router.refresh();
@@ -68,12 +75,18 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
         <li className="flex gap-3">
           <span className="num shrink-0 text-accent">2</span>
           <div>
-            Copie o código de autenticação e o <strong className="text-ink">share code da última partida</strong>; cole aqui.
+            {pedeShare ? (
+              <>
+                Copie o código de autenticação e o <strong className="text-ink">share code da última partida</strong>, que aparece logo abaixo dele; cole aqui.
+              </>
+            ) : (
+              <>Copie o código de autenticação e cole aqui. As partidas continuam de onde pararam.</>
+            )}
           </div>
         </li>
       </ol>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className={cn("grid gap-3", pedeShare && "sm:grid-cols-2")}>
         <label className="block">
           <span className="hud">Código de autenticação</span>
           <input
@@ -86,19 +99,27 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
             className={cn(campo, "mt-1.5", erro?.campo === "auth" ? "ring-danger" : "ring-line")}
           />
         </label>
-        <label className="block">
-          <span className="hud">{religar ? "Share code (opcional: em branco, continua de onde parou)" : "Share code da última partida"}</span>
-          <input
-            value={shareCode}
-            onChange={(e) => setShareCode(e.target.value)}
-            placeholder="CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"
-            autoComplete="off"
-            spellCheck={false}
-            required={!religar}
-            className={cn(campo, "mt-1.5", erro?.campo === "share" ? "ring-danger" : "ring-line")}
-          />
-        </label>
+        {pedeShare && (
+          <label className="block">
+            <span className="hud">{religar ? "Share code (opcional: em branco, continua de onde parou)" : "Share code da última partida"}</span>
+            <input
+              value={shareCode}
+              onChange={(e) => setShareCode(e.target.value)}
+              placeholder="CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"
+              autoComplete="off"
+              spellCheck={false}
+              required={!religar}
+              className={cn(campo, "mt-1.5", erro?.campo === "share" ? "ring-danger" : "ring-line")}
+            />
+          </label>
+        )}
       </div>
+
+      {!pedeShare && (
+        <button type="button" onClick={() => setTrocarShare(true)} className="text-xs text-ink-faint underline decoration-line hover:text-ink">
+          Recomeçar de outra partida (colar um share code)
+        </button>
+      )}
 
       {erro && <p className="text-sm text-danger">{erro.texto}</p>}
 
