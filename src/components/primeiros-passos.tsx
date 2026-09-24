@@ -201,3 +201,28 @@ export async function PrimeirosPassos({
     </section>
   );
 }
+
+/**
+ * O "5 de 5" que a lista nunca mostra: ela some quando fica toda verde.
+ * Diz o que mudou agora que tudo está ligado, para o último passo não
+ * terminar em silêncio.
+ */
+export function TudoPronto() {
+  return (
+    <section className="rounded-2xl bg-accent/5 p-5 ring-1 ring-accent/30 sm:p-6">
+      <div className="flex items-center gap-3">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-canvas">
+          <Check className="size-3.5" />
+        </span>
+        <h2 className="hud text-accent">Primeiros passos concluídos</h2>
+        <span className="num text-xs text-ink-faint">5 de 5</span>
+      </div>
+      <p className="mt-3 text-sm text-ink-muted">
+        Agora tudo chega sozinho: cada sessão com modo e mapa, cada partida oficial com o placar dos dez. Não há mais nada para colar.
+      </p>
+      <Link href="/games/730/partidas" className="mt-3 inline-flex items-center gap-1.5 text-sm text-accent hover:underline">
+        Ver as partidas <ArrowRight className="size-3.5" />
+      </Link>
+    </section>
+  );
+}

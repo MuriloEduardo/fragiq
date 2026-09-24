@@ -7,7 +7,7 @@ import { CS2_PANEL } from "@/lib/cs2-panel";
 import { SessaoHero } from "@/components/sessao-hero";
 import { StatPanel } from "@/components/stat-panel";
 import { PorModo } from "@/components/por-modo";
-import { PrimeirosPassos } from "@/components/primeiros-passos";
+import { PrimeirosPassos, TudoPronto } from "@/components/primeiros-passos";
 import { Secao } from "@/components/secao";
 import { SemDados } from "@/components/sem-dados";
 import { Estado } from "@/components/estado";
@@ -47,11 +47,15 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
 
   const sessao = ultimaSessao(rows, filtroDoModo(modo));
   const amigoDoBot = appId === 730 ? await botEhAmigo(session.steamId) : true;
-  const partidasAtivas =
-    appId === 730
-      ? Boolean((await prisma.user.findUnique({ where: { id: session.userId }, select: { partidasAtivadasEm: true } }))?.partidasAtivadasEm)
-      : true;
+  const portas =
+    appId === 730 ? await prisma.user.findUnique({ where: { id: session.userId }, select: { partidasAtivadasEm: true, botAmigoDesde: true } }) : null;
+  const partidasAtivas = appId === 730 ? Boolean(portas?.partidasAtivadasEm) : true;
   const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true || !partidasAtivas);
+  // A lista some quando fica toda verde; sem isto, o último passo feito
+  // não tem recompensa nenhuma — a pessoa nunca vê o "5 de 5". O cartão
+  // fica alguns dias depois da última porta aberta e depois some sozinho.
+  const ultimaPorta = Math.max(portas?.partidasAtivadasEm?.getTime() ?? 0, portas?.botAmigoDesde?.getTime() ?? 0);
+  const recemConcluido = appId === 730 && !onboarding && Date.now() - ultimaPorta < 3 * 86_400_000;
   const notas = lerSerie(rows, filtroDoModo(modo)).filter((l) => l.id === "amostra" || l.id === "mapas");
   const [daSessao, doModo] =
     appId === 730 ? await Promise.all([insightsDaUltimaSessao(session.userId, lente), insightsDoModo(session.userId, lente)]) : [null, []];
@@ -61,6 +65,11 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
       {onboarding && (
         <div className="mb-8">
           <PrimeirosPassos statsVisiveis botAmigo={amigoDoBot} coletas={rows.length} partidasAtivas={partidasAtivas} />
+        </div>
+      )}
+      {recemConcluido && (
+        <div className="mb-8">
+          <TudoPronto />
         </div>
       )}
 
