@@ -39,6 +39,7 @@ export default async function Home({
         <Pilares />
         <Tese />
         <Comparacao />
+        <ComoComecar />
         <Chamada />
       </main>
       <Footer />
@@ -248,6 +249,46 @@ function Comparacao() {
 }
 
 /* --------------------------------- chamada -------------------------------- */
+
+/* ------------------------------ como começar ------------------------------ */
+
+/**
+ * O que vem depois do botão. Sem isto, "Entrar com Steam" era um salto no
+ * escuro: quem entrava encontrava uma lista de passos que ninguém tinha
+ * anunciado. Com o tempo de cada um à vista, a lista vira o combinado.
+ */
+const PASSOS_INICIAIS = [
+  { titulo: "Entre com a Steam", texto: "Login pela própria Valve. Recebemos só o seu SteamID.", tempo: "10 s" },
+  { titulo: "Abra os detalhes do jogo", texto: "Um ajuste de privacidade na Steam para as estatísticas do CS2 chegarem.", tempo: "30 s" },
+  { titulo: "Adicione o bot", texto: "Ele avisa quando a partida termina, com mapa e modo. Opcional.", tempo: "20 s" },
+  { titulo: "Ligue as partidas oficiais", texto: "Dois códigos de uma página da Steam: placar dos dez em cada partida. Opcional.", tempo: "1 min" },
+];
+
+function ComoComecar() {
+  return (
+    <section className="border-b border-line">
+      <div className="mx-auto max-w-6xl px-6 py-20">
+        <Revelar>
+          <p className="hud">Como começar</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Uns dois minutos, uma vez só.</h2>
+          <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {PASSOS_INICIAIS.map((p, i) => (
+              <li key={p.titulo} className="rounded-2xl bg-surface p-5 ring-1 ring-line">
+                <div className="flex items-baseline justify-between">
+                  <span className="num text-accent">{i + 1}</span>
+                  <span className="num text-xs text-ink-faint">{p.tempo}</span>
+                </div>
+                <p className="mt-3 font-medium">{p.titulo}</p>
+                <p className="mt-1 text-sm text-ink-muted">{p.texto}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-6 text-sm text-ink-muted">Depois disso, cada partida chega sozinha. Dentro do site, uma lista mostra o que falta.</p>
+        </Revelar>
+      </div>
+    </section>
+  );
+}
 
 function Chamada() {
   return (
