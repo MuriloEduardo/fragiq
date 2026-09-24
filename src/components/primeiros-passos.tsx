@@ -47,7 +47,7 @@ export async function PrimeirosPassos({
       titulo: "Deixe os detalhes do jogo públicos na Steam",
       texto: statsVisiveis
         ? "A Steam mostra suas estatísticas de CS2 para nós."
-        : "Steam → Perfil → Privacidade → \"Detalhes do jogo\": Público. Depois, Sincronizar.",
+        : "Na Steam: Perfil → Editar perfil → Privacidade → \"Detalhes do jogo\": Público. Volte aqui e clique em Sincronizar.",
       acao: statsVisiveis ? null : (
         <div className="flex flex-wrap items-center gap-2">
           <a
@@ -98,10 +98,10 @@ export async function PrimeirosPassos({
       titulo: "Jogue uma partida",
       texto:
         coletas >= 2
-          ? "A curva existe: cada nova partida vira um ponto."
+          ? "Sua evolução já está sendo desenhada: cada partida nova vira um ponto."
           : coletas === 1
-            ? "Primeira coleta gravada. A segunda vem do bot no fim da partida, do Sincronizar, ou do cron das 02:00."
-            : "Depois do passo 1, a primeira coleta entra na hora e a curva começa na partida seguinte.",
+            ? "Já temos seu ponto de partida. Jogue uma partida de CS2: com o bot como amigo, a comparação aparece aqui sozinha quando ela termina; sem ele, clique em Sincronizar."
+            : "Assim que a Steam liberar suas estatísticas, guardamos o ponto de partida. A partida seguinte já mostra o que mudou.",
       acao: null,
     },
     {

@@ -3,7 +3,7 @@ import { PrimeirosPassos } from "./primeiros-passos";
 /**
  * Um usuário novo cujo perfil está restrito, ou que ainda não jogou CS2,
  * cairia num 404 — o que parece defeito do site em vez de estado do dado.
- * Em vez disso, os três primeiros passos, com o primeiro em aberto.
+ * Em vez disso, os primeiros passos, com o que falta em aberto.
  */
 export function SemDados({ botAmigo }: { botAmigo: boolean | null }) {
   return (
