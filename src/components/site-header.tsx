@@ -6,6 +6,7 @@ import { MenuConta } from "./menu-conta";
 import { SyncButton } from "./sync-button";
 import { FeedbackButton } from "./feedback-button";
 import { cn } from "@/lib/utils";
+import type { Progresso } from "@/lib/primeiros-passos";
 
 type Props = {
   personaName: string;
@@ -16,6 +17,8 @@ type Props = {
   admin?: boolean;
   /** Selo da comunidade, quando a pessoa entrou. */
   selo?: "fundador" | "beta" | null;
+  /** Primeiros passos ainda pendentes; null quando todos estão feitos. */
+  passos?: Progresso | null;
 };
 
 /**
@@ -42,7 +45,7 @@ const SECOES = [
   { href: "/comunidade", rotulo: "Comunidade", combina: (p: string) => p.startsWith("/comunidade") },
 ];
 
-export function SiteHeader({ personaName, avatarUrl, steamId, lastSyncedAt, admin, selo }: Props) {
+export function SiteHeader({ personaName, avatarUrl, steamId, lastSyncedAt, admin, selo, passos }: Props) {
   const pathname = usePathname() ?? "";
 
   return (
@@ -69,6 +72,21 @@ export function SiteHeader({ personaName, avatarUrl, steamId, lastSyncedAt, admi
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          {passos && (
+            <Link
+              href="/games/730"
+              title="Primeiros passos: o que falta para tudo chegar sozinho"
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-ink-muted ring-1 ring-accent/40 transition hover:text-ink hover:ring-accent"
+            >
+              <span className="hidden sm:inline">Primeiros passos</span>
+              <span className="num text-accent">
+                {passos.feitos}/{passos.total}
+              </span>
+              <span className="h-1 w-8 overflow-hidden rounded-full bg-line" aria-hidden>
+                <span className="block h-full rounded-full bg-accent" style={{ width: `${(passos.feitos / passos.total) * 100}%` }} />
+              </span>
+            </Link>
+          )}
           <div className="hidden sm:block">
             <SyncButton />
           </div>

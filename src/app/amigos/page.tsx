@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { progressoDosPrimeirosPassos } from "@/lib/primeiros-passos";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { isAdmin, seloDe } from "@/lib/admin";
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function AmigosPage() {
   const session = await requireSession();
-  const [user, selo, amigos, sigo, seguem] = await Promise.all([
+  const [user, selo, amigos, sigo, seguem, passos] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: { personaName: true, avatarUrl: true, lastSyncedAt: true, steamId: true, curvaVisivel: true },
@@ -32,12 +33,13 @@ export default async function AmigosPage() {
     amigosNoFragiq(session.userId, session.steamId),
     quemSigo(session.userId),
     quemMeSegue(session.userId),
+    progressoDosPrimeirosPassos(session.userId),
   ]);
   if (!user) return null;
 
   return (
     <>
-      <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} />
+      <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} passos={passos} />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Amigos</h1>

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Download, ExternalLink } from "lucide-react";
+import { progressoDosPrimeirosPassos } from "@/lib/primeiros-passos";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { isAdmin, seloDe } from "@/lib/admin";
@@ -36,7 +37,7 @@ export default async function ConfiguracoesPage() {
   const session = await getSession();
   if (!session) redirect("/");
 
-  const [user, selo, amigo, seguidores, temShare] = await Promise.all([
+  const [user, selo, amigo, seguidores, temShare, passos] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: {
@@ -57,13 +58,14 @@ export default async function ConfiguracoesPage() {
     botEhAmigo(session.steamId),
     prisma.follow.count({ where: { seguidoId: session.userId } }),
     shareCodeConhecido(session.userId, session.steamId).then(Boolean),
+    progressoDosPrimeirosPassos(session.userId),
   ]);
   if (!user) redirect("/");
   const ativo = Boolean(user.partidasAtivadasEm);
 
   return (
     <div className="min-h-dvh">
-      <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} />
+      <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} passos={passos} />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Configurações</h1>

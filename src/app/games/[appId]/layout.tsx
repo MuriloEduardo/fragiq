@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Image from "next/image";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { progressoDosPrimeirosPassos } from "@/lib/primeiros-passos";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { gameHeaderUrl } from "@/lib/steam/api";
@@ -37,7 +38,7 @@ export default async function GameLayout({
   const appId = Number((await params).appId);
   if (!Number.isInteger(appId)) notFound();
 
-  const [user, userGame, selo, lente, jar] = await Promise.all([
+  const [user, userGame, selo, lente, jar, passos] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: { personaName: true, avatarUrl: true, lastSyncedAt: true, steamId: true },
@@ -54,12 +55,13 @@ export default async function GameLayout({
     seloDe(session.userId),
     lenteDoUsuario(session.userId, appId),
     cookies(),
+    progressoDosPrimeirosPassos(session.userId),
   ]);
   if (!user) redirect("/");
 
   return (
     <>
-      <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} />
+      <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} passos={passos} />
 
       {userGame ? (
         <>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
+import { progressoDosPrimeirosPassos } from "@/lib/primeiros-passos";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { isAdmin, seloDe } from "@/lib/admin";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function SegurancaPage() {
   const session = await getSession();
-  const [user, selo] = await Promise.all([
+  const [user, selo, passos] = await Promise.all([
     session
       ? prisma.user.findUnique({
           where: { id: session.userId },
@@ -25,12 +26,13 @@ export default async function SegurancaPage() {
         })
       : null,
     session ? seloDe(session.userId) : null,
+    session ? progressoDosPrimeirosPassos(session.userId) : null,
   ]);
 
   return (
     <div className="min-h-dvh">
       {session && user ? (
-        <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} />
+        <SiteHeader {...user} admin={isAdmin(session.steamId)} selo={selo} passos={passos} />
       ) : (
         <header className="border-b border-line/60 bg-canvas/70 backdrop-blur-md">
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3.5">
