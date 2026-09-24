@@ -36,3 +36,23 @@ export function decodificarShareCode(codigo: string): ShareCode {
     token: bytes.readUInt16LE(16),
   };
 }
+
+/** Código de autenticação do histórico de partidas: `XXXX-XXXXX-XXXX`. */
+const FORMATO_AUTH = /^[A-Z0-9]{4}-[A-Z0-9]{5}-[A-Z0-9]{4}$/i;
+
+export function authCodeValido(codigo: string): boolean {
+  return FORMATO_AUTH.test(codigo.trim());
+}
+
+/**
+ * O que foi colado, e em que campo deveria estar. A página da Steam mostra
+ * os dois códigos um embaixo do outro, e é comum colar o share code no
+ * campo do código de autenticação (ou o contrário); o formulário usa isto
+ * para mover a cola em vez de devolver "formato errado".
+ */
+export function separarCodigos(colado: string): { auth?: string; share?: string } {
+  const share = normalizarShareCode(colado);
+  if (FORMATO.test(share)) return { share };
+  const auth = colado.trim().toUpperCase();
+  return FORMATO_AUTH.test(auth) ? { auth } : {};
+}

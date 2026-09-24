@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { decodificarGameType } from "./game-type";
 import { fecharSessao } from "./sessao/materializar";
 import { authSecret } from "./env";
-import { decodificarShareCode, normalizarShareCode, shareCodeValido } from "./sharecode";
+import { authCodeValido, decodificarShareCode, normalizarShareCode, shareCodeValido } from "./sharecode";
 import { getPlayerSummaries } from "./steam/api";
 import { CogniflowApiError, invocar } from "./cogniflow-api";
 import { registrar, reportarErro } from "./eventos";
@@ -24,7 +24,6 @@ import { registrar, reportarErro } from "./eventos";
  * Duas colas, uma vez, e as partidas passam a chegar sozinhas.
  */
 
-const FORMATO_AUTH = /^[A-Z0-9]{4}-[A-Z0-9]{5}-[A-Z0-9]{4}$/i;
 /** Quantos elos da corrente seguimos por coleta. A Steam limita chamadas; quem ficou semanas fora vai em várias. */
 const MAX_POR_RODADA = 8;
 /** Depois disso o bot desiste da partida. O GC costuma responder na primeira. */
@@ -65,10 +64,6 @@ export class CodigoInvalido extends Error {
     super(mensagem);
     this.name = "CodigoInvalido";
   }
-}
-
-export function authCodeValido(codigo: string) {
-  return FORMATO_AUTH.test(codigo.trim());
 }
 
 /**
