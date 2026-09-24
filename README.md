@@ -307,7 +307,9 @@ a vantagem numérica e a bomba plantada que viraram round — "converteu 2 de
 2 vantagens" no rodapé de cada time. Desde 21/09/2026 a mesma linha diz o
 **ritmo**: a que segundo do round, contado do fim do freeze, vem o
 primeiro contato e a plantada — de T é o ritmo que o time impõe, de CT o
-que ele sofre. O que a demo tem, o custo medido e a linguagem tática que
+que ele sofre. Desde 24/09/2026 o parser do bot colhe também o dinheiro e
+o equipamento de cada um no fim do freeze (payload v2), de que sai a classe
+do round de cada time — pistol, eco, meia ou cheia —, ainda sem tela. O que a demo tem, o custo medido e a linguagem tática que
 falta construir estão em [docs/demos.md](docs/demos.md).
 
 Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:

@@ -15,7 +15,8 @@ import { parseEvents, parseHeader, parsePlayerInfo, parseTicks } from "@laihoe/d
  * medições que sustentam o formato estão em docs/demos.md.
  */
 
-export const VERSAO_PAYLOAD = 1;
+/** 2: `round.economia` (dinheiro e equipamento de cada um no fim do freeze). */
+export const VERSAO_PAYLOAD = 2;
 
 /** A cada quantos ticks olhamos a posição de cada jogador (64 = 1 s). */
 const PASSO_POSICAO = 64;
@@ -23,6 +24,9 @@ const PASSO_POSICAO = 64;
 type Lado = "CT" | "T";
 
 export type Jogador = { steamId: string; nome: string };
+
+/** Com quanto um jogador entrou no round: o que sobrou no bolso e o que carrega, no fim do freeze. */
+export type Economia = { steamId: string; lado: Lado; saldo: number; equipamento: number };
 
 export type Round = {
   n: number;
@@ -32,6 +36,8 @@ export type Round = {
   fim: number;
   vencedor: Lado | null;
   motivo: string | null;
+  /** Amostra do fim do freeze; vazia no round sem `jogo`. */
+  economia: Economia[];
 };
 
 export type Evento =
@@ -164,8 +170,24 @@ export function extrairDemo(arquivo: string): DemoPayload {
       fim: n(fim.tick),
       vencedor: fim.winner === "CT" ? "CT" : fim.winner === "T" ? "T" : null,
       motivo: s(fim.reason),
+      economia: [],
     };
   });
+
+  // Economia: uma amostra por round, no fim do freeze — o mesmo zero do
+  // ritmo. É ali que o round começa, e o equipamento que cada um carrega é
+  // a compra que ele fez (as armas guardadas do round anterior incluídas).
+  const freezesDosRounds = rounds.flatMap((r) => (r.jogo == null ? [] : [r.jogo]));
+  if (freezesDosRounds.length > 0) {
+    const porTick = new Map(rounds.filter((r) => r.jogo != null).map((r) => [r.jogo!, r]));
+    for (const a of parseTicks(arquivo, ["balance", "current_equip_value", "team_name"], freezesDosRounds) as Linha[]) {
+      const quem = s(a.steamid);
+      const ladoDele = lado(a.team_name);
+      const round = porTick.get(n(a.tick));
+      if (!quem || !ladoDele || !round) continue;
+      round.economia.push({ steamId: quem, lado: ladoDele, saldo: n(a.balance), equipamento: n(a.current_equip_value) });
+    }
+  }
   const roundDoTick = (tick: number) => rounds.find((r) => tick >= r.inicio && tick <= r.fim)?.n ?? 0;
 
   const eventos: Evento[] = [];

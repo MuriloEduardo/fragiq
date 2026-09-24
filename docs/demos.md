@@ -115,7 +115,8 @@ POST /api/bot/demos ◄── JSON gzip (~11 KB por 8 rounds; ~300 KB estimado p
   a cada 5 min.
 - **Payload** (`bot/src/demo-parse.ts`, validado por
   `src/lib/demo/payload.ts`): `jogadores`, `rounds` (início, fim do
-  freeze, fim, vencedor, motivo) e `eventos` ordenados por tick — `morte`,
+  freeze, fim, vencedor, motivo e, desde a v2, a `economia` de cada um no
+  fim do freeze) e `eventos` ordenados por tick — `morte`,
   `dano`, `cego`, `granada`, `bomba`, `zona`, `saiu`, `rank` — mais
   `tiros` por jogador e arma (o `weapon_fire` cru é o maior evento da demo
   e não vale o peso). A zona só entra quando muda, mas todo jogador ganha
@@ -241,6 +242,51 @@ sozinho. As duas plantadas foram aos 23,9 e 109,5 s (mediana 66,7 s sobre
 uma base de dois: o número existe, a leitura ainda não).
 Testes: `tests/lib/demo-ritmo.test.ts`.
 
+### 4.3 Economia do time — a dimensão recursos
+
+`src/lib/demo/economia.ts`, sobre o campo `round.economia` do **payload
+v2** (24/09): para cada jogador, no fim do freeze, o `balance` (o que
+sobrou no bolso, `saldo`) e o `current_equip_value` (o que ele carrega,
+`equipamento`). É a primeira regra que **não** sai das demos já gravadas:
+o parser v1 nunca pediu esses campos, então demo lida antes do
+`bot/deploy.sh` que levar a v2 não tem amostra, e a função devolve lista
+vazia em vez de inventar classe. O site aceita as duas versões — o campo
+é opcional no validador.
+
+A classe é do time em cada round, pela **média** do equipamento de quem
+estava no lado:
+
+| Classe | Critério (média por jogador) |
+|---|---|
+| `pistol` | primeiro round de cada metade (o primeiro jogado, ou o primeiro depois da troca de lado) **e** abaixo de 1 500 |
+| `eco` | abaixo de 1 500 — pistola e colete, no máximo |
+| `meia` | de 1 500 a 3 499 — SMG, fuzil sem capacete, pistola forte com colete |
+| `cheia` | 3 500 ou mais — fuzil com colete e capacete (AK 2 700 + 1 000) |
+
+Três decisões:
+
+- **A amostra é o fim do freeze**, o mesmo zero do ritmo (§4.2). Quem
+  compra nos segundos de buytime que sobram depois dele entra com a compra
+  incompleta; a classe é do time e os limites são largos, então uma compra
+  tardia só muda a classe quando o time inteiro compra tarde.
+- **Média, não soma.** Round de 4v5 porque alguém saiu não vira eco por
+  ter um jogador a menos: quatro de fuzil (16 000) ficariam abaixo de cinco
+  de compra cheia (17 500) pela soma.
+- **O limite de valor separa pistol de prorrogação.** A prorrogação também
+  começa depois de uma troca de lado, mas com dinheiro de compra cheia; o
+  round só é pistol quando o time entrou nele com equipamento de eco.
+
+`economiaDaDemo` conta, por time (a mesma identidade de `timesPorRound`),
+quantos rounds de cada classe ele jogou e venceu. Ainda **não é gravada
+nem mostrada**: as colunas em `MatchTeamDemo` e a tela com o ADR ao lado
+da economia do round são o passo seguinte, e só medem alguma coisa depois
+que o bot com a v2 ler a primeira partida. Testes:
+`tests/lib/demo-economia.test.ts`.
+
+O parser também conhece `round_start_equip_value`, `cash_spent_this_round`
+e `t_losing_streak`/`ct_losing_streak` (o bônus de derrota); nenhum entrou,
+porque nenhuma regra os usa ainda.
+
 ## 5. A linguagem tática — o que falta e de onde sai
 
 A tese (registrada em 18/09): CS2 é um jogo de **informação e controle de
@@ -266,7 +312,7 @@ existe no payload marcado — é o backlog desta frente.
 | **Tempo** — timing de rotação | quanto o CT demora a mudar de site depois do primeiro sinal? | `zona` (mudança de site) contra tick do primeiro `dano`/`granada` no outro site | sim, não calculado |
 | **Informação** — o que se revelou | o time viu antes de comprometer? | `dano` sem morte, `cego`, `granada` de reconhecimento, `zona` de quem entrou e saiu | parcial: falta `weapon_fire` por round (um tiro de "info") e `player_footstep` |
 | **Recursos** — utilitário que compra algo | a smoke/flash antecedeu uma entrada com kill ou uma plant? | `granada.pos`+tick vs `morte`/`bomba` logo depois, `flashAssist` | sim, não calculado |
-| **Recursos** — economia | com quanto cada um entrou no round; força ou eco? | `balance`, `current_equip_value` (propriedade de jogador, **não** incluída) | não — próximo campo do payload |
+| **Recursos** — economia | com quanto cada um entrou no round; força ou eco? | `balance`, `current_equip_value` no fim do freeze | **payload v2** (§4.3): classe calculada, ainda não gravada nem mostrada |
 | **Ameaça** — fake | o time mostrou presença num site e plantou no outro? | `granada`/`zona`/`dano` num site seguido de `bomba.plantada` no outro | sim, não calculado |
 | **Risco** — disciplina de troca | morreu sozinho ou com aliado a ≤ 5 s de distância? | `morte` + `zona` dos aliados no mesmo tick | `mortesTrocadas` já; falta "morte sem aliado perto" |
 | **Risco** — duelo tomado | morreu cego, atravessando smoke, sem colete, num 1v3? | `morte.cego/atravesSmoke`, `vivos` no tick | sim, não calculado |
@@ -283,11 +329,10 @@ Ordem sugerida para o próximo ciclo, do mais barato ao mais caro:
    não tem definição que os eventos sustentem — "primeiro contato" é o que
    se consegue medir sem inventar intenção. Fica como pergunta aberta,
    não como item.
-3. **Economia**: `balance` e `current_equip_value` na amostra do início do
-   round (dois campos em `parseTicks`, versão 2 do payload). Sem isso,
-   "força vs eco" não existe e ADR num eco é lido como ADR. É o único
-   item desta lista que **não** sai das demos já gravadas: os campos não
-   estão nelas, então só vale para demo lida depois do `bot/deploy.sh`.
+3. **Economia** — o fato e a classe feitos em 24/09 (§4.3, payload v2).
+   Falta gravar as contagens em `MatchTeamDemo` e mostrar o ADR ao lado
+   da economia do round; só mede alguma coisa em demo lida depois do
+   `bot/deploy.sh`.
 4. **Utilitário que compra algo**: flash seguida de kill/entrada, smoke
    seguida de plant. Cruza dois eventos por tick e zona.
 5. **Controle de mapa por time e por round**: `zonas` já existe por
@@ -319,7 +364,10 @@ Ordem sugerida para o próximo ciclo, do mais barato ao mais caro:
    gravada antes de cada uma delas só ganha os números novos no `npm run
    recompute:demos` — é ele também quem sobe o `versaoRegras` de 1 para 2.
 2. `bot/deploy.sh` — a imagem nova instala `bzip2` e o
-   `@laihoe/demoparser2`; o `.dockerignore`/`npm ci` já cobrem.
+   `@laihoe/demoparser2`; o `.dockerignore`/`npm ci` já cobrem. **Sempre
+   depois do site**: o site grava o payload já validado, e o validador
+   descarta campo que não conhece — bot com payload v2 falando com site
+   v1 grava a demo sem `round.economia`, e essa amostra não volta.
 3. Conferir no `/admin` (log do bot) a primeira linha `Demo CSGO-…: N MB,
    S s` e, se vier `parser saiu com null` (SIGKILL), é memória: a
    instância não aguentou uma partida longa.

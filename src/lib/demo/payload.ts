@@ -4,9 +4,12 @@ import { z } from "zod";
  * O que o bot entrega de uma demo (`bot/src/demo-parse.ts`): fatos, não
  * métricas. O contrato é validado aqui porque quem grava no banco somos
  * nós; a versão sobe quando um campo muda de significado.
+ *
+ * Versão 2 (24/09): `round.economia`. Demo gravada em v1 não tem o campo e
+ * continua válida — ele é opcional aqui e nenhuma regra o inventa.
  */
 
-export const VERSAO_PAYLOAD = 1;
+export const VERSAO_PAYLOAD = 2;
 
 const lado = z.enum(["CT", "T"]);
 const steamId = z.string().min(1);
@@ -99,6 +102,14 @@ const rank = z.object({
 
 export const evento = z.discriminatedUnion("t", [morte, dano, cego, granada, bomba, zona, saiu, rank]);
 
+/** Com quanto um jogador entrou no round, no fim do freeze (payload v2). */
+const economia = z.object({
+  steamId,
+  lado,
+  saldo: z.number().int().nonnegative(),
+  equipamento: z.number().int().nonnegative(),
+});
+
 export const round = z.object({
   n: z.number().int(),
   inicio: z.number().int(),
@@ -106,6 +117,7 @@ export const round = z.object({
   fim: z.number().int(),
   vencedor: lado.nullable(),
   motivo: z.string().nullable(),
+  economia: z.array(economia).max(64).optional(),
 });
 
 export const demoPayload = z.object({
@@ -124,4 +136,5 @@ export type DemoPayload = z.infer<typeof demoPayload>;
 export type Evento = z.infer<typeof evento>;
 export type Morte = z.infer<typeof morte>;
 export type Round = z.infer<typeof round>;
+export type Economia = z.infer<typeof economia>;
 export type Lado = z.infer<typeof lado>;
