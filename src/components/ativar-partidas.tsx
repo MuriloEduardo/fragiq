@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { Check, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** A página da Steam que gera o código de autenticação e mostra o share code da última partida. */
@@ -20,6 +20,22 @@ export const PAGINA_STEAM = "https://help.steampowered.com/pt-br/wizard/HelpWith
  * partida que a corrente de outra pessoa trouxe —, o campo some atrás de
  * um link e só volta se a pessoa quiser ou se a Steam recusar o que temos.
  */
+const FORMATO_AUTH = /^[A-Z0-9]{4}-[A-Z0-9]{5}-[A-Z0-9]{4}$/;
+const FORMATO_SHARE = /CSGO(-[A-Za-z0-9]{5}){5}/;
+
+/**
+ * A página da Steam mostra os dois códigos um embaixo do outro, e é comum
+ * colar o share code no primeiro campo. Em vez de devolver "formato
+ * errado", o código vai para o campo dele — e o ✓ ao lado do rótulo diz,
+ * antes de enviar, que a cola saiu inteira.
+ */
+function separar(colado: string): { auth?: string; share?: string } {
+  const share = colado.match(FORMATO_SHARE)?.[0];
+  if (share) return { share };
+  const auth = colado.trim().toUpperCase();
+  return FORMATO_AUTH.test(auth) ? { auth } : {};
+}
+
 export function AtivarPartidas({ compacto = false, religar = false }: { compacto?: boolean; religar?: boolean }) {
   const router = useRouter();
   const [authCode, setAuthCode] = useState("");
@@ -28,6 +44,23 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
   const [enviando, setEnviando] = useState(false);
   const [trocarShare, setTrocarShare] = useState(false);
   const pedeShare = !religar || trocarShare;
+  const authOk = FORMATO_AUTH.test(authCode.trim());
+  const shareOk = FORMATO_SHARE.test(shareCode);
+
+  function colar(valor: string, campo: "auth" | "share") {
+    const { auth, share } = separar(valor);
+    if (campo === "auth" && share) {
+      setShareCode(share);
+      setTrocarShare(true);
+      return;
+    }
+    if (campo === "share" && auth) {
+      setAuthCode(auth);
+      return;
+    }
+    if (campo === "auth") setAuthCode(valor.toUpperCase());
+    else setShareCode(valor);
+  }
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -88,10 +121,12 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
 
       <div className={cn("grid gap-3", pedeShare && "sm:grid-cols-2")}>
         <label className="block">
-          <span className="hud">Código de autenticação</span>
+          <span className="hud inline-flex items-center gap-1.5">
+            Código de autenticação {authOk && <Check className="size-3.5 text-accent" aria-label="formato certo" />}
+          </span>
           <input
             value={authCode}
-            onChange={(e) => setAuthCode(e.target.value.toUpperCase())}
+            onChange={(e) => colar(e.target.value, "auth")}
             placeholder="XXXX-XXXXX-XXXX"
             autoComplete="off"
             spellCheck={false}
@@ -101,10 +136,13 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
         </label>
         {pedeShare && (
           <label className="block">
-            <span className="hud">{religar ? "Share code (opcional: em branco, começa da última que temos)" : "Share code da última partida"}</span>
+            <span className="hud inline-flex items-center gap-1.5">
+              {religar ? "Share code (opcional: em branco, começa da última que temos)" : "Share code da última partida"}
+              {shareOk && <Check className="size-3.5 text-accent" aria-label="formato certo" />}
+            </span>
             <input
               value={shareCode}
-              onChange={(e) => setShareCode(e.target.value)}
+              onChange={(e) => colar(e.target.value, "share")}
               placeholder="CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"
               autoComplete="off"
               spellCheck={false}
