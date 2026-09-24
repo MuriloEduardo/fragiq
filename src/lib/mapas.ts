@@ -12,10 +12,10 @@ import { rotularMapa } from "./cs2-labels";
  * jade de Ancient. Não é decoração — duas partidas no mesmo mapa ficam
  * iguais na lista, que é justamente o que se quer ao procurar uma delas.
  *
- * **Screenshot no lugar da cor**: um arquivo em `public/mapas/<mapa>.jpg`
- * (por exemplo `public/mapas/de_dust2.jpg`) é usado automaticamente por
- * `MapaVisual`, sem mudar código. As imagens oficiais da Valve não têm CDN
- * público estável, então o padrão é o que não depende de terceiro nenhum.
+ * **Screenshot no lugar da cor**: `public/mapas/<mapa>.jpg` é usado
+ * automaticamente por `MapaVisual`. Os arquivos saem do próprio jogo
+ * (`npm run assets:cs2`); a cor fica para o mapa que o jogo não traz —
+ * workshop, ou um mapa novo antes de rodar a extração de novo.
  */
 export type IdentidadeMapa = {
   /** Fundo: duas paradas de gradiente. */

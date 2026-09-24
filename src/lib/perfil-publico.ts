@@ -29,8 +29,9 @@ export type PerfilPublico =
       usuarioDoFragiq: { desde: Date; coletas: number } | null;
       horas: number;
       resumo: { rotulo: string; valor: string }[];
-      armas: { arma: string; kills: number; tiros: number; acertos: number; precisao: number | null }[];
-      mapas: { mapa: string; rounds: number; vitorias: number; taxa: number | null }[];
+      /** `id` é o nome da Valve (`ak47`, `de_nuke`), que acha o ícone; o outro campo é o rótulo. */
+      armas: { id: string; arma: string; kills: number; tiros: number; acertos: number; precisao: number | null }[];
+      mapas: { id: string; mapa: string; rounds: number; vitorias: number; taxa: number | null }[];
     };
 
 const cache = new Map<string, { em: number; valor: PerfilPublico }>();
@@ -90,6 +91,7 @@ async function montar(steamId: string): Promise<PerfilPublico> {
       const tiros = m[`total_shots_${arma}`] ?? 0;
       const acertos = m[`total_hits_${arma}`] ?? 0;
       return {
+        id: arma,
         arma: rotularArma(arma),
         kills: m[`total_kills_${arma}`] ?? 0,
         tiros,
@@ -106,7 +108,7 @@ async function montar(steamId: string): Promise<PerfilPublico> {
       const mapa = k.replace("total_rounds_map_", "");
       const rounds = m[k] ?? 0;
       const vitorias = m[`total_wins_map_${mapa}`] ?? 0;
-      return { mapa: rotularMapa(mapa), rounds, vitorias, taxa: rounds ? (vitorias / rounds) * 100 : null };
+      return { id: mapa, mapa: rotularMapa(mapa), rounds, vitorias, taxa: rounds ? (vitorias / rounds) * 100 : null };
     })
     .filter((x) => x.rounds > 0)
     .sort((a, b) => b.rounds - a.rounds);

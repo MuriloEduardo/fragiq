@@ -21,6 +21,8 @@ import { listarInventario } from "@/lib/inventario";
 import { InventarioGrade } from "@/components/inventario-grade";
 import { carregarPerfilCS } from "@/lib/perfil-cs";
 import { DemoPublicaBloco } from "@/components/demo-publica";
+import { ArmaIcone } from "@/components/arma-icone";
+import { MapaVisual } from "@/components/mapa-visual";
 
 export const dynamic = "force-dynamic";
 
@@ -342,7 +344,10 @@ export default async function PerfilPublicoPage({
                           <Tabela
                             cabecalho={["Arma", "Kills", "Tiros", "Precisão"]}
                             linhas={perfil.armas.slice(0, 12).map((a) => [
-                              a.arma,
+                              <span key="n" className="flex items-center gap-3">
+                                <ArmaIcone arma={a.id} className="text-ink-muted" />
+                                {a.arma}
+                              </span>,
                               a.kills.toLocaleString("pt-BR"),
                               a.tiros.toLocaleString("pt-BR"),
                               a.precisao === null ? "—" : `${a.precisao.toFixed(1).replace(".", ",")}%`,
@@ -354,7 +359,10 @@ export default async function PerfilPublicoPage({
                           <Tabela
                             cabecalho={["Mapa", "Rounds", "Ganhos", "Taxa"]}
                             linhas={perfil.mapas.slice(0, 12).map((m) => [
-                              m.mapa,
+                              <span key="n" className="flex items-center gap-3">
+                                <MapaVisual mapa={m.id} />
+                                {m.mapa}
+                              </span>,
                               m.rounds.toLocaleString("pt-BR"),
                               m.vitorias.toLocaleString("pt-BR"),
                               m.taxa === null ? "—" : `${m.taxa.toFixed(1).replace(".", ",")}%`,
@@ -422,7 +430,7 @@ function Estado({ titulo, texto }: { titulo: string; texto: string }) {
   );
 }
 
-function Tabela({ cabecalho, linhas }: { cabecalho: string[]; linhas: string[][] }) {
+function Tabela({ cabecalho, linhas }: { cabecalho: string[]; linhas: React.ReactNode[][] }) {
   if (linhas.length === 0) {
     return <p className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-faint">Sem dados.</p>;
   }
