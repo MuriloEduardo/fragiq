@@ -12,8 +12,13 @@ import { cn } from "@/lib/utils";
  * privado na Steam (a API não lê nada), o bot ainda não é amigo (mapa e
  * modo não chegam) e só existe uma coleta (não há curva). Cada passo diz o
  * que fazer e conferimos sozinhos quando foi feito — a lista some quando
- * todos estão verdes. O quarto (partidas oficiais) é o que transforma
+ * todos estão verdes. O último (partidas oficiais) é o que transforma
  * "totais entre coletas" em "cada partida, com placar".
+ *
+ * Entrar com a Steam conta como o passo zero, já feito: uma lista que
+ * começa em "1 de 5" é uma lista que a pessoa já começou, e isso puxa mais
+ * do que "0 de 4". O próximo passo pendente fica em destaque — quem chega
+ * não precisa decidir por onde ir — e a barra mostra quanto falta.
  */
 export async function PrimeirosPassos({
   statsVisiveis,
@@ -30,7 +35,13 @@ export async function PrimeirosPassos({
   partidasAtivas: boolean;
 }) {
   const bot = await perfilDoBot();
-  const passos = [
+  const passos: { feito: boolean; incerto?: boolean; ancora?: string; titulo: string; texto: string; acao: React.ReactNode }[] = [
+    {
+      feito: true,
+      titulo: "Entre com a Steam",
+      texto: "Feito. Sua conta está ligada ao seu perfil da Steam.",
+      acao: null,
+    },
     {
       feito: statsVisiveis,
       titulo: "Deixe os detalhes do jogo públicos na Steam",
@@ -98,7 +109,7 @@ export async function PrimeirosPassos({
       titulo: "Ligue as partidas oficiais",
       texto: partidasAtivas
         ? "Cada partida de matchmaking chega com o placar dos dez jogadores."
-        : "Dois códigos da Steam, colados uma vez: cada partida chega com K/D, HS, MVPs e placar.",
+        : "O código de histórico da Steam, colado uma vez: cada partida chega com K/D, HS, MVPs e placar.",
       acao: partidasAtivas ? null : (
         <Link
           href="/games/730/partidas"
@@ -112,6 +123,20 @@ export async function PrimeirosPassos({
 
   const pendentes = passos.filter((p) => !p.feito).length;
   const feitos = passos.length - pendentes;
+  const proximo = passos.findIndex((p) => !p.feito);
+
+  const progresso = (
+    <div
+      className="h-1.5 flex-1 overflow-hidden rounded-full bg-line"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={passos.length}
+      aria-valuenow={feitos}
+      aria-label="Progresso dos primeiros passos"
+    >
+      <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(feitos / passos.length) * 100}%` }} />
+    </div>
+  );
 
   // Com as estatísticas entrando, o cartão inteiro vira uma linha: o que
   // falta (bot, partidas) é conveniência, não bloqueio, e a tela é da
@@ -120,7 +145,11 @@ export async function PrimeirosPassos({
   const lista = (
     <ol className="mt-4 space-y-4">
         {passos.map((p, i) => (
-          <li key={p.titulo} id={p.ancora} className="flex gap-3 scroll-mt-24">
+          <li
+            key={p.titulo}
+            id={p.ancora}
+            className={cn("flex gap-3 scroll-mt-24", i === proximo && "-mx-3 rounded-xl bg-accent/5 p-3 ring-1 ring-accent/30")}
+          >
             <span
               className={cn(
                 "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ring-1",
@@ -132,9 +161,10 @@ export async function PrimeirosPassos({
             </span>
             <div className="min-w-0 flex-1">
               <p className={cn("text-sm font-medium", p.feito && "text-ink-muted line-through decoration-line")}>
-                {i + 1}. {p.titulo}
+                {p.titulo}
+                {i === proximo && <span className="hud ml-2 text-accent">próximo</span>}
               </p>
-              <p className="mt-0.5 truncate text-sm text-ink-muted" title={p.texto}>{p.texto}</p>
+              <p className="mt-0.5 text-sm text-ink-muted">{p.texto}</p>
               {p.acao && <div className="mt-3">{p.acao}</div>}
             </div>
           </li>
@@ -150,7 +180,8 @@ export async function PrimeirosPassos({
           <span className="num text-xs text-ink-faint">
             {feitos} de {passos.length}
           </span>
-          <span className="ml-auto text-xs text-ink-faint transition group-open:rotate-180">▾</span>
+          {progresso}
+          <span className="ml-2 text-xs text-ink-faint transition group-open:rotate-180">▾</span>
         </summary>
         <div className="pb-5">{lista}</div>
       </details>
@@ -159,11 +190,12 @@ export async function PrimeirosPassos({
 
   return (
     <section className="rounded-2xl bg-surface p-5 ring-1 ring-line sm:p-6">
-      <div className="flex items-baseline gap-3">
+      <div className="flex items-center gap-3">
         <h2 className="hud">Primeiros passos</h2>
         <span className="num text-xs text-ink-faint">
           {feitos} de {passos.length}
         </span>
+        {progresso}
       </div>
       {lista}
     </section>
