@@ -72,12 +72,16 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ authCode, shareCode: pedeShare ? shareCode : "" }),
       });
-      const corpo = (await res.json().catch(() => ({}))) as { error?: string; campo?: string };
+      const corpo = (await res.json().catch(() => ({}))) as { error?: string; campo?: string; novas?: number };
       if (!res.ok) {
         setErro({ campo: corpo.campo, texto: corpo.error ?? "Não deu certo. Tente de novo." });
         if (corpo.campo === "share") setTrocarShare(true);
         return;
       }
+      // O formulário some quando a corrente liga; sem isto o último passo do
+      // onboarding terminava em silêncio. A aba Partidas confirma e diz
+      // quantas a Steam já devolveu.
+      router.push(`/games/730/partidas?ligou=${corpo.novas ?? 0}`);
       router.refresh();
     } finally {
       setEnviando(false);

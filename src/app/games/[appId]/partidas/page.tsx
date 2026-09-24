@@ -35,6 +35,7 @@ export default async function PartidasPage({ params, searchParams }: { params: P
     shareCodeConhecido(session.userId, session.steamId).then(Boolean),
   ]);
   const ativo = Boolean(user?.partidasAtivadasEm);
+  const ligou = ativo ? Number((await searchParams)?.ligou) : NaN;
 
   if (!ativo && partidas.length === 0 && modo === TUDO) {
     return (
@@ -58,6 +59,16 @@ export default async function PartidasPage({ params, searchParams }: { params: P
 
   return (
     <div className="space-y-4">
+      {Number.isInteger(ligou) && ligou >= 0 && !user?.partidasErro && (
+        <div className="rounded-2xl bg-accent/5 p-4 text-sm ring-1 ring-accent/30">
+          <p className="font-medium text-accent">Partidas oficiais ligadas.</p>
+          <p className="mt-1 text-ink-muted">
+            {ligou > 0
+              ? `A Steam já devolveu ${ligou} ${ligou === 1 ? "partida nova" : "partidas novas"}; o placar de cada uma chega em até um minuto.`
+              : "Começamos pela sua partida mais recente que conhecemos: o placar dela chega em até um minuto, e as próximas entram sozinhas."}
+          </p>
+        </div>
+      )}
       {user?.partidasErro && (
         <div className="rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm">
           <p className="font-medium text-danger">A corrente parou.</p>
