@@ -159,6 +159,22 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
         </button>
       )}
 
+      <details className="rounded-xl bg-canvas px-4 py-3 text-sm text-ink-muted ring-1 ring-line">
+        <summary className="cursor-pointer text-ink">Onde encontro os códigos?</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>A página da Steam pede login com a mesma conta do CS2.</li>
+          <li>
+            Na seção <strong className="text-ink">Acesse o seu histórico de partidas</strong>, clique em{" "}
+            <strong className="text-ink">Criar código de autenticação</strong>: aparece um código no formato XXXX-XXXXX-XXXX.
+          </li>
+          <li>
+            Logo abaixo fica <strong className="text-ink">Seu código de compartilhamento mais recente</strong>, que começa com CSGO-.
+            Se não aparecer nenhum, jogue uma partida de Premier ou Competitivo e volte depois.
+          </li>
+          <li>Pode colar os dois em qualquer campo: a gente põe cada um no lugar certo.</li>
+        </ol>
+      </details>
+
       {erro && <p className="text-sm text-danger">{erro.texto}</p>}
 
       <div className="flex flex-wrap items-center gap-3">

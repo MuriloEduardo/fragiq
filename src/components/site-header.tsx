@@ -72,7 +72,8 @@ export function SiteHeader({ personaName, avatarUrl, steamId, lastSyncedAt, admi
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-          {passos && (
+          {/* No Resumo a lista inteira já está na tela; o atalho seria eco. */}
+          {passos && pathname !== "/games/730" && (
             <Link
               href="/games/730"
               title="Primeiros passos: o que falta para tudo chegar sozinho"
