@@ -41,7 +41,7 @@ export default async function SessoesPage({ params, searchParams }: { params: Pr
 
   const sessoes = listarSessoes(fonte.rows).reverse();
   if (sessoes.length === 0) {
-    return <Estado titulo="Nenhuma sessão ainda" texto="É preciso duas coletas com partidas entre elas." />;
+    return <Estado titulo="Nenhuma sessão ainda" texto="Uma sessão é o que mudou entre duas leituras da Steam. Jogue uma partida de CS2 e ela aparece aqui." acao={{ rotulo: "Ver os primeiros passos", href: `/games/${appId}` }} />;
   }
   const kd = CS2_PANEL.find((s) => s.key === "kd")!;
   const adr = CS2_PANEL.find((s) => s.key === "adr")!;

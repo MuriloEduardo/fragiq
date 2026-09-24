@@ -60,7 +60,7 @@ export default async function PainelStatPage({ params, searchParams }: { params:
 
       <div className="rounded-2xl bg-surface p-3 ring-1 ring-line sm:p-5">
         {pontos.length === 0 ? (
-          <Estado titulo="Sem sessões" texto="A primeira partida depois de duas coletas vira o primeiro ponto." compacto />
+          <Estado titulo="Sem sessões" texto="Jogue uma partida de CS2: quando ela terminar, vira o primeiro ponto deste gráfico." compacto />
         ) : (
           <SerieChart
             pontos={pontos}

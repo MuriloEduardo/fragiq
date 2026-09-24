@@ -81,7 +81,7 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
       ) : modo !== TUDO ? (
         <Estado titulo={`Sem sessões de ${rotuloDoModo(modo)}`} texto="A próxima partida nesse modo aparece aqui." acao={{ rotulo: "Ver tudo", href: `/games/${appId}` }} />
       ) : rows.length === 1 ? (
-        <Estado titulo="Primeira coleta gravada" texto="A próxima partida vira a primeira sessão." />
+        <Estado titulo="Ponto de partida guardado" texto="Jogue uma partida de CS2: quando ela terminar, a primeira sessão aparece aqui com o que mudou." />
       ) : null}
 
       {(daSessao || doModo.length > 0) && (
