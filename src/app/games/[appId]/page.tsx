@@ -48,8 +48,11 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
   const sessao = ultimaSessao(rows, filtroDoModo(modo));
   const amigoDoBot = appId === 730 ? await botEhAmigo(session.steamId) : true;
   const portas =
-    appId === 730 ? await prisma.user.findUnique({ where: { id: session.userId }, select: { partidasAtivadasEm: true, botAmigoDesde: true } }) : null;
-  const partidasAtivas = appId === 730 ? Boolean(portas?.partidasAtivadasEm) : true;
+    appId === 730 ? await prisma.user.findUnique({ where: { id: session.userId }, select: { partidasAtivadasEm: true, partidasErro: true, botAmigoDesde: true } }) : null;
+  // Ligada e andando: uma corrente que a Steam parou de aceitar não é um
+  // passo feito, é um passo para refazer.
+  const partidasParadas = appId === 730 && Boolean(portas?.partidasAtivadasEm && portas.partidasErro);
+  const partidasAtivas = appId === 730 ? Boolean(portas?.partidasAtivadasEm) && !partidasParadas : true;
   const onboarding = appId === 730 && (rows.length < 2 || amigoDoBot !== true || !partidasAtivas);
   // A lista some quando fica toda verde; sem isto, o último passo feito
   // não tem recompensa nenhuma — a pessoa nunca vê o "5 de 5". O cartão
@@ -64,7 +67,7 @@ export default async function ResumoPage({ params, searchParams }: { params: Pro
     <>
       {onboarding && (
         <div className="mb-8">
-          <PrimeirosPassos statsVisiveis botAmigo={amigoDoBot} coletas={rows.length} partidasAtivas={partidasAtivas} />
+          <PrimeirosPassos statsVisiveis botAmigo={amigoDoBot} coletas={rows.length} partidasAtivas={partidasAtivas} partidasParadas={partidasParadas} />
         </div>
       )}
       {recemConcluido && (

@@ -25,6 +25,7 @@ export async function PrimeirosPassos({
   botAmigo,
   coletas,
   partidasAtivas,
+  partidasParadas = false,
 }: {
   /** A Steam devolveu estatísticas de CS2 (perfil e detalhes do jogo públicos). */
   statsVisiveis: boolean;
@@ -33,6 +34,8 @@ export async function PrimeirosPassos({
   coletas: number;
   /** A corrente de share codes está ligada (partidas oficiais, uma a uma). */
   partidasAtivas: boolean;
+  /** Foi ligada, mas a Steam parou de aceitar o código. */
+  partidasParadas?: boolean;
 }) {
   const bot = await perfilDoBot();
   const passos: { feito: boolean; incerto?: boolean; ancora?: string; titulo: string; texto: string; acao: React.ReactNode }[] = [
@@ -106,16 +109,18 @@ export async function PrimeirosPassos({
     },
     {
       feito: partidasAtivas,
-      titulo: "Ligue as partidas oficiais",
+      titulo: partidasParadas ? "Religue as partidas oficiais" : "Ligue as partidas oficiais",
       texto: partidasAtivas
         ? "Cada partida de matchmaking chega com o placar dos dez jogadores."
-        : "O código de histórico da Steam, colado uma vez: cada partida chega com K/D, HS, MVPs e placar.",
+        : partidasParadas
+          ? "As partidas pararam de chegar: cole o código de autenticação de novo. As que ficaram no intervalo voltam junto."
+          : "O código de histórico da Steam, colado uma vez: cada partida chega com K/D, HS, MVPs e placar.",
       acao: partidasAtivas ? null : (
         <Link
-          href="/games/730/partidas"
+          href={partidasParadas ? "/configuracoes" : "/games/730/partidas"}
           className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-canvas transition hover:brightness-110"
         >
-          Ativar partidas <ArrowRight className="size-3.5" />
+          {partidasParadas ? "Colar o código novo" : "Ativar partidas"} <ArrowRight className="size-3.5" />
         </Link>
       ),
     },

@@ -20,12 +20,13 @@ export async function progressoDosPrimeirosPassos(userId: string): Promise<Progr
     select: {
       botAmigoDesde: true,
       partidasAtivadasEm: true,
+      partidasErro: true,
       games: { where: { gameAppId: 730 }, select: { _count: { select: { snapshots: true } } } },
     },
   });
   if (!user) return null;
   const coletas = user.games[0]?._count.snapshots ?? 0;
-  const passos = [true, coletas > 0, Boolean(user.botAmigoDesde), coletas >= 2, Boolean(user.partidasAtivadasEm)];
+  const passos = [true, coletas > 0, Boolean(user.botAmigoDesde), coletas >= 2, Boolean(user.partidasAtivadasEm && !user.partidasErro)];
   const feitos = passos.filter(Boolean).length;
   return feitos === passos.length ? null : { feitos, total: passos.length };
 }
