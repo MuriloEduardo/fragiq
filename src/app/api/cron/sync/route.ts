@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPlayerSummaries, type SteamPlayer } from "@/lib/steam/api";
 import { syncUser } from "@/lib/steam/sync";
 import { processarCapturasDevidas } from "@/lib/capturas";
 import { lembrarPendenciasNoSteam } from "@/lib/pendencias";
@@ -85,6 +86,18 @@ export async function GET(request: NextRequest) {
     data: { status: "RUNNING", candidates: users.length },
   });
 
+  // Os perfis do lote numa chamada só: a Steam aceita 100 SteamIDs por
+  // GetPlayerSummaries, e o lote é de 50. Uma chamada por usuário era o
+  // item mais caro da coleta de quem não jogou (docs/roadmap-dados.md).
+  // Se a leitura em lote falhar, cada coleta volta a ler o próprio perfil.
+  const perfis: Map<string, SteamPlayer> | null =
+    users.length > 0
+      ? await getPlayerSummaries(users.map((u) => u.steamId)).catch(async (e) => {
+          await reportarErro("cron.perfis", e);
+          return null;
+        })
+      : null;
+
   const deadline = Date.now() + TIME_BUDGET_MS;
 
   let synced = 0;
@@ -101,7 +114,8 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const result = await syncUser(user.id, user.steamId, "CRON");
+      const perfil = perfis ? (perfis.get(user.steamId) ?? null) : undefined;
+      const result = await syncUser(user.id, user.steamId, "CRON", undefined, undefined, { perfil });
       snapshots += result.snapshotsCreated;
       synced++;
     } catch (err) {
