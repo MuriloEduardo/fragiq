@@ -21,6 +21,20 @@ describe("separarCodigos", () => {
     expect(separarCodigos("  7k8s-ynxhw-bfqn ")).toEqual({ auth: "7K8S-YNXHW-BFQN" });
   });
 
+  it("separa os dois códigos colados juntos, com ou sem espaço entre eles", () => {
+    expect(separarCodigos(`7k8s-ynxhw-bfqn${SHARE}`)).toEqual({ auth: "7K8S-YNXHW-BFQN", share: SHARE });
+    expect(separarCodigos(`${SHARE} 7K8S-YNXHW-BFQN`)).toEqual({ auth: "7K8S-YNXHW-BFQN", share: SHARE });
+  });
+
+  it("não corta um share code com caractere sobrando no fim", () => {
+    expect(separarCodigos(`${SHARE}x`)).toEqual({});
+  });
+
+  it("não quebra com um link copiado pela metade", () => {
+    expect(separarCodigos("steam://rungame/730/76561202255233023/+csgo_download_match%2")).toEqual({});
+    expect(separarCodigos("100%")).toEqual({});
+  });
+
   it("não adivinha quando não é nenhum dos dois", () => {
     expect(separarCodigos("7K8S-YNXH")).toEqual({});
     expect(separarCodigos("")).toEqual({});
@@ -31,6 +45,11 @@ describe("validação de formato", () => {
   it("aceita os dois formatos certos", () => {
     expect(authCodeValido("7K8S-YNXHW-BFQN")).toBe(true);
     expect(shareCodeValido(SHARE)).toBe(true);
+  });
+
+  it("recusa, sem jogar erro, o que não é URI válida", () => {
+    expect(shareCodeValido("%")).toBe(false);
+    expect(shareCodeValido(`${SHARE}%`)).toBe(true);
   });
 
   it("recusa share code com letra fora do alfabeto da Steam", () => {
