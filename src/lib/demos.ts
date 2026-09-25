@@ -5,6 +5,7 @@ import { demoPayload, type DemoPayload } from "./demo/payload";
 import { metricasDaDemo, REGRAS_VERSAO, type Metricas } from "./demo/metricas";
 import { conversaoDaDemo } from "./demo/conversao";
 import { ritmoDaDemo, type RitmoDeTime } from "./demo/ritmo";
+import { porCompraDaDemo, type PorCompra } from "./demo/economia";
 
 /**
  * Demos: a fila para o bot e o que fazer com o que ele traz.
@@ -40,13 +41,14 @@ export async function filaDeDemos(limite = 1): Promise<DemoPendente[]> {
   return partidas.map((p) => ({ matchId: p.id, shareCode: p.shareCode, demoUrl: p.demoUrl! }));
 }
 
-function linhaDe(matchId: string, m: Metricas): Prisma.MatchPlayerDemoCreateManyInput {
+function linhaDe(matchId: string, m: Metricas, porCompra: PorCompra | undefined): Prisma.MatchPlayerDemoCreateManyInput {
   const { rating, zonas, ...resto } = m;
   return {
     ...resto,
     matchId,
     versaoRegras: REGRAS_VERSAO,
     zonas: zonas as Prisma.InputJsonValue,
+    porCompra: porCompra ? (porCompra as Prisma.InputJsonValue) : Prisma.JsonNull,
     ratingTipo: rating?.tipo ?? null,
     ratingAntes: rating?.antes ?? null,
     ratingDepois: rating?.depois ?? null,
@@ -83,10 +85,16 @@ function colunasDoRitmo(r: RitmoDeTime | undefined) {
   };
 }
 
+/** As linhas de jogador de uma demo: as métricas e, quando o payload tem economia, o recorte por compra. */
+function linhasDosJogadores(matchId: string, p: DemoPayload): Prisma.MatchPlayerDemoCreateManyInput[] {
+  const porCompra = porCompraDaDemo(p);
+  return metricasDaDemo(p).map((m) => linhaDe(matchId, m, porCompra.get(m.steamId)));
+}
+
 /** Eventos gravados inteiros, métricas calculadas e gravadas; o mapa da partida ganha o do cabeçalho se ainda não tinha. */
 export async function gravarDemo(matchId: string, bruto: unknown): Promise<{ jogadores: number }> {
   const payload: DemoPayload = demoPayload.parse(bruto);
-  const metricas = metricasDaDemo(payload);
+  const jogadores = linhasDosJogadores(matchId, payload);
   const times = linhasDosTimes(matchId, payload);
   await prisma.$transaction([
     prisma.matchDemo.upsert({
@@ -95,13 +103,13 @@ export async function gravarDemo(matchId: string, bruto: unknown): Promise<{ jog
       update: { status: "DONE", error: null, versao: payload.versao, parser: payload.parser, ticks: payload.ticks, dados: payload as Prisma.InputJsonValue },
     }),
     prisma.matchPlayerDemo.deleteMany({ where: { matchId } }),
-    prisma.matchPlayerDemo.createMany({ data: metricas.map((m) => linhaDe(matchId, m)) }),
+    prisma.matchPlayerDemo.createMany({ data: jogadores }),
     prisma.matchTeamDemo.deleteMany({ where: { matchId } }),
     prisma.matchTeamDemo.createMany({ data: times }),
     prisma.match.updateMany({ where: { id: matchId, mapa: null, NOT: { demo: null } }, data: { mapa: payload.mapa, servidor: payload.servidor } }),
   ]);
-  await registrar("demo.lida", { dados: { matchId, rounds: payload.rounds.length, eventos: payload.eventos.length, jogadores: metricas.length } });
-  return { jogadores: metricas.length };
+  await registrar("demo.lida", { dados: { matchId, rounds: payload.rounds.length, eventos: payload.eventos.length, jogadores: jogadores.length } });
+  return { jogadores: jogadores.length };
 }
 
 export async function registrarFalhaDaDemo(matchId: string, motivo: "EXPIRED" | "FAILED", error?: string) {
@@ -122,10 +130,9 @@ export async function recomputarMetricasDasDemos(): Promise<number> {
   for (const d of demos) {
     const parsed = demoPayload.safeParse(d.dados);
     if (!parsed.success) continue;
-    const metricas = metricasDaDemo(parsed.data);
     await prisma.$transaction([
       prisma.matchPlayerDemo.deleteMany({ where: { matchId: d.matchId } }),
-      prisma.matchPlayerDemo.createMany({ data: metricas.map((m) => linhaDe(d.matchId, m)) }),
+      prisma.matchPlayerDemo.createMany({ data: linhasDosJogadores(d.matchId, parsed.data) }),
       prisma.matchTeamDemo.deleteMany({ where: { matchId: d.matchId } }),
       prisma.matchTeamDemo.createMany({ data: linhasDosTimes(d.matchId, parsed.data) }),
     ]);

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { demoPayload, type DemoPayload, type Economia, type Evento, type Lado } from "@/lib/demo/payload";
-import { classe, economiaDaDemo, economiaDosRounds, LIMITE_CHEIA, LIMITE_ECO } from "@/lib/demo/economia";
+import { classe, economiaDaDemo, economiaDosRounds, LIMITE_CHEIA, LIMITE_ECO, porCompraDaDemo } from "@/lib/demo/economia";
+import { metricasDaDemo } from "@/lib/demo/metricas";
 
 /** A mesma partida real de Premier em Ancient dos outros testes de demo — lida em payload v1, sem economia. */
 const ancient = demoPayload.parse(JSON.parse(readFileSync(new URL("../fixtures/demo-ancient.json", import.meta.url), "utf8")));
@@ -145,5 +146,74 @@ describe("economia — o time", () => {
     ]);
     expect(time1(p)).toEqual({ ladoInicial: "CT", pistol: 2, pistolGanhos: 0, eco: 1, ecoGanhos: 1, meia: 1, meiaGanhas: 1, cheia: 1, cheiaGanhas: 1 });
     expect(time2(p)).toEqual({ ladoInicial: "T", pistol: 2, pistolGanhos: 2, eco: 1, ecoGanhos: 0, meia: 1, meiaGanhas: 0, cheia: 1, cheiaGanhas: 0 });
+  });
+});
+
+describe("economia — ADR e kills por compra", () => {
+  const dano = (round: number, autor: string, vitima: string, vida: number, restou: number, tick = 500): Evento => ({
+    t: "dano",
+    tick: base(round) + tick,
+    round,
+    vitima,
+    autor,
+    arma: "ak47",
+    vida,
+    colete: 0,
+    parte: "chest",
+    restou,
+  });
+  const morte = (round: number, autor: string, ladoAutor: Lado, vitima: string, ladoVitima: Lado, tick = 600): Evento => ({
+    t: "morte",
+    tick: base(round) + tick,
+    round,
+    vitima,
+    ladoVitima,
+    zonaVitima: null,
+    autor,
+    ladoAutor,
+    zonaAutor: null,
+    assistente: null,
+    flashAssist: false,
+    arma: "ak47",
+    hs: false,
+    atravesSmoke: false,
+    cego: false,
+    noscope: false,
+    penetrou: false,
+    distancia: 10,
+    pos: null,
+    posAutor: null,
+  });
+
+  it("separa pela compra do time do jogador, com as definições das métricas", () => {
+    const p = partida([comoCT(1, "CT", 900, 900), comoCT(2, "T", 1000, 4000), comoT(3, "CT", 4000, 4000)]);
+    p.eventos.push(
+      dano(1, "a1", "b1", 100, 0),
+      morte(1, "a1", "CT", "b1", "T"),
+      // 108 num jogador que tinha 30 conta 30.
+      dano(2, "a1", "b2", 70, 30, 400),
+      dano(2, "a1", "b2", 108, 0, 500),
+      dano(2, "b3", "a1", 100, 0),
+      morte(2, "b3", "T", "a1", "CT"),
+      dano(3, "a1", "b1", 50, 50),
+    );
+    const a1 = porCompraDaDemo(p).get("a1")!;
+    expect(a1).toEqual({
+      pistol: { rounds: 1, kills: 1, dano: 100 },
+      eco: { rounds: 1, kills: 0, dano: 100 },
+      cheia: { rounds: 1, kills: 0, dano: 50 },
+    });
+    expect(porCompraDaDemo(p).get("b3")).toEqual({ pistol: { rounds: 1, kills: 0, dano: 0 }, cheia: { rounds: 2, kills: 1, dano: 100 } });
+    // A soma das classes é o total da partida, quando todo round tem amostra.
+    const total = metricasDaDemo(p).find((m) => m.steamId === "a1")!;
+    const soma = Object.values(a1).reduce((s, c) => ({ rounds: s.rounds + c.rounds, kills: s.kills + c.kills, dano: s.dano + c.dano }), { rounds: 0, kills: 0, dano: 0 });
+    expect(soma).toEqual({ rounds: total.rounds, kills: total.kills, dano: total.dano });
+  });
+
+  it("demo sem amostra não ganha recorte, e round sem amostra fica fora", () => {
+    expect(porCompraDaDemo(ancient).size).toBe(0);
+    const p = partida([comoCT(1, "CT", 900, 900), { ...comoCT(2, "CT", 4000, 4000), equipCT: undefined }]);
+    expect(porCompraDaDemo(p).get("a1")).toEqual({ pistol: { rounds: 1, kills: 0, dano: 0 } });
+    expect(porCompraDaDemo(p).get("b1")).toEqual({ pistol: { rounds: 1, kills: 0, dano: 0 }, cheia: { rounds: 1, kills: 0, dano: 0 } });
   });
 });

@@ -131,9 +131,10 @@ POST /api/bot/demos ◄── JSON gzip (~11 KB por 8 rounds; ~300 KB estimado p
 
 ## 4. As métricas, definidas
 
-`src/lib/demo/metricas.ts`, regras versão 2 (a `REGRAS_VERSAO` é a da
+`src/lib/demo/metricas.ts`, regras versão 3 (a `REGRAS_VERSAO` é a da
 rodada de recompute, não a de cada coluna: nenhuma definição de jogador
-mudou desde a versão 1 — o que entrou na 2 foi o ritmo do time, §4.2).
+mudou desde a versão 1 — o que entrou na 2 foi o ritmo do time, §4.2, e
+na 3 o ADR por compra, §4.3).
 Por jogador, por partida. Round rendido não é jogado; jogador que saiu
 conta só os rounds em que apareceu.
 
@@ -277,11 +278,15 @@ Três decisões:
   round só é pistol quando o time entrou nele com equipamento de eco.
 
 `economiaDaDemo` conta, por time (a mesma identidade de `timesPorRound`),
-quantos rounds de cada classe ele jogou e venceu. Ainda **não é gravada
-nem mostrada**: as colunas em `MatchTeamDemo` e a tela com o ADR ao lado
-da economia do round são o passo seguinte, e só medem alguma coisa depois
-que o bot com a v2 ler a primeira partida. Testes:
-`tests/lib/demo-economia.test.ts`.
+quantos rounds de cada classe ele jogou e venceu; ainda não é gravada.
+
+`porCompraDaDemo` (25/09) separa o ADR e as kills de cada jogador pela
+compra do **time dele** no round, com as definições de §4 (kill em
+inimigo, dano entre lados limitado à vida — `danosEntreLados`, o mesmo
+helper das métricas): a soma das classes é o total da partida nos rounds
+com amostra. Gravado em `MatchPlayerDemo.porCompra` (regras versão 3) e
+mostrado na página da partida, abaixo do placar de cada time, só quando a
+demo tem economia. Testes: `tests/lib/demo-economia.test.ts`.
 
 O parser também conhece `round_start_equip_value`, `cash_spent_this_round`
 e `t_losing_streak`/`ct_losing_streak` (o bônus de derrota); nenhum entrou,
@@ -312,7 +317,7 @@ existe no payload marcado — é o backlog desta frente.
 | **Tempo** — timing de rotação | quanto o CT demora a mudar de site depois do primeiro sinal? | `zona` (mudança de site) contra tick do primeiro `dano`/`granada` no outro site | sim, não calculado |
 | **Informação** — o que se revelou | o time viu antes de comprometer? | `dano` sem morte, `cego`, `granada` de reconhecimento, `zona` de quem entrou e saiu | parcial: falta `weapon_fire` por round (um tiro de "info") e `player_footstep` |
 | **Recursos** — utilitário que compra algo | a smoke/flash antecedeu uma entrada com kill ou uma plant? | `granada.pos`+tick vs `morte`/`bomba` logo depois, `flashAssist` | sim, não calculado |
-| **Recursos** — economia | com quanto cada um entrou no round; força ou eco? | `balance`, `current_equip_value` no fim do freeze | **payload v2** (§4.3): classe calculada, ainda não gravada nem mostrada |
+| **Recursos** — economia | com quanto cada um entrou no round; força ou eco? | `balance`, `current_equip_value` no fim do freeze | **payload v2** (§4.3): classe calculada; ADR e kills por compra gravados e mostrados na partida |
 | **Ameaça** — fake | o time mostrou presença num site e plantou no outro? | `granada`/`zona`/`dano` num site seguido de `bomba.plantada` no outro | sim, não calculado |
 | **Risco** — disciplina de troca | morreu sozinho ou com aliado a ≤ 5 s de distância? | `morte` + `zona` dos aliados no mesmo tick | `mortesTrocadas` já; falta "morte sem aliado perto" |
 | **Risco** — duelo tomado | morreu cego, atravessando smoke, sem colete, num 1v3? | `morte.cego/atravesSmoke`, `vivos` no tick | sim, não calculado |
@@ -330,9 +335,9 @@ Ordem sugerida para o próximo ciclo, do mais barato ao mais caro:
    se consegue medir sem inventar intenção. Fica como pergunta aberta,
    não como item.
 3. **Economia** — o fato e a classe feitos em 24/09 (§4.3, payload v2).
-   Falta gravar as contagens em `MatchTeamDemo` e mostrar o ADR ao lado
-   da economia do round; só mede alguma coisa em demo lida depois do
-   `bot/deploy.sh`.
+   O ADR e as kills por compra de cada jogador entraram em 25/09. Falta
+   gravar as contagens do time em `MatchTeamDemo`; só mede alguma coisa
+   em demo lida depois do `bot/deploy.sh`.
 4. **Utilitário que compra algo**: flash seguida de kill/entrada, smoke
    seguida de plant. Cruza dois eventos por tick e zona.
 5. **Controle de mapa por time e por round**: `zonas` já existe por
@@ -360,9 +365,9 @@ Ordem sugerida para o próximo ciclo, do mais barato ao mais caro:
 
 1. `git push` (migrations `20260918200000_demos`,
    `20260918210000_gc_bruto`, `20260919030000_conversao_do_time` e
-   `20260921120000_ritmo_do_time` entram pelo `vercel-build`). Demo já
+   `20260921120000_ritmo_do_time` e `20260925190000_adr_por_compra` entram pelo `vercel-build`). Demo já
    gravada antes de cada uma delas só ganha os números novos no `npm run
-   recompute:demos` — é ele também quem sobe o `versaoRegras` de 1 para 2.
+   recompute:demos` — é ele também quem sobe o `versaoRegras` (hoje 3).
 2. `bot/deploy.sh` — a imagem nova instala `bzip2` e o
    `@laihoe/demoparser2`; o `.dockerignore`/`npm ci` já cobrem. **Sempre
    depois do site**: o site grava o payload já validado, e o validador

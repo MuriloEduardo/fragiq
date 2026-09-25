@@ -18,11 +18,12 @@ import type { DemoPayload, Lado, Morte, Round } from "./payload";
 
 /**
  * Versão 2 desde 2026-09-21: a linha de time ganhou o ritmo (`ritmo.ts`).
- * Nenhuma definição de jogador mudou, mas a versão é da rodada de
- * recompute, não de cada coluna: linha com `versaoRegras` 1 é linha
- * gravada antes do ritmo existir.
+ * Versão 3 desde 2026-09-25: a linha de jogador ganhou o ADR e as kills
+ * por compra (`economia.ts`). Nenhuma definição antiga mudou, mas a versão
+ * é da rodada de recompute, não de cada coluna: linha com `versaoRegras`
+ * menor é linha gravada antes da coluna existir.
  */
-export const REGRAS_VERSAO = 2;
+export const REGRAS_VERSAO = 3;
 
 /** Demos de matchmaking são gravadas a 64 ticks por segundo. */
 export const TICKS_POR_S = 64;
@@ -230,22 +231,14 @@ export function metricasDaDemo(p: DemoPayload): Metricas[] {
       }
     }
 
-    // Dano limitado à vida que a vítima tinha: o evento pode dizer 108 num jogador com 30.
-    const vida = new Map<string, number>();
+    for (const d of danosEntreLados(eventos, lado)) {
+      const a = de(d.autor);
+      a.dano += d.efetivo;
+      if (UTILITARIO.has(d.arma)) a.danoUtil += d.efetivo;
+      de(d.vitima).danoSofrido += d.efetivo;
+    }
     for (const e of eventos) {
-      if (e.t === "dano") {
-        const antes = vida.get(e.vitima) ?? 100;
-        const efetivo = Math.max(0, Math.min(e.vida, antes));
-        vida.set(e.vitima, e.restou);
-        const ladoAutor = e.autor ? lado.get(e.autor) : undefined;
-        const ladoVitima = lado.get(e.vitima);
-        if (e.autor && e.autor !== e.vitima && ladoAutor && ladoVitima && ladoAutor !== ladoVitima) {
-          const a = de(e.autor);
-          a.dano += efetivo;
-          if (UTILITARIO.has(e.arma)) a.danoUtil += efetivo;
-          de(e.vitima).danoSofrido += efetivo;
-        }
-      } else if (e.t === "cego") {
+      if (e.t === "cego") {
         if (!e.autor || e.autor === e.vitima) continue;
         const a = de(e.autor);
         if (lado.get(e.autor) !== lado.get(e.vitima)) {
@@ -284,6 +277,28 @@ export function metricasDaDemo(p: DemoPayload): Metricas[] {
         vidaMediaS: mortesComTempo ? Math.round((vidaTicks / mortesComTempo / TICKS_POR_S) * 10) / 10 : null,
       };
     });
+}
+
+/**
+ * O dano de um round que conta para ADR: entre lados opostos e limitado à
+ * vida que a vítima tinha — o evento pode dizer 108 num jogador com 30. Os
+ * eventos são os do round, em ordem; `lado` é o de `ladosPorRound`.
+ */
+export function danosEntreLados(eventos: DemoPayload["eventos"], lado: Map<string, Lado>): { autor: string; vitima: string; arma: string; efetivo: number }[] {
+  const vida = new Map<string, number>();
+  const danos: { autor: string; vitima: string; arma: string; efetivo: number }[] = [];
+  for (const e of eventos) {
+    if (e.t !== "dano") continue;
+    const antes = vida.get(e.vitima) ?? 100;
+    const efetivo = Math.max(0, Math.min(e.vida, antes));
+    vida.set(e.vitima, e.restou);
+    const ladoAutor = e.autor ? lado.get(e.autor) : undefined;
+    const ladoVitima = lado.get(e.vitima);
+    if (e.autor && e.autor !== e.vitima && ladoAutor && ladoVitima && ladoAutor !== ladoVitima) {
+      danos.push({ autor: e.autor, vitima: e.vitima, arma: e.arma, efetivo });
+    }
+  }
+  return danos;
 }
 
 /**
