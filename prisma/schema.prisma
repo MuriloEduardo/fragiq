@@ -632,6 +632,19 @@ model MatchTeamDemo {
   /// base é `plants`.
   segundoPlant     Float?
 
+  /// Economia (docs/demos.md §4.3): quantos rounds o time jogou em cada
+  /// classe de compra, pela média do equipamento no fim do freeze, e
+  /// quantos venceu. Nulo é "sem amostra" (demo lida em payload v1); zero
+  /// é "nenhum round dessa classe".
+  pistol       Int?
+  pistolGanhos Int?
+  eco          Int?
+  ecoGanhos    Int?
+  meia         Int?
+  meiaGanhas   Int?
+  cheia        Int?
+  cheiaGanhas  Int?
+
   @@unique([matchId, ladoInicial])
   @@map("match_team_demos")
 }

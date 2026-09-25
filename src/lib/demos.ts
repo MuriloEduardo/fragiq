@@ -5,7 +5,7 @@ import { demoPayload, type DemoPayload } from "./demo/payload";
 import { metricasDaDemo, REGRAS_VERSAO, type Metricas } from "./demo/metricas";
 import { conversaoDaDemo } from "./demo/conversao";
 import { ritmoDaDemo, type RitmoDeTime } from "./demo/ritmo";
-import { porCompraDaDemo, type PorCompra } from "./demo/economia";
+import { economiaDaDemo, porCompraDaDemo, type EconomiaDeTime, type PorCompra } from "./demo/economia";
 
 /**
  * Demos: a fila para o bot e o que fazer com o que ele traz.
@@ -58,16 +58,42 @@ function linhaDe(matchId: string, m: Metricas, porCompra: PorCompra | undefined)
 }
 
 /**
- * A linha de um time: conversão e ritmo, as duas leituras de time da mesma
- * demo, casadas pelo lado em que o time começou — que é a identidade que
- * `timesPorRound` dá às duas.
+ * A linha de um time: conversão, ritmo e economia, as três leituras de
+ * time da mesma demo, casadas pelo lado em que o time começou — que é a
+ * identidade que `timesPorRound` dá a todas.
  */
 function linhasDosTimes(matchId: string, p: DemoPayload): Prisma.MatchTeamDemoCreateManyInput[] {
   const ritmo = new Map(ritmoDaDemo(p).map((r) => [r.ladoInicial, r]));
+  const economia = new Map(economiaDaDemo(p).map((e) => [e.ladoInicial, e]));
   return conversaoDaDemo(p).map((c) => {
     const { jogadores, ...resto } = c;
-    return { ...resto, ...colunasDoRitmo(ritmo.get(c.ladoInicial)), matchId, versaoRegras: REGRAS_VERSAO, jogadores: jogadores as Prisma.InputJsonValue };
+    return {
+      ...resto,
+      ...colunasDoRitmo(ritmo.get(c.ladoInicial)),
+      ...colunasDaEconomia(economia.get(c.ladoInicial)),
+      matchId,
+      versaoRegras: REGRAS_VERSAO,
+      jogadores: jogadores as Prisma.InputJsonValue,
+    };
   });
+}
+
+/**
+ * As contagens de economia, uma a uma como as do ritmo. Aqui o vazio é
+ * nulo, não zero: time sem amostra é demo lida em payload v1, e "0 rounds
+ * de eco" diria que o time comprou em todos.
+ */
+function colunasDaEconomia(e: EconomiaDeTime | undefined) {
+  return {
+    pistol: e?.pistol ?? null,
+    pistolGanhos: e?.pistolGanhos ?? null,
+    eco: e?.eco ?? null,
+    ecoGanhos: e?.ecoGanhos ?? null,
+    meia: e?.meia ?? null,
+    meiaGanhas: e?.meiaGanhas ?? null,
+    cheia: e?.cheia ?? null,
+    cheiaGanhas: e?.cheiaGanhas ?? null,
+  };
 }
 
 /**
