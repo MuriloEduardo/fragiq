@@ -6,6 +6,7 @@ import { getSession } from "@/lib/session";
 import { carregarScoreboard, type Scoreboard } from "@/lib/partidas";
 import { metricasDaPartida, type ConversaoGravada, type MetricasDaPartida } from "@/lib/demos";
 import { conversaoDosTimes, vantagens } from "@/lib/demo/conversao";
+import { LIMITE_CHEIA, LIMITE_ECO, type ClasseEconomica, type PorCompra } from "@/lib/demo/economia";
 import { formatarQuando } from "@/lib/sessoes";
 import { rotularMapa } from "@/lib/cs2-labels";
 import { SteamMark } from "@/components/steam-mark";
@@ -220,9 +221,72 @@ function Time({
           ))}
         </tbody>
       </table>
+      <PorCompraDoTime time={time} metricas={metricas} />
       <Conversao c={conversao} />
       <Ritmo c={conversao} />
     </section>
+  );
+}
+
+const CLASSES: { classe: ClasseEconomica; rotulo: string }[] = [
+  { classe: "pistol", rotulo: "Pistol" },
+  { classe: "eco", rotulo: "Eco" },
+  { classe: "meia", rotulo: "Meia" },
+  { classe: "cheia", rotulo: "Cheia" },
+];
+
+/**
+ * O ADR e as kills de cada um separados pela compra do time no round
+ * (src/lib/demo/economia.ts): um ADR de 90 que veio todo de compra cheia
+ * não é o mesmo de um que segurou os ecos. Só aparece em demo lida com a
+ * economia (payload v2), e só com as classes que o time jogou. O número
+ * no cabeçalho são os rounds do time naquela compra.
+ */
+function PorCompraDoTime({ time, metricas }: { time: Scoreboard["times"][number]; metricas: MetricasDaPartida }) {
+  const linhas = time.jogadores.map((j) => ({ j, c: (metricas.get(j.steamId)?.porCompra ?? null) as PorCompra | null }));
+  if (!linhas.some((l) => l.c)) return null;
+  const colunas = CLASSES.map((k) => ({ ...k, rounds: Math.max(0, ...linhas.map((l) => l.c?.[k.classe]?.rounds ?? 0)) })).filter((k) => k.rounds > 0);
+  return (
+    <div
+      className="border-t border-line-soft"
+      title={`Compra do time no fim do freeze, pela média do equipamento: eco abaixo de ${LIMITE_ECO.toLocaleString("pt-BR")}, cheia a partir de ${LIMITE_CHEIA.toLocaleString("pt-BR")}, meia entre os dois; pistol é o primeiro round de cada metade com dinheiro de eco. Cada célula é o ADR e as kills do jogador nesses rounds.`}
+    >
+      <p className="hud px-4 pt-2.5">ADR por compra</p>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left">
+            <th className="sr-only">Jogador</th>
+            {colunas.map((k) => (
+              <th key={k.classe} className="hud px-3 py-2 text-right font-normal">
+                {k.rotulo} <span className="text-ink-faint">{k.rounds}</span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="num">
+          {linhas.map(({ j, c }) => (
+            <tr key={j.steamId} className="border-t border-line-soft">
+              <td className="truncate px-4 py-1.5 font-sans text-ink-muted">{j.nome ?? j.steamId}</td>
+              {colunas.map((k) => {
+                const na = c?.[k.classe];
+                return (
+                  <td key={k.classe} className="px-3 py-1.5 text-right">
+                    {na && na.rounds > 0 ? (
+                      <>
+                        {Math.round(na.dano / na.rounds)}
+                        <span className="ml-1.5 text-ink-faint">{na.kills}k</span>
+                      </>
+                    ) : (
+                      <span className="text-ink-faint">–</span>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

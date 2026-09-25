@@ -571,6 +571,10 @@ model MatchPlayerDemo {
   vidaMediaS Float?
   /// Segundos em cada zona do mapa, por lado: `{ "CT": { "BombsiteA": 120 }, "T": {…} }`.
   zonas Json?
+  /// ADR e kills pela compra do time no round (`src/lib/demo/economia.ts`):
+  /// `{ "eco": { "rounds": 3, "kills": 1, "dano": 120 }, "cheia": {…} }`.
+  /// Nulo em demo sem `round.economia` (payload v1).
+  porCompra Json?
 
   /// O `rank_update` da demo: tipo 11 é o CS Rating do Premier.
   ratingTipo     Int?

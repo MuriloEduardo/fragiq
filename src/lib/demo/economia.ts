@@ -1,4 +1,4 @@
-import { roundsJogados } from "./metricas";
+import { danosEntreLados, ladosPorRound, roundsJogados } from "./metricas";
 import { timesPorRound } from "./conversao";
 import type { DemoPayload, Lado } from "./payload";
 
@@ -114,4 +114,61 @@ export function economiaDaDemo(p: DemoPayload): EconomiaDeTime[] {
     if (l.venceu) acc[l.time][ganhos]++;
   }
   return acc.filter((a) => a.pistol + a.eco + a.meia + a.cheia > 0);
+}
+
+/** Rounds, kills e dano de um jogador nos rounds de uma classe; o ADR é `dano / rounds`. */
+export type NaCompra = { rounds: number; kills: number; dano: number };
+export type PorCompra = Partial<Record<ClasseEconomica, NaCompra>>;
+
+/**
+ * O ADR e as kills de cada jogador separados pela compra do **time dele**
+ * no round: ADR num eco ao lado de ADR numa compra cheia, em vez de uma
+ * média só que mistura os dois.
+ *
+ * Mesmas definições de `metricas.ts` — kill em inimigo, dano entre lados
+ * limitado à vida da vítima —, então a soma das classes é o total da
+ * partida nos rounds que têm amostra. Round sem amostra do lado do
+ * jogador fica fora; demo sem amostra nenhuma devolve mapa vazio. Só entra
+ * classe em que o jogador jogou.
+ */
+export function porCompraDaDemo(p: DemoPayload): Map<string, PorCompra> {
+  const saida = new Map<string, PorCompra>();
+  const linhas = economiaDosRounds(p);
+  if (linhas.length === 0) return saida;
+  const classeDe = new Map(linhas.map((l) => [`${l.n}:${l.lado}`, l.classe]));
+  const lados = ladosPorRound(p);
+  const porRound = new Map<number, DemoPayload["eventos"]>();
+  for (const e of p.eventos) {
+    if (e.t === "rank") continue;
+    if (!porRound.has(e.round)) porRound.set(e.round, []);
+    porRound.get(e.round)!.push(e);
+  }
+  const na = (quem: string, c: ClasseEconomica) => {
+    let doJogador = saida.get(quem);
+    if (!doJogador) saida.set(quem, (doJogador = {}));
+    return (doJogador[c] ??= { rounds: 0, kills: 0, dano: 0 });
+  };
+  for (const round of roundsJogados(p)) {
+    const lado = lados.get(round.n);
+    if (!lado) continue;
+    const classeDoJogador = (quem: string) => {
+      const l = lado.get(quem);
+      return l ? classeDe.get(`${round.n}:${l}`) : undefined;
+    };
+    for (const quem of lado.keys()) {
+      const c = classeDoJogador(quem);
+      if (c) na(quem, c).rounds++;
+    }
+    const eventos = porRound.get(round.n) ?? [];
+    for (const e of eventos) {
+      if (e.t !== "morte" || !e.autor || !e.ladoAutor || e.ladoAutor === e.ladoVitima) continue;
+      const c = classeDoJogador(e.autor);
+      if (c) na(e.autor, c).kills++;
+    }
+    for (const d of danosEntreLados(eventos, lado)) {
+      const c = classeDoJogador(d.autor);
+      if (c) na(d.autor, c).dano += d.efetivo;
+    }
+  }
+  return saida;
 }
