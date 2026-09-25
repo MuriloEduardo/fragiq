@@ -53,12 +53,11 @@ abrindo.
 Os dados não se perderam: o branch do Neon está intacto, só o compute
 recusa conexão porque a cota do plano acabou. Duas saídas:
 
-1. **Subir o projeto do Neon para um plano pago por um dia** (recomendado).
-   O limite cai na hora, você faz o passo 2 e depois volta para o free ou
-   apaga o projeto.
-2. **Esperar a cota zerar** no começo do próximo ciclo de cobrança (a data
-   está na página de billing do Neon). Não custa nada, mas o histórico
-   fica fora do site até lá.
+1. **Esperar a cota zerar** no começo do próximo ciclo de cobrança (a data
+   está na página de billing do Neon). Não custa nada; é o caminho
+   escolhido. O histórico fica fora do site até lá.
+2. **Subir o projeto do Neon para um plano pago por um dia.** O limite cai
+   na hora, mas custa dinheiro; só se não der para esperar.
 
 Restaurar um branch não ajuda: os dados não estão danificados, e o restore
 também precisa de compute.
