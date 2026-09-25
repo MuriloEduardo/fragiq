@@ -278,7 +278,13 @@ Três decisões:
   round só é pistol quando o time entrou nele com equipamento de eco.
 
 `economiaDaDemo` conta, por time (a mesma identidade de `timesPorRound`),
-quantos rounds de cada classe ele jogou e venceu; ainda não é gravada.
+quantos rounds de cada classe ele jogou e venceu. Gravado em
+`MatchTeamDemo.pistol`/`pistolGanhos`… (25/09) e mostrado no rodapé de
+cada time na página da partida ("eco 1 de 3 · cheia 5 de 8"). O vazio é
+**nulo**, não zero: demo lida em payload v1 não tem amostra, e "0 rounds
+de eco" diria que o time comprou em todos. Demo v2 gravada antes da coluna
+ganha o número no `npm run recompute:demos`. Testes:
+`tests/lib/demos-gravar.test.ts`.
 
 `porCompraDaDemo` (25/09) separa o ADR e as kills de cada jogador pela
 compra do **time dele** no round, com as definições de §4 (kill em

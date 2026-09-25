@@ -224,6 +224,7 @@ function Time({
       <PorCompraDoTime time={time} metricas={metricas} />
       <Conversao c={conversao} />
       <Ritmo c={conversao} />
+      <Economia c={conversao} />
     </section>
   );
 }
@@ -287,6 +288,39 @@ function PorCompraDoTime({ time, metricas }: { time: Scoreboard["times"][number]
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Com que compra o time jogou e o que venceu com cada uma
+ * (src/lib/demo/economia.ts): "eco 1 de 3 · cheia 5 de 8". Nulo é demo
+ * lida antes do payload v2 — sem amostra, sem rodapé; a classe que o time
+ * não jogou fica fora da frase.
+ */
+function Economia({ c }: { c: ConversaoGravada | null }) {
+  if (!c || c.pistol == null) return null;
+  const contagem = {
+    pistol: [c.pistolGanhos, c.pistol],
+    eco: [c.ecoGanhos, c.eco],
+    meia: [c.meiaGanhas, c.meia],
+    cheia: [c.cheiaGanhas, c.cheia],
+  } as const;
+  const partes = CLASSES.map(({ classe, rotulo }) => [rotulo, ...contagem[classe]] as const).filter(([, , jogados]) => (jogados ?? 0) > 0);
+  if (partes.length === 0) return null;
+  const n = (v: number) => v.toLocaleString("pt-BR");
+  return (
+    <p
+      className="border-t border-line-soft px-4 py-2.5 text-sm text-ink-muted"
+      title={`Rounds vencidos de jogados, pela compra do time no fim do freeze (média por jogador): eco abaixo de ${n(LIMITE_ECO)}, cheia a partir de ${n(LIMITE_CHEIA)}, meia no meio; pistol é o primeiro round de cada metade com dinheiro de eco.`}
+    >
+      <span className="hud mr-2">economia</span>
+      {partes.map(([rotulo, ganhos, jogados], i) => (
+        <span key={rotulo}>
+          {i > 0 && <span className="text-ink-faint"> · </span>}
+          {rotulo.toLowerCase()} <b className="num text-ink">{ganhos ?? 0} de {jogados}</b>
+        </span>
+      ))}
+    </p>
   );
 }
 

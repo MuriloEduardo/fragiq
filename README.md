@@ -309,7 +309,10 @@ a vantagem numérica e a bomba plantada que viraram round — "converteu 2 de
 primeiro contato e a plantada — de T é o ritmo que o time impõe, de CT o
 que ele sofre. Desde 24/09/2026 o parser do bot colhe também o dinheiro e
 o equipamento de cada um no fim do freeze (payload v2), de que sai a classe
-do round de cada time — pistol, eco, meia ou cheia —, ainda sem tela. O que a demo tem, o custo medido e a linguagem tática que
+do round de cada time — pistol, eco, meia ou cheia. Desde 25/09/2026 ela
+está na página da partida: "eco 1 de 3 · cheia 5 de 8" no rodapé de cada
+time e o ADR de cada um separado pela compra; demo lida antes da v2 fica
+sem esses números, em vez de zeros. O que a demo tem, o custo medido e a linguagem tática que
 falta construir estão em [docs/demos.md](docs/demos.md).
 
 Existem cinco caminhos para chegar lá, com credenciais e custos diferentes:
