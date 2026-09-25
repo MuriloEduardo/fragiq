@@ -35,6 +35,12 @@ export function AtivarPartidas({ compacto = false, religar = false }: { compacto
 
   function colar(valor: string, campo: "auth" | "share") {
     const { auth, share } = separarCodigos(valor);
+    if (auth && share) {
+      setAuthCode(auth);
+      setShareCode(share);
+      setTrocarShare(true);
+      return;
+    }
     if (campo === "auth" && share) {
       setShareCode(share);
       setTrocarShare(true);
