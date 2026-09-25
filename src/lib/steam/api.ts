@@ -1,4 +1,5 @@
 import { CogniflowApiError, invocar } from "../cogniflow-api";
+import { registrar } from "../eventos";
 
 /**
  * A Steam, vista daqui, é um conjunto de capabilities do cogniflow.
@@ -26,13 +27,21 @@ export class SteamApiError extends Error {
  * como sempre foi (403 = chave; quem chama decide se é fatal). Qualquer
  * outra falha — cogniflow fora, grant faltando, payload recusado — sobe
  * como está: não é a Steam dizendo não, é a nossa integração quebrada.
+ *
+ * Toda recusa deixa uma linha `steam.recusa` no diário com os dois
+ * status, inclusive as que quem chama engole (schema, preço). Toda a
+ * coleta sai de IPs compartilhados da Vercel, e um 429 da Steam bem antes
+ * da cota diária é plausível; sem o registro ele seria só "o sync falhou".
  */
 async function capability<T>(id: string, input: Record<string, unknown>): Promise<T> {
   try {
     return await invocar<T>(id, input);
   } catch (err) {
-    if (err instanceof CogniflowApiError && err.providerStatus !== null) {
-      throw new SteamApiError(id, err.providerStatus);
+    if (err instanceof CogniflowApiError) {
+      await registrar("steam.recusa", {
+        dados: { capability: id, status: err.status, providerStatus: err.providerStatus },
+      });
+      if (err.providerStatus !== null) throw new SteamApiError(id, err.providerStatus);
     }
     throw err;
   }

@@ -10,6 +10,7 @@ import {
   getPlayerSummary,
   getUserStatsForGame,
   type OwnedGame,
+  type SteamPlayer,
 } from "./api";
 
 /**
@@ -77,19 +78,28 @@ export type MatchContext = {
  */
 export type Proveniencia = { syncRunId: string; trigger: SyncTrigger; traceId: string };
 
+/**
+ * `perfil` é o resumo do jogador já lido por quem chama: o cron pede os
+ * perfis de todo o lote numa chamada só (a Steam aceita 100 SteamIDs), em
+ * vez de uma por usuário. `null` é "a Steam não devolveu este perfil";
+ * ausente, a coleta lê o perfil sozinha, como sempre.
+ */
+export type OpcoesSync = { perfil?: SteamPlayer | null };
+
 export async function syncUser(
   userId: string,
   steamId: string,
   trigger: SyncTrigger = "MANUAL",
   context?: MatchContext,
   traceId: string = crypto.randomUUID(),
+  opcoes: OpcoesSync = {},
 ): Promise<SyncResult> {
   const run = await prisma.syncRun.create({
     data: { userId, trigger, status: "RUNNING", traceId },
   });
 
   try {
-    const result = await runSync(userId, steamId, { syncRunId: run.id, trigger, traceId }, context);
+    const result = await runSync(userId, steamId, { syncRunId: run.id, trigger, traceId }, context, opcoes);
 
     await prisma.$transaction([
       prisma.syncRun.update({
@@ -123,9 +133,10 @@ async function runSync(
   steamId: string,
   proveniencia: Proveniencia,
   context?: MatchContext,
+  opcoes: OpcoesSync = {},
 ): Promise<SyncResult> {
   const { trigger } = proveniencia;
-  const summary = await getPlayerSummary(steamId);
+  const summary = opcoes.perfil !== undefined ? opcoes.perfil : await getPlayerSummary(steamId);
   // 3 = público. Abaixo disso a Steam responde vazio para biblioteca e
   // stats, e vazio não pode ser lido como "o jogo não tem stats".
   const perfilPublico = summary?.communityvisibilitystate === 3;

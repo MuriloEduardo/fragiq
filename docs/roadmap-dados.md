@@ -146,12 +146,12 @@ coloca sob sua guarda uma credencial que move skins. Ver
 
 Coisas pequenas que o crescimento transforma em incidente:
 
-- **Agrupar `GetPlayerSummaries`.** Aceita 100 SteamIDs por chamada; o cron
-  faz uma por usuário. Ganho imediato ao escalar.
+- ~~**Agrupar `GetPlayerSummaries`.**~~ Feito em 25/09: o cron lê os perfis
+  do lote numa chamada só e entrega cada um a `syncUser` (`opcoes.perfil`).
 - **Cron do plano Hobby.** 1×/dia com 60s de função dá ~25 usuários/dia. O
   campo `skipped` na resposta do cron avisa quando a fila deixa de ser
   vazada — é o gatilho para migrar para Pro ou para um worker.
 - **Limites por IP não documentados.** Como toda a coleta sai de um IP da
   Vercel compartilhado, um `429` inesperado é plausível bem antes dos 100k
-  diários. Vale registrar o status das respostas da Steam antes que isso
-  vire um mistério de produção.
+  diários. Desde 25/09 toda recusa deixa `steam.recusa` no diário
+  (`/admin`), com o status do cogniflow e o da Steam.
