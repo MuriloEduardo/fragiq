@@ -24,10 +24,12 @@ describe("separarCodigos", () => {
   it("separa os dois códigos colados juntos, com ou sem espaço entre eles", () => {
     expect(separarCodigos(`7k8s-ynxhw-bfqn${SHARE}`)).toEqual({ auth: "7K8S-YNXHW-BFQN", share: SHARE });
     expect(separarCodigos(`${SHARE} 7K8S-YNXHW-BFQN`)).toEqual({ auth: "7K8S-YNXHW-BFQN", share: SHARE });
+    expect(separarCodigos(`${SHARE}7k8s-ynxhw-bfqn`)).toEqual({ auth: "7K8S-YNXHW-BFQN", share: SHARE });
   });
 
   it("não corta um share code com caractere sobrando no fim", () => {
     expect(separarCodigos(`${SHARE}x`)).toEqual({});
+    expect(separarCodigos(`${SHARE}-`)).toEqual({});
   });
 
   it("não quebra com um link copiado pela metade", () => {

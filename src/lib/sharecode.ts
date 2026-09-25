@@ -15,8 +15,12 @@ export function shareCodeValido(codigo: string): boolean {
   return FORMATO.test(normalizarShareCode(codigo));
 }
 
-/** Onde está o share code no meio do que foi colado. Um caractere a mais no fim é código errado, não sobra. */
-const NO_TEXTO = /CSGO(?:-[A-Za-z0-9]{5}){5}(?![A-Za-z0-9])/;
+/**
+ * Onde está o share code no meio do que foi colado. Um caractere (ou hífen)
+ * a mais no fim é código errado, não sobra — a não ser que seja o código de
+ * autenticação colado logo depois, sem nada entre os dois.
+ */
+const NO_TEXTO = /CSGO(?:-[A-Za-z0-9]{5}){5}(?:(?![A-Za-z0-9-])|(?=[A-Za-z0-9]{4}-[A-Za-z0-9]{5}-[A-Za-z0-9]{4}(?![A-Za-z0-9-])))/;
 
 /**
  * Um link copiado pela metade (`...match%2`) não é URI válida e o
